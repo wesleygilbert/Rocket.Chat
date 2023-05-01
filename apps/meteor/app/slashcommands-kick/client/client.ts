@@ -1,10 +1,8 @@
-import type { SlashCommandCallbackParams } from '@rocket.chat/core-typings';
-
 import { slashCommands } from '../../utils/lib/slashCommand';
 
 slashCommands.add({
 	command: 'kick',
-	callback({ params }: SlashCommandCallbackParams<'kick'>) {
+	callback(_command: 'kick', params: string) {
 		const username = params.trim();
 		if (username === '') {
 			return;

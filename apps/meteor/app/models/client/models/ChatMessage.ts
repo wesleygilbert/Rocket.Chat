@@ -1,12 +1,7 @@
 import type { IMessage, IRoom } from '@rocket.chat/core-typings';
 import { Mongo } from 'meteor/mongo';
 
-import type { MinimongoCollection } from '../../../../client/definitions/MinimongoCollection';
-
-class ChatMessageCollection
-	extends Mongo.Collection<IMessage & { ignored?: boolean }>
-	implements MinimongoCollection<IMessage & { ignored?: boolean }>
-{
+class ChatMessageCollection extends Mongo.Collection<IMessage & { ignored?: boolean }> {
 	constructor() {
 		super(null);
 	}
@@ -19,11 +14,14 @@ class ChatMessageCollection
 
 		return this.findOne(query, options);
 	}
-
-	public declare _collection: MinimongoCollection<IMessage & { ignored?: boolean }>['_collection'];
-
-	public declare queries: MinimongoCollection<IMessage & { ignored?: boolean }>['queries'];
 }
 
-/** @deprecated */
-export const ChatMessage = new ChatMessageCollection();
+// TODO: check if we can dodge these missing typings from Meteor Collection Hooks
+export const ChatMessage = new ChatMessageCollection() as unknown as Mongo.Collection<
+	Omit<IMessage, '_id'> & { ignored?: boolean },
+	IMessage & { ignored?: boolean }
+> & {
+	direct: Mongo.Collection<Omit<IMessage, '_id'>, IMessage>;
+
+	queries: unknown[];
+};

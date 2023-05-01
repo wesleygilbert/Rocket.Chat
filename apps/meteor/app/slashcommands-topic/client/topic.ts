@@ -1,5 +1,4 @@
 import { Meteor } from 'meteor/meteor';
-import type { SlashCommandCallbackParams } from '@rocket.chat/core-typings';
 
 import { slashCommands } from '../../utils/lib/slashCommand';
 import { ChatRoom } from '../../models/client/models/ChatRoom';
@@ -9,15 +8,16 @@ import { dispatchToastMessage } from '../../../client/lib/toast';
 
 slashCommands.add({
 	command: 'topic',
-	callback: async function Topic({ params, message }: SlashCommandCallbackParams<'topic'>): Promise<void> {
-		if (hasPermission('edit-room', message.rid)) {
-			try {
-				await Meteor.callAsync('saveRoomSettings', message.rid, 'roomTopic', params);
-				await callbacks.run('roomTopicChanged', ChatRoom.findOne(message.rid));
-			} catch (error: unknown) {
-				dispatchToastMessage({ type: 'error', message: error });
-				throw error;
-			}
+	callback: function Topic(_command: 'topic', params, item): void {
+		if (hasPermission('edit-room', item.rid)) {
+			Meteor.call('saveRoomSettings', item.rid, 'roomTopic', params, (error: Meteor.Error) => {
+				if (error) {
+					dispatchToastMessage({ type: 'error', message: error });
+					throw error;
+				}
+
+				callbacks.run('roomTopicChanged', ChatRoom.findOne(item.rid));
+			});
 		}
 	},
 	options: {

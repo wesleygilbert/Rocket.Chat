@@ -1,8 +1,7 @@
-import { Users } from './fixtures/userStates';
-import { HomeChannel } from './page-objects';
 import { test, expect } from './utils/test';
+import { HomeChannel } from './page-objects';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 test.describe.serial('message-mentions', () => {
 	let poHomeChannel: HomeChannel;
@@ -17,7 +16,7 @@ test.describe.serial('message-mentions', () => {
 		await poHomeChannel.sidenav.openChat('general');
 		await poHomeChannel.content.inputMessage.type('@');
 
-		await expect(poHomeChannel.content.messagePopupUsers.locator('role=listitem >> text="all"')).toBeVisible();
-		await expect(poHomeChannel.content.messagePopupUsers.locator('role=listitem >> text="here"')).toBeVisible();
+		await expect(poHomeChannel.content.messagePopUpItems.locator('strong >> text=all')).toBeVisible();
+		await expect(poHomeChannel.content.messagePopUpItems.locator('strong >> text=here')).toBeVisible();
 	});
 });

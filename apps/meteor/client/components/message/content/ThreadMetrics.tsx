@@ -7,6 +7,7 @@ import { useTimeAgo } from '../../../hooks/useTimeAgo';
 import { useToggleFollowingThreadMutation } from '../../../views/room/contextualBar/Threads/hooks/useToggleFollowingThreadMutation';
 import { useGoToThread } from '../../../views/room/hooks/useGoToThread';
 import { followStyle, anchor } from '../helpers/followSyle';
+import { useBlockRendered } from '../hooks/useBlockRendered';
 import AllMentionNotification from '../notification/AllMentionNotification';
 import MeMentionNotification from '../notification/MeMentionNotification';
 import UnreadMessagesNotification from '../notification/UnreadMessagesNotification';
@@ -24,6 +25,7 @@ type ThreadMetricsProps = {
 };
 
 const ThreadMetrics = ({ unread, mention, all, rid, mid, counter, participants, following, lm }: ThreadMetricsProps): ReactElement => {
+	const { className, ref } = useBlockRendered<HTMLDivElement>();
 	const t = useTranslation();
 
 	const format = useTimeAgo();
@@ -38,13 +40,14 @@ const ThreadMetrics = ({ unread, mention, all, rid, mid, counter, participants, 
 	});
 
 	const handleFollow = useCallback(() => {
-		toggleFollowingThreadMutation.mutate({ rid, tmid: mid, follow: !following });
-	}, [following, rid, mid, toggleFollowingThreadMutation]);
+		toggleFollowingThreadMutation.mutate({ tmid: mid, follow: !following });
+	}, [following, mid, toggleFollowingThreadMutation]);
 
 	return (
 		<MessageBlock className={followStyle}>
+			<div className={className} ref={ref} />
 			<MessageMetrics>
-				<MessageMetricsReply data-rid={rid} data-mid={mid} onClick={() => goToThread({ rid, tmid: mid })}>
+				<MessageMetricsReply data-rid={rid} data-mid={mid} onClick={() => goToThread(mid)}>
 					{t('Reply')}
 				</MessageMetricsReply>
 				<MessageMetricsItem title={t('Replies')}>
@@ -69,13 +72,11 @@ const ThreadMetrics = ({ unread, mention, all, rid, mid, counter, participants, 
 				>
 					<MessageMetricsFollowing name={following ? 'bell' : 'bell-off'} />
 				</MessageMetricsItem>
-				{(mention || all || unread) && (
-					<MessageMetricsItem>
-						<MessageMetricsItem.Label>
-							{(mention && <MeMentionNotification />) || (all && <AllMentionNotification />) || (unread && <UnreadMessagesNotification />)}
-						</MessageMetricsItem.Label>
-					</MessageMetricsItem>
-				)}
+				<MessageMetricsItem>
+					<MessageMetricsItem.Label>
+						{(mention && <MeMentionNotification />) || (all && <AllMentionNotification />) || (unread && <UnreadMessagesNotification />)}
+					</MessageMetricsItem.Label>
+				</MessageMetricsItem>
 			</MessageMetrics>
 		</MessageBlock>
 	);

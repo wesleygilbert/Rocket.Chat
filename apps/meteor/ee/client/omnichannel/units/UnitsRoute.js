@@ -1,12 +1,11 @@
 import { Table } from '@rocket.chat/fuselage';
 import { useDebouncedValue, useMutableCallback } from '@rocket.chat/fuselage-hooks';
-import { useEndpoint, useRouteParameter, useRoute, usePermission, useTranslation } from '@rocket.chat/ui-contexts';
-import { useQuery } from '@tanstack/react-query';
+import { useRouteParameter, useRoute, usePermission, useTranslation } from '@rocket.chat/ui-contexts';
 import React, { useMemo, useCallback, useState } from 'react';
 
 import GenericTable from '../../../../client/components/GenericTable';
+import { useEndpointData } from '../../../../client/hooks/useEndpointData';
 import NotAuthorizedPage from '../../../../client/views/notAuthorized/NotAuthorizedPage';
-import { useHasLicenseModule } from '../../hooks/useHasLicenseModule';
 import RemoveUnitButton from './RemoveUnitButton';
 import UnitEdit from './UnitEdit';
 import UnitEditWithData from './UnitEditWithData';
@@ -14,7 +13,7 @@ import UnitsPage from './UnitsPage';
 
 const sortDir = (sortDir) => (sortDir === 'asc' ? 1 : -1);
 
-const useQueryFilter = ({ text, itemsPerPage, current }, [column, direction]) =>
+const useQuery = ({ text, itemsPerPage, current }, [column, direction]) =>
 	useMemo(
 		() => ({
 			fields: JSON.stringify({ name: 1 }),
@@ -32,14 +31,13 @@ const useQueryFilter = ({ text, itemsPerPage, current }, [column, direction]) =>
 function UnitsRoute() {
 	const t = useTranslation();
 	const canViewUnits = usePermission('manage-livechat-units');
-	const isEnterprise = useHasLicenseModule('livechat-enterprise');
 
 	const [params, setParams] = useState({ text: '', current: 0, itemsPerPage: 25 });
 	const [sort, setSort] = useState(['name', 'asc']);
 
 	const debouncedParams = useDebouncedValue(params, 500);
 	const debouncedSort = useDebouncedValue(sort, 500);
-	const query = useQueryFilter(debouncedParams, debouncedSort);
+	const query = useQuery(debouncedParams, debouncedSort);
 	const unitsRoute = useRoute('omnichannel-units');
 	const context = useRouteParameter('context');
 	const id = useRouteParameter('id');
@@ -62,8 +60,7 @@ function UnitsRoute() {
 			}),
 	);
 
-	const getUnits = useEndpoint('GET', '/v1/livechat/units', { params: query });
-	const { data, refetch: reload } = useQuery(['/v1/livechat/units'], () => getUnits());
+	const { value: data = {}, reload } = useEndpointData('/v1/livechat/units', { params: query });
 
 	const header = useMemo(
 		() =>
@@ -106,7 +103,7 @@ function UnitsRoute() {
 		return <UnitEdit title={t('New_Unit')} reload={reload} isNew={true} />;
 	}
 
-	if (!(isEnterprise && canViewUnits)) {
+	if (!canViewUnits) {
 		return <NotAuthorizedPage />;
 	}
 
@@ -116,6 +113,7 @@ function UnitsRoute() {
 			params={params}
 			onHeaderClick={onHeaderClick}
 			data={data}
+			useQuery={useQuery}
 			reload={reload}
 			header={header}
 			renderRow={renderRow}

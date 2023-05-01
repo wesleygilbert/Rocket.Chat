@@ -54,7 +54,7 @@ const setPrometheusData = async (): Promise<void> => {
 	}
 
 	metrics.version.set({ version: statistics.version }, 1);
-	metrics.migration.set((await getControl()).version);
+	metrics.migration.set(getControl().version);
 	metrics.instanceCount.set(statistics.instanceCount);
 	metrics.oplogEnabled.set({ enabled: `${statistics.oplogEnabled}` }, 1);
 
@@ -94,18 +94,12 @@ const app = connect();
 
 app.use('/metrics', (_req, res) => {
 	res.setHeader('Content-Type', 'text/plain');
-	client.register
-		.metrics()
-		.then((data) => {
-			metrics.metricsRequests.inc();
-			metrics.metricsSize.set(data.length);
+	client.register.metrics().then((data) => {
+		metrics.metricsRequests.inc();
+		metrics.metricsSize.set(data.length);
 
-			res.end(data);
-		})
-		.catch((err) => {
-			SystemLogger.error({ msg: 'Error while collecting metrics', err });
-			res.end();
-		});
+		res.end(data);
+	});
 });
 
 app.use('/', (_req, res) => {
@@ -125,8 +119,8 @@ app.use('/', (_req, res) => {
 
 const server = http.createServer(app);
 
-let timer: NodeJS.Timeout;
-let resetTimer: NodeJS.Timeout;
+let timer: number;
+let resetTimer: number;
 let defaultMetricsInitiated = false;
 let gcStatsInitiated = false;
 const was = {
@@ -155,7 +149,7 @@ const updatePrometheusConfig = async (): Promise<void> => {
 		if (was.enabled) {
 			SystemLogger.info('Disabling Prometheus');
 			server.close();
-			clearInterval(timer);
+			Meteor.clearInterval(timer);
 		}
 		Object.assign(was, is);
 		return;
@@ -169,23 +163,18 @@ const updatePrometheusConfig = async (): Promise<void> => {
 			host: process.env.BIND_IP || '0.0.0.0',
 		});
 
-		timer = setInterval(setPrometheusData, 5000);
+		timer = Meteor.setInterval(setPrometheusData, 5000);
 	}
 
-	clearInterval(resetTimer);
+	Meteor.clearInterval(resetTimer);
 	if (is.resetInterval) {
-		resetTimer = setInterval(() => {
-			client.register
-				.getMetricsAsArray()
-				.then((metrics) => {
-					metrics.forEach((metric) => {
-						// @ts-expect-error Property 'hashMap' does not exist on type 'metric'.
-						metric.hashMap = {};
-					});
-				})
-				.catch((err) => {
-					SystemLogger.error({ msg: 'Error while collecting metrics', err });
+		resetTimer = Meteor.setInterval(() => {
+			client.register.getMetricsAsArray().then((metrics) => {
+				metrics.forEach((metric) => {
+					// @ts-expect-error Property 'hashMap' does not exist on type 'metric'.
+					metric.hashMap = {};
 				});
+			});
 		}, is.resetInterval);
 	}
 

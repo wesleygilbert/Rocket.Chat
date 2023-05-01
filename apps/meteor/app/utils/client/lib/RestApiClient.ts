@@ -5,7 +5,7 @@ import { Accounts } from 'meteor/accounts-base';
 import { baseURI } from '../../../../client/lib/baseURI';
 import { process2faReturn } from '../../../../client/lib/2fa/process2faReturn';
 
-class RestApiClient extends RestClient {
+export class RestApiClient extends RestClient {
 	getCredentials():
 		| {
 				'X-User-Id': string;
@@ -39,7 +39,7 @@ APIClient.use(async function (request, next) {
 		const e = await error.json();
 
 		return new Promise(async (resolve, reject) => {
-			await process2faReturn({
+			process2faReturn({
 				error: e,
 				result: null,
 				emailOrUsername: undefined,

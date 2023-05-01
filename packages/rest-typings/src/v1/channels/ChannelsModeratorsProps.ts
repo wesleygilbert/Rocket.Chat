@@ -2,9 +2,7 @@ import Ajv from 'ajv';
 
 const ajv = new Ajv();
 
-export type ChannelsModeratorsProps =
-	| { roomId: string; userId?: string; username?: string; user?: string }
-	| { roomName: string; userId?: string; username?: string; user?: string };
+export type ChannelsModeratorsProps = { roomId: string } | { roomName: string };
 
 const channelsModeratorsPropsSchema = {
 	oneOf: [
@@ -12,18 +10,6 @@ const channelsModeratorsPropsSchema = {
 			type: 'object',
 			properties: {
 				roomId: { type: 'string' },
-				userId: {
-					type: 'string',
-					nullable: true,
-				},
-				username: {
-					type: 'string',
-					nullable: true,
-				},
-				user: {
-					type: 'string',
-					nullable: true,
-				},
 			},
 			required: ['roomId'],
 
@@ -33,18 +19,6 @@ const channelsModeratorsPropsSchema = {
 			type: 'object',
 			properties: {
 				roomName: { type: 'string' },
-				userId: {
-					type: 'string',
-					nullable: true,
-				},
-				username: {
-					type: 'string',
-					nullable: true,
-				},
-				user: {
-					type: 'string',
-					nullable: true,
-				},
 			},
 			required: ['roomName'],
 

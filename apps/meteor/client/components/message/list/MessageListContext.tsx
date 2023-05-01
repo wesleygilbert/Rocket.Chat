@@ -24,8 +24,6 @@ export type MessageListContextValue = {
 	};
 	autoTranslateLanguage?: string;
 	showColors: boolean;
-	jumpToMessageParam?: string;
-	scrollMessageList?: (callback: (wrapper: HTMLDivElement | null) => ScrollToOptions | void) => void;
 };
 
 export const MessageListContext = createContext<MessageListContextValue>({
@@ -46,7 +44,6 @@ export const MessageListContext = createContext<MessageListContextValue>({
 	showRealName: false,
 	showUsername: false,
 	showColors: false,
-	scrollMessageList: () => undefined,
 });
 
 export const useShowTranslated: MessageListContextValue['useShowTranslated'] = (...args) =>
@@ -61,9 +58,7 @@ export const useMessageListShowRoles = (): MessageListContextValue['showRoles'] 
 export const useMessageListShowRealName = (): MessageListContextValue['showRealName'] => useContext(MessageListContext).showRealName;
 export const useMessageListShowUsername = (): MessageListContextValue['showUsername'] => useContext(MessageListContext).showUsername;
 export const useMessageListHighlights = (): MessageListContextValue['highlights'] => useContext(MessageListContext).highlights;
-export const useMessageListJumpToMessageParam = (): MessageListContextValue['jumpToMessageParam'] =>
-	useContext(MessageListContext).jumpToMessageParam;
-export const useMessageListScroll = (): MessageListContextValue['scrollMessageList'] => useContext(MessageListContext).scrollMessageList;
+export const useMessageListKatex = (): MessageListContextValue['katex'] => useContext(MessageListContext).katex;
 
 export const useUserHasReacted: MessageListContextValue['useUserHasReacted'] = (message: IMessage) =>
 	useContext(MessageListContext).useUserHasReacted(message);
@@ -71,3 +66,5 @@ export const useOpenEmojiPicker: MessageListContextValue['useOpenEmojiPicker'] =
 	useContext(MessageListContext).useOpenEmojiPicker(...args);
 export const useReactionsFilter: MessageListContextValue['useReactionsFilter'] = (message: IMessage) =>
 	useContext(MessageListContext).useReactionsFilter(message);
+
+export const useMessageListContext = (): MessageListContextValue => useContext(MessageListContext);

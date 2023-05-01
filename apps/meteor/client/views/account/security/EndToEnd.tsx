@@ -35,7 +35,7 @@ const EndToEnd = (props: ComponentProps<typeof Box>): ReactElement => {
 
 	const handleLogout = useMutableCallback(() => {
 		Meteor.logout(() => {
-			void callbacks.run('afterLogoutCleanUp', user);
+			callbacks.run('afterLogoutCleanUp', user);
 			Meteor.call('logoutCleanUp', user);
 			homeRoute.push({});
 		});

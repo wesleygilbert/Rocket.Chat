@@ -7,10 +7,11 @@ import ChatsContextualBar from './ChatsContextualBar';
 import ContactContextualBar from './ContactContextualBar';
 
 type ContextualBarProps = {
+	contactReload?: () => void;
 	chatReload?: () => void;
 };
 
-const ContextualBar: FC<ContextualBarProps> = ({ chatReload }) => {
+const ContextualBar: FC<ContextualBarProps> = ({ contactReload, chatReload }) => {
 	const page = useRouteParameter('page');
 	const bar = useRouteParameter('bar');
 
@@ -20,7 +21,7 @@ const ContextualBar: FC<ContextualBarProps> = ({ chatReload }) => {
 
 	switch (page) {
 		case 'contacts':
-			return <ContactContextualBar />;
+			return <ContactContextualBar contactReload={contactReload} />;
 		case 'chats':
 			return <ChatsContextualBar chatReload={chatReload} />;
 		case 'calls':

@@ -1,14 +1,13 @@
 import { API } from '../api';
 import { getStatistics, getLastStatistics } from '../../../statistics/server';
 import telemetryEvent from '../../../statistics/server/lib/telemetryEvents';
-import { getPaginationItems } from '../helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'statistics',
 	{ authRequired: true },
 	{
 		async get() {
-			const { refresh = 'false' } = this.queryParams;
+			const { refresh = 'false' } = this.requestParams();
 
 			return API.v1.success(
 				await getLastStatistics({
@@ -25,8 +24,8 @@ API.v1.addRoute(
 	{ authRequired: true },
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { sort, fields, query } = await this.parseJsonQuery();
+			const { offset, count } = this.getPaginationItems();
+			const { sort, fields, query } = this.parseJsonQuery();
 
 			return API.v1.success(
 				await getStatistics({
@@ -49,11 +48,11 @@ API.v1.addRoute(
 	{ authRequired: true },
 	{
 		post() {
-			const events = this.bodyParams;
+			const events = this.requestParams();
 
-			events?.params?.forEach((event) => {
+			events.params.forEach((event) => {
 				const { eventName, ...params } = event;
-				void telemetryEvent.call(eventName, params);
+				telemetryEvent.call(eventName, params);
 			});
 
 			return API.v1.success();

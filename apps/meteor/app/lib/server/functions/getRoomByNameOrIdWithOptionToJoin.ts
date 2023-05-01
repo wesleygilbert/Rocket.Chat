@@ -1,76 +1,73 @@
 import { Meteor } from 'meteor/meteor';
+import _ from 'underscore';
 import type { IRoom, IUser, RoomType } from '@rocket.chat/core-typings';
-import { Rooms, Users } from '@rocket.chat/models';
 
-import { isObject } from '../../../../lib/utils/isObject';
-import { createDirectMessage } from '../../../../server/methods/createDirectMessage';
-import { addUserToRoom } from './addUserToRoom';
+import { Rooms, Users, Subscriptions } from '../../../models/server';
 
-export const getRoomByNameOrIdWithOptionToJoin = async ({
-	user,
+export const getRoomByNameOrIdWithOptionToJoin = ({
+	currentUserId = '',
 	nameOrId = '',
 	type,
 	tryDirectByUserIdOnly = false,
 	joinChannel = true,
 	errorOnEmpty = true,
 }: {
-	user: Pick<IUser, '_id' | 'username'>;
+	currentUserId?: string;
 	nameOrId: string;
 	type?: RoomType;
 	tryDirectByUserIdOnly?: boolean;
 	joinChannel?: boolean;
 	errorOnEmpty?: boolean;
-}): Promise<IRoom | null> => {
-	let room: IRoom | null;
+}): IRoom | undefined => {
+	let room: IRoom;
 
 	// If the nameOrId starts with #, then let's try to find a channel or group
 	if (nameOrId.startsWith('#')) {
 		nameOrId = nameOrId.substring(1);
-		room = await Rooms.findOneByIdOrName(nameOrId);
+		room = Rooms.findOneByIdOrName(nameOrId);
 	} else if (nameOrId.startsWith('@') || type === 'd') {
 		// If the nameOrId starts with @ OR type is 'd', then let's try just a direct message
 		nameOrId = nameOrId.replace('@', '');
 
-		let roomUser;
+		let roomUser: IUser;
 		if (tryDirectByUserIdOnly) {
-			roomUser = await Users.findOneById(nameOrId);
+			roomUser = Users.findOneById(nameOrId);
 		} else {
-			roomUser = await Users.findOne({
+			roomUser = Users.findOne({
 				$or: [{ _id: nameOrId }, { username: nameOrId }],
 			});
 		}
 
-		const rid = isObject(roomUser) ? [user._id, roomUser._id].sort().join('') : nameOrId;
-		room = await Rooms.findOneById(rid);
+		const rid = _.isObject(roomUser) ? [currentUserId, roomUser._id].sort().join('') : nameOrId;
+		room = Rooms.findOneById(rid);
 
 		// If the room hasn't been found yet, let's try some more
-		if (!isObject(room)) {
+		if (!_.isObject(room)) {
 			// If the roomUser wasn't found, then there's no destination to point towards
 			// so return out based upon errorOnEmpty
-			if (!isObject(roomUser)) {
+			if (!_.isObject(roomUser)) {
 				if (errorOnEmpty) {
 					throw new Meteor.Error('invalid-channel');
 				} else {
-					return null;
+					return;
 				}
 			}
 
-			await createDirectMessage([roomUser.username], user._id);
-
-			return Rooms.findOneById(rid);
+			room = Meteor.runAsUser(currentUserId, function () {
+				const { rid } = Meteor.call('createDirectMessage', roomUser.username);
+				return Rooms.findOneById(rid);
+			});
 		}
 	} else {
 		// Otherwise, we'll treat this as a channel or group.
-		room = await Rooms.findOneByIdOrName(nameOrId);
+		room = Rooms.findOneByIdOrName(nameOrId);
 	}
 
 	// If no room was found, handle the room return based upon errorOnEmpty
 	if (!room && errorOnEmpty) {
 		throw new Meteor.Error('invalid-channel');
-	}
-
-	if (room === null) {
-		return null;
+	} else if (!room) {
+		return;
 	}
 
 	// If a room was found and they provided a type to search, then check
@@ -80,14 +77,20 @@ export const getRoomByNameOrIdWithOptionToJoin = async ({
 		if (errorOnEmpty) {
 			throw new Meteor.Error('invalid-channel');
 		} else {
-			return null;
+			return;
 		}
 	}
 
 	// If the room type is channel and joinChannel has been passed, try to join them
 	// if they can't join the room, this will error out!
 	if (room.t === 'c' && joinChannel) {
-		await addUserToRoom(room._id, user);
+		const sub = Subscriptions.findOneByRoomIdAndUserId(room._id, currentUserId);
+
+		if (!sub) {
+			Meteor.runAsUser(currentUserId, function () {
+				return Meteor.call('joinRoom', room._id);
+			});
+		}
 	}
 
 	return room;

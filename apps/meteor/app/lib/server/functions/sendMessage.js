@@ -1,12 +1,13 @@
 import { Match, check } from 'meteor/check';
-import { Messages } from '@rocket.chat/models';
 
 import { settings } from '../../../settings/server';
 import { callbacks } from '../../../../lib/callbacks';
-import { Apps } from '../../../../ee/server/apps';
+import { Messages } from '../../../models/server';
+import { Apps } from '../../../apps/server';
 import { isURL } from '../../../../lib/utils/isURL';
 import { FileUpload } from '../../../file-upload/server';
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { hasPermission } from '../../../authorization/server';
+import { SystemLogger } from '../../../../server/lib/logger/system';
 import { parseUrlsInMessage } from './parseUrlsInMessage';
 import { isRelativeURL } from '../../../../lib/utils/isRelativeURL';
 import notifications from '../../../notifications/server/lib/Notifications';
@@ -128,18 +129,18 @@ const validateAttachment = (attachment) => {
 		}),
 	);
 
-	if (attachment.fields?.length) {
+	if (attachment.fields && attachment.fields.length) {
 		attachment.fields.map(validateAttachmentsFields);
 	}
 
-	if (attachment.actions?.length) {
+	if (attachment.actions && attachment.actions.length) {
 		attachment.actions.map(validateAttachmentsActions);
 	}
 };
 
 const validateBodyAttachments = (attachments) => attachments.map(validateAttachment);
 
-export const validateMessage = async (message, room, user) => {
+export const validateMessage = (message, room, user) => {
 	check(
 		message,
 		objectMaybeIncluding({
@@ -159,7 +160,7 @@ export const validateMessage = async (message, room, user) => {
 	if (message.alias || message.avatar) {
 		const isLiveChatGuest = !message.avatar && user.token && user.token === room.v?.token;
 
-		if (!isLiveChatGuest && !(await hasPermissionAsync(user._id, 'message-impersonate', room._id))) {
+		if (!isLiveChatGuest && !hasPermission(user._id, 'message-impersonate', room._id)) {
 			throw new Error('Not enough permission');
 		}
 	}
@@ -203,12 +204,12 @@ function cleanupMessageObject(message) {
 	['customClass'].forEach((field) => delete message[field]);
 }
 
-export const sendMessage = async function (user, message, room, upsert = false) {
+export const sendMessage = function (user, message, room, upsert = false) {
 	if (!user || !message || !room._id) {
 		return false;
 	}
 
-	await validateMessage(message, room, user);
+	validateMessage(message, room, user);
 	prepareMessageObject(message, room._id, user);
 
 	if (settings.get('Message_Read_Receipt_Enabled')) {
@@ -217,20 +218,24 @@ export const sendMessage = async function (user, message, room, upsert = false) 
 
 	// For the Rocket.Chat Apps :)
 	if (Apps && Apps.isLoaded()) {
-		const prevent = await Apps.getBridges()?.getListenerBridge().messageEvent('IPreMessageSentPrevent', message);
+		const prevent = Promise.await(Apps.getBridges().getListenerBridge().messageEvent('IPreMessageSentPrevent', message));
 		if (prevent) {
+			if (settings.get('Apps_Framework_Development_Mode')) {
+				SystemLogger.info({ msg: 'A Rocket.Chat App prevented the message sending.', message });
+			}
+
 			return;
 		}
 
 		let result;
-		result = await Apps.getBridges()?.getListenerBridge().messageEvent('IPreMessageSentExtend', message);
-		result = await Apps.getBridges()?.getListenerBridge().messageEvent('IPreMessageSentModify', result);
+		result = Promise.await(Apps.getBridges().getListenerBridge().messageEvent('IPreMessageSentExtend', message));
+		result = Promise.await(Apps.getBridges().getListenerBridge().messageEvent('IPreMessageSentModify', result));
 
 		if (typeof result === 'object') {
 			message = Object.assign(message, result);
 
 			// Some app may have inserted malicious/invalid values in the message, let's check it again
-			await validateMessage(message, room, user);
+			validateMessage(message, room, user);
 		}
 	}
 
@@ -238,7 +243,7 @@ export const sendMessage = async function (user, message, room, upsert = false) 
 
 	parseUrlsInMessage(message);
 
-	message = await callbacks.run('beforeSaveMessage', message, room);
+	message = callbacks.run('beforeSaveMessage', message, room);
 	if (message) {
 		if (message.t === 'otr') {
 			const otrStreamer = notifications.streamRoomMessage;
@@ -246,28 +251,26 @@ export const sendMessage = async function (user, message, room, upsert = false) 
 		} else if (message._id && upsert) {
 			const { _id } = message;
 			delete message._id;
-			await Messages.updateOne(
+			Messages.upsert(
 				{
 					_id,
 					'u._id': message.u._id,
 				},
-				{ $set: message },
-				{ upsert: true },
+				message,
 			);
 			message._id = _id;
 		} else {
-			const messageAlreadyExists = message._id && (await Messages.findOneById(message._id, { projection: { _id: 1 } }));
+			const messageAlreadyExists = message._id && Messages.findOneById(message._id, { fields: { _id: 1 } });
 			if (messageAlreadyExists) {
 				return;
 			}
-			const result = await Messages.insertOne(message);
-			message._id = result.insertedId;
+			message._id = Messages.insert(message);
 		}
 
 		if (Apps && Apps.isLoaded()) {
 			// This returns a promise, but it won't mutate anything about the message
 			// so, we don't really care if it is successful or fails
-			void Apps.getBridges()?.getListenerBridge().messageEvent('IPostMessageSent', message);
+			Apps.getBridges().getListenerBridge().messageEvent('IPostMessageSent', message);
 		}
 
 		/*

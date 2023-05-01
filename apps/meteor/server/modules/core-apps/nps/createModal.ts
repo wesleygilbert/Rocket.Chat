@@ -1,9 +1,10 @@
+import { Meteor } from 'meteor/meteor';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import type { IUser } from '@rocket.chat/core-typings';
 
 import { settings } from '../../../../app/settings/server';
 
-type ModalParams = {
+export type ModalParams = {
 	id: string;
 	type: string;
 	appId: string;
@@ -13,7 +14,7 @@ type ModalParams = {
 	user: IUser;
 };
 
-export const createModal = ({ type = 'modal.open', id, appId, npsId, triggerId, score, user }: ModalParams): any => {
+export const createModal = Meteor.bindEnvironment(({ type = 'modal.open', id, appId, npsId, triggerId, score, user }: ModalParams): any => {
 	const language = user.language || settings.get('Language') || 'en';
 
 	return {
@@ -86,4 +87,4 @@ export const createModal = ({ type = 'modal.open', id, appId, npsId, triggerId, 
 			],
 		},
 	};
-};
+});

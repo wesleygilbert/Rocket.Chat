@@ -1,7 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { SyncedCron } from 'meteor/littledata:synced-cron';
 
-import { Logger } from '../../app/logger/server';
+import { Logger } from '../../app/logger';
 import { oembedCron } from '../cron/oembed';
 import { statsCron } from '../cron/statistics';
 import { npsCron } from '../cron/nps';

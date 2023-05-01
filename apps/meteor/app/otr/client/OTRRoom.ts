@@ -1,7 +1,7 @@
 import type { IMessage } from '@rocket.chat/core-typings';
-import EJSON from 'ejson';
+import { EJSON } from 'meteor/ejson';
 import { Meteor } from 'meteor/meteor';
-import { Random } from '@rocket.chat/random';
+import { Random } from 'meteor/random';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import { Tracker } from 'meteor/tracker';
@@ -85,7 +85,7 @@ export class OTRRoom implements IOTRRoom {
 					refresh,
 				});
 			if (refresh) {
-				await Meteor.callAsync('sendSystemMessages', this._roomId, Meteor.user(), otrSystemMessages.USER_REQUESTED_OTR_KEY_REFRESH);
+				Meteor.call('sendSystemMessages', this._roomId, Meteor.user(), otrSystemMessages.USER_REQUESTED_OTR_KEY_REFRESH);
 				this.isFirstOTR = false;
 			}
 		} catch (e) {
@@ -94,7 +94,7 @@ export class OTRRoom implements IOTRRoom {
 	}
 
 	acknowledge(): void {
-		void APIClient.post('/v1/statistics.telemetry', { params: [{ eventName: 'otrStats', timestamp: Date.now(), rid: this._roomId }] });
+		APIClient.post('/v1/statistics.telemetry', { params: [{ eventName: 'otrStats', timestamp: Date.now(), rid: this._roomId }] });
 
 		this.peerId &&
 			Notifications.notifyUser(this.peerId, 'otr', 'acknowledge', {
@@ -246,27 +246,24 @@ export class OTRRoom implements IOTRRoom {
 	async onUserStream(type: string, data: IOnUserStreamData): Promise<void> {
 		switch (type) {
 			case 'handshake':
-				let timeout: NodeJS.Timeout;
+				let timeout = 0;
 
 				const establishConnection = async (): Promise<void> => {
 					this.setState(OtrRoomState.ESTABLISHING);
-					clearTimeout(timeout);
+					Meteor.clearTimeout(timeout);
 					try {
 						if (!data.publicKey) throw new Error('Public key is not generated');
 						await this.generateKeyPair();
 						await this.importPublicKey(data.publicKey);
 						await goToRoomById(data.roomId);
-						setTimeout(async () => {
+						Meteor.defer(() => {
 							this.setState(OtrRoomState.ESTABLISHED);
 							this.acknowledge();
 
 							if (data.refresh) {
-								await APIClient.post('/v1/chat.otr', {
-									roomId: this._roomId,
-									type: otrSystemMessages.USER_KEY_REFRESHED_SUCCESSFULLY,
-								});
+								Meteor.call('sendSystemMessages', this._roomId, Meteor.user(), otrSystemMessages.USER_KEY_REFRESHED_SUCCESSFULLY);
 							}
-						}, 0);
+						});
 					} catch (e) {
 						dispatchToastMessage({ type: 'error', message: e });
 						throw new Meteor.Error('establish-connection-error', 'Establish connection error.');
@@ -274,7 +271,7 @@ export class OTRRoom implements IOTRRoom {
 				};
 
 				const closeOrCancelModal = (): void => {
-					clearTimeout(timeout);
+					Meteor.clearTimeout(timeout);
 					this.deny();
 					imperativeModal.close();
 				};
@@ -310,7 +307,7 @@ export class OTRRoom implements IOTRRoom {
 								},
 							},
 						});
-						timeout = setTimeout(() => {
+						timeout = Meteor.setTimeout(() => {
 							this.setState(OtrRoomState.TIMEOUT);
 							imperativeModal.close();
 						}, 10000);
@@ -328,10 +325,7 @@ export class OTRRoom implements IOTRRoom {
 					this.setState(OtrRoomState.ESTABLISHED);
 
 					if (this.isFirstOTR) {
-						await APIClient.post('/v1/chat.otr', {
-							roomId: this._roomId,
-							type: otrSystemMessages.USER_JOINED_OTR,
-						});
+						Meteor.call('sendSystemMessages', this._roomId, Meteor.user(), otrSystemMessages.USER_JOINED_OTR);
 					}
 					this.isFirstOTR = false;
 				} catch (e) {

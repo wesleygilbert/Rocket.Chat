@@ -21,7 +21,7 @@ const ToolboxProvider = ({ children, room }: { children: ReactNode; room: IRoom 
 	});
 	const { listen, actions } = useToolboxActions(room);
 
-	const [routeName, params, queryStringParams] = useCurrentRoute();
+	const [routeName, params] = useCurrentRoute();
 	const router = useRoute(routeName || '');
 
 	const tab = params?.tab;
@@ -33,14 +33,11 @@ const ToolboxProvider = ({ children, room }: { children: ReactNode; room: IRoom 
 	);
 
 	const close = useMutableCallback(() => {
-		router.push(
-			{
-				...params,
-				tab: '',
-				context: '',
-			},
-			queryStringParams,
-		);
+		router.push({
+			...params,
+			tab: '',
+			context: '',
+		});
 	});
 
 	const open = useMutableCallback((actionId: string, context?: string) => {

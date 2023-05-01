@@ -1,35 +1,27 @@
 import { Meteor } from 'meteor/meteor';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
-import { Users } from '@rocket.chat/models';
 
+import { Users } from '../../../models/server';
 import { TOTP } from '../lib/totp';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		'2fa:validateTempToken': (userToken: string) => { codes: string[] } | undefined;
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async '2fa:validateTempToken'(userToken) {
+Meteor.methods({
+	'2fa:validateTempToken'(userToken) {
 		const userId = Meteor.userId();
 		if (!userId) {
 			throw new Meteor.Error('not-authorized');
 		}
 
-		const user = await Meteor.userAsync();
+		const user = Meteor.user();
 		if (!user) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
 				method: '2fa:validateTempToken',
 			});
 		}
 
-		if (!user.services?.totp?.tempSecret) {
+		if (!user.services || !user.services.totp || !user.services.totp.tempSecret) {
 			throw new Meteor.Error('invalid-totp');
 		}
 
-		const verified = await TOTP.verify({
+		const verified = TOTP.verify({
 			secret: user.services.totp.tempSecret,
 			token: userToken,
 		});
@@ -37,7 +29,7 @@ Meteor.methods<ServerMethods>({
 		if (verified) {
 			const { codes, hashedCodes } = TOTP.generateCodes();
 
-			await Users.enable2FAAndSetSecretAndCodesByUserId(userId, user.services.totp.tempSecret, hashedCodes);
+			Users.enable2FAAndSetSecretAndCodesByUserId(Meteor.userId(), user.services.totp.tempSecret, hashedCodes);
 			return { codes };
 		}
 	},

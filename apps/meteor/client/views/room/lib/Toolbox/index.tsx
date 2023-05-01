@@ -1,7 +1,6 @@
 import type { IRoom } from '@rocket.chat/core-typings';
 import type { Box, Option, Icon } from '@rocket.chat/fuselage';
 import type { TranslationKey } from '@rocket.chat/ui-contexts';
-import type { BlazeTemplates } from 'meteor/templating';
 import type { ReactNode, MouseEvent, ComponentProps, ComponentType } from 'react';
 
 import type { ToolboxContextValue } from '../../contexts/ToolboxContext';
@@ -17,7 +16,7 @@ type ActionRendererProps = Omit<ToolboxActionConfig, 'renderAction' | 'groups' |
 	key: string;
 };
 
-type ActionRenderer = (props: ActionRendererProps) => ReactNode;
+export type ActionRenderer = (props: ActionRendererProps) => ReactNode;
 
 type OptionRendererProps = ComponentProps<typeof Option>;
 
@@ -38,7 +37,7 @@ export type ToolboxActionConfig = {
 	'hotkey'?: string;
 	'action'?: (e?: MouseEvent<HTMLElement>) => void;
 	'template'?:
-		| keyof BlazeTemplates
+		| string
 		| ComponentType<{
 				tabBar: ToolboxContextValue;
 				_id: IRoom['_id'];

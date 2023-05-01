@@ -1,4 +1,4 @@
-import { numberFormat } from '../../lib/utils/stringUtils';
+import s from 'underscore.string';
 
 const formatMemorySize = (memorySize: number): string | null => {
 	if (typeof memorySize !== 'number') {
@@ -18,7 +18,7 @@ const formatMemorySize = (memorySize: number): string | null => {
 
 	const divider = Math.pow(1024, order);
 	const decimalDigits = order === 0 ? 0 : 2;
-	return `${numberFormat(memorySize / divider, decimalDigits)} ${units[order]}`;
+	return `${s.numberFormat(memorySize / divider, decimalDigits)} ${units[order]}`;
 };
 
 export const useFormatMemorySize = (): ((memorySize: number) => string | null) => formatMemorySize;

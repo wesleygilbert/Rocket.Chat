@@ -1,25 +1,8 @@
-import type { IMessage, RequiredField, SlashCommandPreviewItem } from '@rocket.chat/core-typings';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 import { Meteor } from 'meteor/meteor';
 
 import { slashCommands } from '../../../utils/server';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		executeSlashCommandPreview(
-			command: {
-				cmd: string;
-				params: string;
-				msg: RequiredField<Partial<IMessage>, 'rid'>;
-				triggerId?: string;
-			},
-			preview: SlashCommandPreviewItem,
-		): void;
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	executeSlashCommandPreview(command, preview) {
 		if (!Meteor.userId()) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
@@ -27,7 +10,7 @@ Meteor.methods<ServerMethods>({
 			});
 		}
 
-		if (!command?.cmd || !slashCommands.commands[command.cmd]) {
+		if (!command || !command.cmd || !slashCommands.commands[command.cmd]) {
 			throw new Meteor.Error('error-invalid-command', 'Invalid Command Provided', {
 				method: 'executeSlashCommandPreview',
 			});

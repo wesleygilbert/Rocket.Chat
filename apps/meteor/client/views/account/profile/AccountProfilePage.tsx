@@ -1,6 +1,5 @@
 import type { AvatarObject, IUser } from '@rocket.chat/core-typings';
 import { ButtonGroup, Button, Box, Icon } from '@rocket.chat/fuselage';
-import { SHA256 } from '@rocket.chat/sha256';
 import type { TranslationKey } from '@rocket.chat/ui-contexts';
 import {
 	useSetModal,
@@ -12,6 +11,7 @@ import {
 	useMethod,
 	useTranslation,
 } from '@rocket.chat/ui-contexts';
+import { SHA256 } from 'meteor/sha';
 import type { ReactElement } from 'react';
 import React, { useMemo, useState, useCallback } from 'react';
 
@@ -71,7 +71,7 @@ const AccountProfilePage = (): ReactElement => {
 
 	const closeModal = useCallback(() => setModal(null), [setModal]);
 
-	const localPassword = Boolean(user?.services?.password?.exists);
+	const localPassword = Boolean(user?.services?.password?.bcrypt);
 
 	const erasureType = useSetting('Message_ErasureType');
 	const allowRealNameChange = useSetting('Accounts_AllowRealNameChange');
@@ -125,9 +125,6 @@ const AccountProfilePage = (): ReactElement => {
 	const onSave = useCallback(async () => {
 		const save = async (typedPassword?: string): Promise<void> => {
 			try {
-				if (!(values.password === values.confirmationPassword)) {
-					throw new Error(t('Invalid_confirm_pass'));
-				}
 				await saveFn(
 					{
 						...(allowRealNameChange ? { realname } : {}),
@@ -157,31 +154,29 @@ const AccountProfilePage = (): ReactElement => {
 
 		save();
 	}, [
-		values?.password,
-		values?.confirmationPassword,
 		saveFn,
-		allowRealNameChange,
-		realname,
 		allowEmailChange,
-		user,
-		email,
 		allowPasswordChange,
-		password,
-		canChangeUsername,
-		username,
+		allowRealNameChange,
 		allowUserStatusMessageChange,
-		statusText,
-		statusType,
-		nickname,
 		bio,
-		customFields,
-		handlePassword,
-		handleConfirmationPassword,
+		canChangeUsername,
+		email,
+		password,
+		realname,
+		statusText,
+		username,
+		user,
 		updateAvatar,
-		commit,
+		handleAvatar,
 		dispatchToastMessage,
 		t,
-		handleAvatar,
+		customFields,
+		statusType,
+		commit,
+		nickname,
+		handlePassword,
+		handleConfirmationPassword,
 	]);
 
 	const handleLogoutOtherLocations = useCallback(async () => {

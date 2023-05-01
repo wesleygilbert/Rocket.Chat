@@ -18,6 +18,16 @@ const handleDeactivateUser = async (userData: IUser) => {
 	}
 };
 
-callbacks.add('afterSaveUser', handleAgentUpdated, callbacks.priority.LOW, 'livechat-after-save-user-remove-extension');
+callbacks.add(
+	'afterSaveUser',
+	(user: UserData) => Promise.await(handleAgentUpdated(user)),
+	callbacks.priority.LOW,
+	'livechat-after-save-user-remove-extension',
+);
 
-callbacks.add('afterDeactivateUser', handleDeactivateUser, callbacks.priority.LOW, 'livechat-after-deactivate-user-remove-extension');
+callbacks.add(
+	'afterDeactivateUser',
+	(user: IUser) => Promise.await(handleDeactivateUser(user)),
+	callbacks.priority.LOW,
+	'livechat-after-deactivate-user-remove-extension',
+);

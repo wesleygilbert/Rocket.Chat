@@ -1,9 +1,9 @@
 export interface ILogoutRequestValidateCallback {
-	(err: string | object | null, data?: Record<string, string | null> | null): Promise<void>;
+	(err: string | object | null, data?: Record<string, string | null> | null): void;
 }
 
 export interface ILogoutResponseValidateCallback {
-	(err: string | object | null, inResponseTo?: string | null): Promise<void>;
+	(err: string | object | null, inResponseTo?: string | null): void;
 }
 
 export interface IResponseValidateCallback {

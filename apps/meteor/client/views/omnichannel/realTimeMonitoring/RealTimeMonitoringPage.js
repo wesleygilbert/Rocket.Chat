@@ -24,15 +24,15 @@ const RealTimeMonitoringPage = () => {
 	const t = useTranslation();
 
 	const [reloadFrequency, setReloadFrequency] = useState(5);
-	const [departmentId, setDepartment] = useState('');
+	const [department, setDepartment] = useState('');
 
 	const reloadRef = useRef({});
 
 	const departmentParams = useMemo(
 		() => ({
-			...(departmentId && { departmentId }),
+			...(department?.value && { departmentId: department?.value }),
 		}),
-		[departmentId],
+		[department],
 	);
 
 	const allParams = useMemo(
@@ -75,7 +75,7 @@ const RealTimeMonitoringPage = () => {
 						<Box maxWidth='50%' display='flex' mi='x4' flexGrow={1} flexDirection='column'>
 							<Label mb='x4'>{t('Departments')}</Label>
 							<AutoCompleteDepartment
-								value={departmentId}
+								value={department}
 								onChange={setDepartment}
 								placeholder={t('All')}
 								label={t('All')}

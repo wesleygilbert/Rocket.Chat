@@ -12,25 +12,24 @@ import {
 
 import { API } from '../../../../../app/api/server';
 import {
-	findAllRoomsAsync,
-	findAllAverageServiceTimeAsync,
-	findAllServiceTimeAsync,
-	findAllAverageWaitingTimeAsync,
-	findAllNumberOfTransferredRoomsAsync,
-	findAllNumberOfAbandonedRoomsAsync,
-	findPercentageOfAbandonedRoomsAsync,
-	findAllAverageOfChatDurationTimeAsync,
+	findAllRooms,
+	findAllAverageServiceTime,
+	findAllServiceTime,
+	findAllAverageWaitingTime,
+	findAllNumberOfTransferredRooms,
+	findAllNumberOfAbandonedRooms,
+	findPercentageOfAbandonedRooms,
+	findAllAverageOfChatDurationTime,
 } from '../../../../../app/livechat/server/lib/analytics/departments';
-import { getPaginationItems } from '../../../../../app/api/server/helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'livechat/analytics/departments/amount-of-chats',
 	{ authRequired: true, permissionsRequired: ['view-livechat-manager'], validateParams: isLivechatAnalyticsDepartmentsAmountOfChatsProps },
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
-			const { answered, departmentId } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
+			const { answered, departmentId } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -42,7 +41,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { departments, total } = await findAllRoomsAsync({
+			const { departments, total } = findAllRooms({
 				start: startDate,
 				end: endDate,
 				answered: answered && answered === 'true',
@@ -68,9 +67,9 @@ API.v1.addRoute(
 	},
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
-			const { departmentId } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
+			const { departmentId } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -82,7 +81,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { departments, total } = await findAllAverageServiceTimeAsync({
+			const { departments, total } = findAllAverageServiceTime({
 				start: startDate,
 				end: endDate,
 				departmentId,
@@ -107,9 +106,9 @@ API.v1.addRoute(
 	},
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
-			const { departmentId } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
+			const { departmentId } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -121,7 +120,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { departments, total } = await findAllAverageOfChatDurationTimeAsync({
+			const { departments, total } = findAllAverageOfChatDurationTime({
 				start: startDate,
 				end: endDate,
 				departmentId,
@@ -146,9 +145,9 @@ API.v1.addRoute(
 	},
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
-			const { departmentId } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
+			const { departmentId } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -160,7 +159,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { departments, total } = await findAllServiceTimeAsync({
+			const { departments, total } = findAllServiceTime({
 				start: startDate,
 				end: endDate,
 				departmentId,
@@ -185,9 +184,9 @@ API.v1.addRoute(
 	},
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
-			const { departmentId } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
+			const { departmentId } = this.requestParams();
 
 			check(start, String);
 			check(end, String);
@@ -203,7 +202,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { departments, total } = await findAllAverageWaitingTimeAsync({
+			const { departments, total } = findAllAverageWaitingTime({
 				start: startDate,
 				end: endDate,
 				departmentId,
@@ -228,9 +227,9 @@ API.v1.addRoute(
 	},
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
-			const { departmentId } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
+			const { departmentId } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -242,7 +241,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { departments, total } = await findAllNumberOfTransferredRoomsAsync({
+			const { departments, total } = findAllNumberOfTransferredRooms({
 				start: startDate,
 				end: endDate,
 				departmentId,
@@ -267,9 +266,9 @@ API.v1.addRoute(
 	},
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
-			const { departmentId } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
+			const { departmentId } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -281,7 +280,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { departments, total } = await findAllNumberOfAbandonedRoomsAsync({
+			const { departments, total } = findAllNumberOfAbandonedRooms({
 				start: startDate,
 				end: endDate,
 				departmentId,
@@ -306,9 +305,9 @@ API.v1.addRoute(
 	},
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
-			const { departmentId } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
+			const { departmentId } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -320,7 +319,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { departments, total } = await findPercentageOfAbandonedRoomsAsync({
+			const { departments, total } = findPercentageOfAbandonedRooms({
 				start: startDate,
 				end: endDate,
 				departmentId,

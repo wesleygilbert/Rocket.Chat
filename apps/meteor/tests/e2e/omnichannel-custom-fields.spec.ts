@@ -1,8 +1,7 @@
-import { Users } from './fixtures/userStates';
-import { OmnichannelCustomFields } from './page-objects';
 import { test, expect } from './utils/test';
+import { OmnichannelCustomFields } from './page-objects';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 test.describe.serial('omnichannel-agents', () => {
 	let poOmnichannelCustomFields: OmnichannelCustomFields;
@@ -43,6 +42,6 @@ test.describe.serial('omnichannel-agents', () => {
 		await poOmnichannelCustomFields.btnModalRemove.click();
 
 		await poOmnichannelCustomFields.inputSearch.fill(newField);
-		await expect(poOmnichannelCustomFields.firstRowInTable(newField)).toBeHidden();
+		expect(poOmnichannelCustomFields.firstRowInTable(newField)).toBeHidden();
 	});
 });

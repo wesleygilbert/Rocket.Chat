@@ -9,7 +9,7 @@ import { Linkedin } from 'meteor/pauli:linkedin-oauth';
 import { OAuth } from 'meteor/oauth';
 
 import { process2faReturn } from '../../../client/lib/2fa/process2faReturn';
-import { CustomOAuth } from '../../custom-oauth/client/custom_oauth_client';
+import { CustomOAuth } from '../../custom-oauth';
 import { convertError } from '../../../client/lib/2fa/utils';
 import { overrideLoginMethod } from '../../../client/lib/2fa/overrideLoginMethod';
 
@@ -105,7 +105,7 @@ Meteor.loginWithLinkedin = function (options, cb) {
 	overrideLoginMethod(loginWithLinkedin, [options], cb, loginWithLinkedinAndTOTP);
 };
 
-Accounts.onPageLoadLogin(async (loginAttempt) => {
+Accounts.onPageLoadLogin((loginAttempt) => {
 	if (loginAttempt?.error?.error !== 'totp-required') {
 		return;
 	}
@@ -119,7 +119,7 @@ Accounts.onPageLoadLogin(async (loginAttempt) => {
 	const { credentialToken, credentialSecret } = oAuthArgs.oauth;
 	const cb = loginAttempt.userCallback;
 
-	await process2faReturn({
+	process2faReturn({
 		error: loginAttempt.error,
 		originalCallback: cb,
 		onCode: (code) => {

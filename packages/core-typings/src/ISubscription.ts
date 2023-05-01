@@ -18,7 +18,7 @@ export interface ISubscription extends IRocketChatRecord {
 	unread: number;
 	t: RoomType;
 	ls: Date;
-	f?: boolean;
+	f?: true;
 	lr: Date;
 	hideUnreadStatus?: true;
 	hideMentionStatus?: true;
@@ -51,7 +51,6 @@ export interface ISubscription extends IRocketChatRecord {
 	desktopNotifications?: 'all' | 'mentions' | 'nothing';
 	mobilePushNotifications?: 'all' | 'mentions' | 'nothing';
 	emailNotifications?: 'all' | 'mentions' | 'nothing';
-	userHighlights?: string[];
 	blocked?: unknown;
 	blocker?: unknown;
 	autoTranslate?: boolean;
@@ -65,9 +64,6 @@ export interface ISubscription extends IRocketChatRecord {
 	desktopPrefOrigin?: 'subscription' | 'user';
 	mobilePrefOrigin?: 'subscription' | 'user';
 	emailPrefOrigin?: 'subscription' | 'user';
-
-	/* @deprecated */
-	customFields?: Record<string, any>;
 }
 
 export interface IOmnichannelSubscription extends ISubscription {

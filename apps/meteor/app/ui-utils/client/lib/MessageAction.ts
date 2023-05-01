@@ -1,4 +1,5 @@
 import type { ComponentProps, ContextType } from 'react';
+import _ from 'underscore';
 import mem from 'mem';
 import { Meteor } from 'meteor/meteor';
 import { ReactiveVar } from 'meteor/reactive-var';
@@ -7,7 +8,7 @@ import type { Icon } from '@rocket.chat/fuselage';
 import type { IMessage, IUser, ISubscription, IRoom, SettingValue, Serialized, ITranslatedMessage } from '@rocket.chat/core-typings';
 import type { TranslationKey } from '@rocket.chat/ui-contexts';
 
-import { Messages, ChatRoom, Subscriptions } from '../../../models/client';
+import { Messages, Rooms, Subscriptions } from '../../../models/client';
 import { roomCoordinator } from '../../../../client/lib/rooms/roomCoordinator';
 import type { ToolboxContextValue } from '../../../../client/views/room/contexts/ToolboxContext';
 import type { ChatContext } from '../../../../client/views/room/contexts/ChatContext';
@@ -23,6 +24,15 @@ const getMessage = async (msgId: string): Promise<Serialized<IMessage> | null> =
 	}
 };
 
+export const addMessageToList = (messagesList: IMessage[], message: IMessage): IMessage[] => {
+	// checks if the message is not already on the list
+	if (!messagesList.find(({ _id }) => _id === message._id)) {
+		messagesList.push(message);
+	}
+
+	return messagesList;
+};
+
 type MessageActionGroup = 'message' | 'menu';
 export type MessageActionContext =
 	| 'message'
@@ -33,8 +43,7 @@ export type MessageActionContext =
 	| 'starred'
 	| 'mentions'
 	| 'federated'
-	| 'videoconf'
-	| 'search';
+	| 'videoconf';
 
 type MessageActionConditionProps = {
 	message: IMessage;
@@ -92,7 +101,7 @@ export const MessageAction = new (class {
 	buttons = new ReactiveVar<Record<string, MessageActionConfig>>({});
 
 	addButton(config: MessageActionConfig): void {
-		if (!config?.id) {
+		if (!config || !config.id) {
 			return;
 		}
 
@@ -125,7 +134,7 @@ export const MessageAction = new (class {
 		return Tracker.nonreactive(() => {
 			const btns = this.buttons.get();
 			if (btns[id]) {
-				btns[id] = Object.assign(btns[id], config);
+				btns[id] = _.extend(btns[id], config);
 				return this.buttons.set(btns);
 			}
 		});
@@ -136,9 +145,7 @@ export const MessageAction = new (class {
 		return allButtons[id];
 	}
 
-	_getButtons = mem((): MessageActionConfigList => Object.values(this.buttons.get()).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), {
-		maxAge: 1000,
-	});
+	_getButtons = mem((): MessageActionConfigList => _.sortBy(_.toArray(this.buttons.get()), 'order'), { maxAge: 1000 });
 
 	async getButtonsByCondition(
 		prop: MessageActionConditionProps,
@@ -194,7 +201,7 @@ export const MessageAction = new (class {
 		if (!msg) {
 			throw new Error('message-not-found');
 		}
-		const roomData = ChatRoom.findOne({
+		const roomData = Rooms.findOne({
 			_id: msg.rid,
 		});
 

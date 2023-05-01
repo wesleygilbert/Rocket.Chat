@@ -1,5 +1,4 @@
-import { FederationRoomEvents } from '@rocket.chat/models';
-
+import { FederationRoomEvents } from '../../../models/server';
 import { clientLogger } from '../lib/logger';
 import { normalizers } from '../normalizers';
 import { hasExternalDomain } from '../functions/helpers';
@@ -17,7 +16,7 @@ async function afterMuteUser(involvedUsers, room) {
 	const { mutedUser } = involvedUsers;
 
 	// Create the mute user event
-	const event = await FederationRoomEvents.createMuteUserEvent(getFederationDomain(), room._id, await normalizers.normalizeUser(mutedUser));
+	const event = await FederationRoomEvents.createMuteUserEvent(getFederationDomain(), room._id, normalizers.normalizeUser(mutedUser));
 
 	// Dispatch event (async)
 	dispatchEvent(room.federation.domains, event);
@@ -27,6 +26,6 @@ async function afterMuteUser(involvedUsers, room) {
 
 export const definition = {
 	hook: 'afterMuteUser',
-	callback: afterMuteUser,
+	callback: (involvedUsers, room) => Promise.await(afterMuteUser(involvedUsers, room)),
 	id: 'federation-after-mute-user',
 };

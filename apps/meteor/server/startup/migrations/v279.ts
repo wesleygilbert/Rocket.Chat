@@ -3,7 +3,7 @@ import { upsertPermissions } from '../../../app/authorization/server/functions/u
 
 addMigration({
 	version: 279,
-	async up() {
-		await upsertPermissions();
+	up() {
+		upsertPermissions();
 	},
 });

@@ -22,13 +22,10 @@ const UserAutoCompleteMultipleOption = ({ label, ...props }: UserAutoCompleteMul
 			icon={_federated ? 'globe' : undefined}
 			key={username}
 			label={
-				(
-					<>
-						{name || username} {!_federated && <OptionDescription>({username})</OptionDescription>}
-					</>
-				) as any
+				<>
+					{name || username} {!_federated && <OptionDescription>({username})</OptionDescription>}
+				</>
 			}
-			children={undefined}
 		/>
 	);
 };

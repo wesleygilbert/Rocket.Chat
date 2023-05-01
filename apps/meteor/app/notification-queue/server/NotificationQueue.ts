@@ -41,9 +41,9 @@ class NotificationClass {
 			return;
 		}
 
-		setTimeout(async () => {
+		setTimeout(() => {
 			try {
-				await this.worker();
+				this.worker();
 			} catch (err) {
 				SystemLogger.error({ msg: 'Error sending notification', err });
 				this.executeWorkerLater();
@@ -68,18 +68,18 @@ class NotificationClass {
 		}
 
 		try {
-			for await (const item of notification.items) {
+			for (const item of notification.items) {
 				switch (item.type) {
 					case 'push':
-						await this.push(notification, item);
+						this.push(notification, item);
 						break;
 					case 'email':
-						await this.email(item);
+						this.email(item);
 						break;
 				}
 			}
 
-			await NotificationQueue.removeById(notification._id);
+			NotificationQueue.removeById(notification._id);
 		} catch (e) {
 			SystemLogger.error(e);
 			await NotificationQueue.setErrorById(notification._id, e instanceof Error ? e.message : String(e));
@@ -88,7 +88,7 @@ class NotificationClass {
 		if (counter >= this.maxBatchSize) {
 			return this.executeWorkerLater();
 		}
-		await this.worker(counter++);
+		this.worker(counter++);
 	}
 
 	getNextNotification(): Promise<INotification | null> {
@@ -98,8 +98,8 @@ class NotificationClass {
 		return NotificationQueue.findNextInQueueOrExpired(expired);
 	}
 
-	async push({ uid, rid, mid }: INotification, item: INotificationItemPush): Promise<void> {
-		await PushNotification.send({
+	push({ uid, rid, mid }: INotification, item: INotificationItemPush): void {
+		PushNotification.send({
 			rid,
 			uid,
 			mid,
@@ -107,8 +107,8 @@ class NotificationClass {
 		});
 	}
 
-	async email(item: INotificationItemEmail): Promise<void> {
-		return sendEmailFromData(item.data);
+	email(item: INotificationItemEmail): void {
+		sendEmailFromData(item.data);
 	}
 
 	async scheduleItem({

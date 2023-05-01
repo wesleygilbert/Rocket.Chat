@@ -9,7 +9,7 @@ import { getMaxNumberSimultaneousChat } from '../lib/Helper';
 
 callbacks.add(
 	'beforeJoinRoom',
-	async (user: IUser, room?: IRoom): Promise<IUser> => {
+	(user: IUser, room?: IRoom): IUser => {
 		if (!settings.get('Livechat_waiting_queue')) {
 			return user;
 		}
@@ -19,16 +19,18 @@ callbacks.add(
 		}
 
 		const { departmentId } = room;
-		const maxNumberSimultaneousChat = await getMaxNumberSimultaneousChat({
-			agentId: user._id,
-			departmentId,
-		});
+		const maxNumberSimultaneousChat = Promise.await(
+			getMaxNumberSimultaneousChat({
+				agentId: user._id,
+				departmentId,
+			}),
+		);
 
 		if (maxNumberSimultaneousChat === 0) {
 			return user;
 		}
 
-		const userSubs = await Users.getAgentAndAmountOngoingChats(user._id);
+		const userSubs = Promise.await(Users.getAgentAndAmountOngoingChats(user._id));
 		if (!userSubs) {
 			return user;
 		}

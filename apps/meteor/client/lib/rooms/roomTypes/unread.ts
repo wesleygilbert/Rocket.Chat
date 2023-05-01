@@ -6,14 +6,8 @@ import { roomCoordinator } from '../roomCoordinator';
 
 export const UnreadRoomType = getUnreadRoomType(roomCoordinator);
 
-roomCoordinator.add(
-	{
-		...UnreadRoomType,
-		label: 'Unread',
+roomCoordinator.add(UnreadRoomType, {
+	condition(): boolean {
+		return getUserPreference(Meteor.userId(), 'sidebarShowUnread') as boolean;
 	},
-	{
-		condition(): boolean {
-			return getUserPreference(Meteor.userId(), 'sidebarShowUnread') as boolean;
-		},
-	},
-);
+});

@@ -23,10 +23,9 @@ const AuditModelList: FC<AuditModelListProps> = ({ showAudit, showAuditLog, onDi
 			<ul>
 				{showAudit && (
 					<ListItem
-						role='listitem'
 						icon='document-eye'
 						text={t('Messages')}
-						onClick={() => {
+						action={(): void => {
 							auditHomeRoute.push();
 							onDismiss();
 						}}
@@ -34,10 +33,9 @@ const AuditModelList: FC<AuditModelListProps> = ({ showAudit, showAuditLog, onDi
 				)}
 				{showAuditLog && (
 					<ListItem
-						role='listitem'
 						icon='document-eye'
 						text={t('Logs')}
-						onClick={() => {
+						action={(): void => {
 							auditSettingsRoute.push();
 							onDismiss();
 						}}

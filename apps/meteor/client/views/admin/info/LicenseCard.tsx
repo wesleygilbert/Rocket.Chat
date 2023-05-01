@@ -27,7 +27,6 @@ const LicenseCard = (): ReactElement => {
 	const hasOmnichannel = modules.includes('livechat-enterprise');
 	const hasAuditing = modules.includes('auditing');
 	const hasCannedResponses = modules.includes('canned-responses');
-	const hasReadReceipts = modules.includes('message-read-receipt');
 
 	const handleApplyLicense = useMutableCallback(() =>
 		setModal(
@@ -65,7 +64,6 @@ const LicenseCard = (): ReactElement => {
 									<Feature label={t('Auditing')} enabled={hasAuditing} />
 									<Feature label={t('Canned_Responses')} enabled={hasCannedResponses} />
 									<Feature label={t('Engagement_Dashboard')} enabled={hasEngagement} />
-									<Feature label={t('Read_Receipts')} enabled={hasReadReceipts} />
 								</>
 							)}
 						</Margins>

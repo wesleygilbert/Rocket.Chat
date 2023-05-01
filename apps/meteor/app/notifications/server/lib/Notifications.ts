@@ -1,21 +1,19 @@
 import { Meteor } from 'meteor/meteor';
 import { DDPCommon } from 'meteor/ddp-common';
 import { api } from '@rocket.chat/core-services';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
 import { NotificationsModule } from '../../../../server/modules/notifications/notifications.module';
 import { Streamer } from '../../../../server/modules/streamer/streamer.module';
-
 import './Presence';
 
-class Stream extends Streamer {
+export class Stream extends Streamer {
 	registerPublication(name: string, fn: (eventName: string, options: boolean | { useCollection?: boolean; args?: any }) => void): void {
 		Meteor.publish(name, function (eventName, options) {
-			return fn.call(this, eventName, options);
+			return Promise.await(fn.call(this, eventName, options));
 		});
 	}
 
-	registerMethod(methods: Partial<ServerMethods>): void {
+	registerMethod(methods: Record<string, (eventName: string, ...args: any[]) => any>): void {
 		Meteor.methods(methods);
 	}
 
@@ -34,7 +32,7 @@ const notifications = new NotificationsModule(Stream);
 notifications.configure();
 
 notifications.streamLocal.on('broadcast', ({ eventName, args }) => {
-	void api.broadcastLocal(eventName, ...args);
+	api.broadcastLocal(eventName, ...args);
 });
 
 export default notifications;

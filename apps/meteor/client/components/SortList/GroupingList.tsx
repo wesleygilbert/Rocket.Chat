@@ -26,25 +26,19 @@ const GroupingList = function GroupingList(): ReactElement {
 			<OptionTitle>{t('Group_by')}</OptionTitle>
 			<ul>
 				<ListItem
-					is='label'
-					role='listitem'
-					icon='flag'
+					icon={'flag'}
 					text={t('Unread')}
-					input={<CheckBox pis='x24' onChange={handleChangeShowUnread} checked={sidebarShowUnread} />}
+					input={<CheckBox pis='x24' onChange={handleChangeShowUnread} name='sidebarShowUnread' checked={sidebarShowUnread} />}
 				/>
 				<ListItem
-					is='label'
-					role='listitem'
-					icon='star'
+					icon={'star'}
 					text={t('Favorites')}
-					input={<CheckBox pis='x24' onChange={handleChangeShoFavorite} checked={sidebarShowFavorites} />}
+					input={<CheckBox pis='x24' onChange={handleChangeShoFavorite} name='sidebarShowFavorites' checked={sidebarShowFavorites} />}
 				/>
 				<ListItem
-					is='label'
-					role='listitem'
-					icon='group-by-type'
+					icon={'group-by-type'}
 					text={t('Types')}
-					input={<CheckBox pis='x24' onChange={handleChangeGroupByType} checked={sidebarGroupByType} />}
+					input={<CheckBox pis='x24' onChange={handleChangeGroupByType} name='sidebarGroupByType' checked={sidebarGroupByType} />}
 				/>
 			</ul>
 		</>

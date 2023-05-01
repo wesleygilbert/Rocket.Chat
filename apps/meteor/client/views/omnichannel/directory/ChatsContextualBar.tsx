@@ -1,20 +1,21 @@
 import { Box } from '@rocket.chat/fuselage';
 import { useRoute, useRouteParameter, useTranslation } from '@rocket.chat/ui-contexts';
 import type { FC } from 'react';
-import React from 'react';
+import React, { useMemo } from 'react';
 
 import VerticalBar from '../../../components/VerticalBar';
+import { AsyncStatePhase } from '../../../hooks/useAsyncState';
+import { useEndpointData } from '../../../hooks/useEndpointData';
+import { FormSkeleton } from './Skeleton';
 import Chat from './chats/Chat';
 import ChatInfoDirectory from './chats/contextualBar/ChatInfoDirectory';
-import { RoomEditWithData } from './chats/contextualBar/RoomEdit';
-import { FormSkeleton } from './components';
-import { useOmnichannelRoomInfo } from './hooks/useOmnichannelRoomInfo';
+import RoomEditWithData from './chats/contextualBar/RoomEditWithData';
 
 const ChatsContextualBar: FC<{ chatReload?: () => void }> = ({ chatReload }) => {
 	const directoryRoute = useRoute('omnichannel-directory');
 
 	const bar = useRouteParameter('bar') || 'info';
-	const id = useRouteParameter('id') || '';
+	const id = useRouteParameter('id');
 
 	const t = useTranslation();
 
@@ -30,13 +31,20 @@ const ChatsContextualBar: FC<{ chatReload?: () => void }> = ({ chatReload }) => 
 		id && directoryRoute.push({ page: 'chats', id, bar: 'info' });
 	};
 
-	const { data: room, isLoading, isError, refetch: reloadInfo } = useOmnichannelRoomInfo(id);
+	const query = useMemo(
+		() => ({
+			roomId: id || '',
+		}),
+		[id],
+	);
+
+	const { value: data, phase: state, error, reload: reloadInfo } = useEndpointData(`/v1/rooms.info`, { params: query });
 
 	if (bar === 'view' && id) {
 		return <Chat rid={id} />;
 	}
 
-	if (isLoading) {
+	if (state === AsyncStatePhase.LOADING) {
 		return (
 			<Box pi='x24'>
 				<FormSkeleton />
@@ -44,7 +52,7 @@ const ChatsContextualBar: FC<{ chatReload?: () => void }> = ({ chatReload }) => 
 		);
 	}
 
-	if (isError || !room) {
+	if (error || !data || !data.room) {
 		return <Box mbs='x16'>{t('Room_not_found')}</Box>;
 	}
 
@@ -66,9 +74,9 @@ const ChatsContextualBar: FC<{ chatReload?: () => void }> = ({ chatReload }) => 
 				)}
 				<VerticalBar.Close onClick={handleChatsVerticalBarCloseButtonClick} />
 			</VerticalBar.Header>
-			{bar === 'info' && <ChatInfoDirectory id={id} room={room} />}
+			{bar === 'info' && <ChatInfoDirectory id={id} room={data.room} />}
 			{bar === 'edit' && (
-				<RoomEditWithData id={id} reload={chatReload} reloadInfo={reloadInfo} onClose={handleChatsVerticalBarBackButtonClick} />
+				<RoomEditWithData id={id} close={handleChatsVerticalBarBackButtonClick} reload={chatReload} reloadInfo={reloadInfo} />
 			)}
 		</VerticalBar>
 	);

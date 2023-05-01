@@ -21,7 +21,7 @@ const POSTRemoveWebdavAccountSchema = {
 	additionalProperties: false,
 };
 
-const isPOSTRemoveWebdavAccount = ajv.compile<POSTRemoveWebdavAccount>(POSTRemoveWebdavAccountSchema);
+export const isPOSTRemoveWebdavAccount = ajv.compile<POSTRemoveWebdavAccount>(POSTRemoveWebdavAccountSchema);
 
 API.v1.addRoute(
 	'webdav.getMyAccounts',
@@ -45,7 +45,7 @@ API.v1.addRoute(
 		async post() {
 			const { accountId } = this.bodyParams;
 
-			const result = await Meteor.callAsync('removeWebdavAccount', accountId);
+			const result = Meteor.call('removeWebdavAccount', accountId);
 
 			return API.v1.success({ result });
 		},

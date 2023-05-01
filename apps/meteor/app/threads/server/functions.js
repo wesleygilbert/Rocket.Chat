@@ -1,14 +1,13 @@
-import { Messages, Subscriptions } from '@rocket.chat/models';
-
+import { Messages, Subscriptions } from '../../models/server';
 import { getMentions } from '../../lib/server/lib/notifyUsersOnMessage';
 
-export async function reply({ tmid }, message, parentMessage, followers) {
+export const reply = ({ tmid }, message, parentMessage, followers) => {
 	const { rid, ts, u, editedAt } = message;
 	if (!tmid || editedAt) {
 		return false;
 	}
 
-	const { toAll, toHere, mentionIds } = await getMentions(message);
+	const { toAll, toHere, mentionIds } = getMentions(message);
 
 	const addToReplies = [
 		...new Set([
@@ -18,51 +17,62 @@ export async function reply({ tmid }, message, parentMessage, followers) {
 		]),
 	];
 
-	await Messages.updateRepliesByThreadId(tmid, addToReplies, ts);
+	Messages.updateRepliesByThreadId(tmid, addToReplies, ts);
 
-	const replies = await Messages.getThreadFollowsByThreadId(tmid);
+	const replies = Messages.getThreadFollowsByThreadId(tmid);
 
 	const repliesFiltered = replies.filter((userId) => userId !== u._id).filter((userId) => !mentionIds.includes(userId));
 
 	if (toAll || toHere) {
-		await Subscriptions.addUnreadThreadByRoomIdAndUserIds(rid, repliesFiltered, tmid, {
+		Subscriptions.addUnreadThreadByRoomIdAndUserIds(rid, repliesFiltered, tmid, {
 			groupMention: true,
 		});
 	} else {
-		await Subscriptions.addUnreadThreadByRoomIdAndUserIds(rid, repliesFiltered, tmid);
+		Subscriptions.addUnreadThreadByRoomIdAndUserIds(rid, repliesFiltered, tmid);
 	}
 
-	for await (const userId of mentionIds) {
-		await Subscriptions.addUnreadThreadByRoomIdAndUserIds(rid, [userId], tmid, { userMention: true });
-	}
-}
+	mentionIds.forEach((mentionId) => Subscriptions.addUnreadThreadByRoomIdAndUserIds(rid, [mentionId], tmid, { userMention: true }));
+};
 
-export async function follow({ tmid, uid }) {
+export const undoReply = ({ tmid }) => {
+	if (!tmid) {
+		return false;
+	}
+
+	const { ts } = Messages.getFirstReplyTsByThreadId(tmid) || {};
+	if (!ts) {
+		return Messages.unsetThreadByThreadId(tmid);
+	}
+
+	return Messages.updateThreadLastMessageAndCountByThreadId(tmid, ts, -1);
+};
+
+export const follow = ({ tmid, uid }) => {
 	if (!tmid || !uid) {
 		return false;
 	}
 
-	await Messages.addThreadFollowerByThreadId(tmid, uid);
-}
+	Messages.addThreadFollowerByThreadId(tmid, uid);
+};
 
-export async function unfollow({ tmid, rid, uid }) {
+export const unfollow = ({ tmid, rid, uid }) => {
 	if (!tmid || !uid) {
 		return false;
 	}
 
-	await Subscriptions.removeUnreadThreadByRoomIdAndUserId(rid, uid, tmid);
+	Subscriptions.removeUnreadThreadByRoomIdAndUserId(rid, uid, tmid);
 
-	await Messages.removeThreadFollowerByThreadId(tmid, uid);
-}
+	return Messages.removeThreadFollowerByThreadId(tmid, uid);
+};
 
-export const readThread = async ({ userId, rid, tmid }) => {
-	const projection = { tunread: 1 };
-	const sub = await Subscriptions.findOneByRoomIdAndUserId(rid, userId, { projection });
+export const readThread = ({ userId, rid, tmid }) => {
+	const fields = { tunread: 1 };
+	const sub = Subscriptions.findOneByRoomIdAndUserId(rid, userId, { fields });
 	if (!sub) {
 		return;
 	}
 	// if the thread being marked as read is the last one unread also clear the unread subscription flag
 	const clearAlert = sub.tunread?.length <= 1 && sub.tunread.includes(tmid);
 
-	await Subscriptions.removeUnreadThreadByRoomIdAndUserId(rid, userId, tmid, clearAlert);
+	Subscriptions.removeUnreadThreadByRoomIdAndUserId(rid, userId, tmid, clearAlert);
 };

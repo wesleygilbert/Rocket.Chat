@@ -27,8 +27,7 @@ const EnterE2EPasswordModal = ({
 		[setPassword],
 	);
 
-	const handleConfirm = useMutableCallback((e): void => {
-		e.preventDefault();
+	const handleConfirm = useMutableCallback((): void => {
 		if (password === '') {
 			setPasswordError(t('Invalid_pass'));
 			return;
@@ -39,11 +38,11 @@ const EnterE2EPasswordModal = ({
 
 	return (
 		<GenericModal
-			wrapperFunction={(props) => <Box is='form' onSubmit={handleConfirm} {...props} />}
 			variant='warning'
 			title={t('Enter_E2E_password')}
 			cancelText={t('Do_It_Later')}
 			confirmText={t('Decode_Key')}
+			onConfirm={handleConfirm}
 			onClose={onClose}
 			onCancel={onCancel}
 		>
@@ -51,13 +50,7 @@ const EnterE2EPasswordModal = ({
 			<FieldGroup mbs='x24' w='full'>
 				<Field>
 					<Field.Row>
-						<PasswordInput
-							autoFocus
-							error={passwordError}
-							value={password}
-							onChange={handleChange}
-							placeholder={t('New_Password_Placeholder')}
-						/>
+						<PasswordInput error={passwordError} value={password} onChange={handleChange} placeholder={t('New_Password_Placeholder')} />
 					</Field.Row>
 					<Field.Error>{passwordError}</Field.Error>
 				</Field>

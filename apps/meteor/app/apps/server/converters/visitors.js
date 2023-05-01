@@ -1,6 +1,6 @@
 import { LivechatVisitors } from '@rocket.chat/models';
 
-import { transformMappedData } from '../../../../ee/lib/misc/transformMappedData';
+import { transformMappedData } from '../../lib/misc/transformMappedData';
 
 // TODO: check if functions from this converter can be async
 export class AppVisitorsConverter {
@@ -8,19 +8,19 @@ export class AppVisitorsConverter {
 		this.orch = orch;
 	}
 
-	async convertById(id) {
-		const visitor = await LivechatVisitors.findOneById(id);
+	convertById(id) {
+		const visitor = Promise.await(LivechatVisitors.findOneById(id));
 
 		return this.convertVisitor(visitor);
 	}
 
-	async convertByToken(token) {
-		const visitor = await LivechatVisitors.getVisitorByToken(token);
+	convertByToken(token) {
+		const visitor = Promise.await(LivechatVisitors.getVisitorByToken(token));
 
 		return this.convertVisitor(visitor);
 	}
 
-	async convertVisitor(visitor) {
+	convertVisitor(visitor) {
 		if (!visitor) {
 			return undefined;
 		}

@@ -39,10 +39,9 @@ const CreateRoomList = ({ closeList }: CreateRoomListProps): ReactElement => {
 			<ul>
 				{canCreateChannel && (
 					<ListItem
-						role='listitem'
 						icon='hashtag'
 						text={t('Channel')}
-						onClick={(e: MouseEvent<HTMLElement>): void => {
+						action={(e: MouseEvent<HTMLElement>): void => {
 							createChannel(e);
 							closeList();
 						}}
@@ -50,10 +49,9 @@ const CreateRoomList = ({ closeList }: CreateRoomListProps): ReactElement => {
 				)}
 				{canCreateTeam && (
 					<ListItem
-						role='listitem'
 						icon='team'
 						text={t('Team')}
-						onClick={(e: MouseEvent<HTMLElement>): void => {
+						action={(e: MouseEvent<HTMLElement>): void => {
 							createTeam(e);
 							closeList();
 						}}
@@ -61,10 +59,9 @@ const CreateRoomList = ({ closeList }: CreateRoomListProps): ReactElement => {
 				)}
 				{canCreateDirectMessages && (
 					<ListItem
-						role='listitem'
 						icon='balloon'
 						text={t('Direct_Messages')}
-						onClick={(e: MouseEvent<HTMLElement>): void => {
+						action={(e: MouseEvent<HTMLElement>): void => {
 							createDirectMessage(e);
 							closeList();
 						}}
@@ -72,10 +69,9 @@ const CreateRoomList = ({ closeList }: CreateRoomListProps): ReactElement => {
 				)}
 				{discussionEnabled && canCreateDiscussion && (
 					<ListItem
-						role='listitem'
 						icon='discussion'
 						text={t('Discussion')}
-						onClick={(e: MouseEvent<HTMLElement>): void => {
+						action={(e: MouseEvent<HTMLElement>): void => {
 							createDiscussion(e);
 							closeList();
 						}}

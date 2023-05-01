@@ -1,15 +1,14 @@
 import { Meteor } from 'meteor/meteor';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import { api } from '@rocket.chat/core-services';
-import { Rooms, Subscriptions, Users } from '@rocket.chat/models';
-import type { SlashCommandCallbackParams } from '@rocket.chat/core-typings';
 
+import { Rooms, Subscriptions } from '../../models/server';
 import { settings } from '../../settings/server';
 import { slashCommands } from '../../utils/lib/slashCommand';
 
 slashCommands.add({
 	command: 'join',
-	callback: async ({ params, message, userId }: SlashCommandCallbackParams<'join'>): Promise<void> => {
+	callback: (_command: 'join', params, item): void => {
 		let channel = params.trim();
 		if (channel === '') {
 			return;
@@ -17,26 +16,26 @@ slashCommands.add({
 
 		channel = channel.replace('#', '');
 
-		const user = await Users.findOne(userId);
-		const room = await Rooms.findOneByNameAndType(channel, 'c');
+		const userId = Meteor.userId() as string;
+		const user = Meteor.users.findOne(userId);
+		const room = Rooms.findOneByNameAndType(channel, 'c');
 
 		if (!user) {
 			return;
 		}
 
 		if (!room) {
-			void api.broadcast('notify.ephemeralMessage', userId, message.rid, {
+			api.broadcast('notify.ephemeralMessage', userId, item.rid, {
 				msg: TAPi18n.__('Channel_doesnt_exist', {
 					postProcess: 'sprintf',
 					sprintf: [channel],
 					lng: settings.get('Language') || 'en',
 				}),
 			});
-			return;
 		}
 
-		const subscription = await Subscriptions.findOneByRoomIdAndUserId(room._id, user._id, {
-			projection: { _id: 1 },
+		const subscription = Subscriptions.findOneByRoomIdAndUserId(room._id, user._id, {
+			fields: { _id: 1 },
 		});
 
 		if (subscription) {
@@ -45,7 +44,7 @@ slashCommands.add({
 			});
 		}
 
-		await Meteor.callAsync('joinRoom', room._id);
+		Meteor.call('joinRoom', room._id);
 	},
 	options: {
 		description: 'Join_the_given_channel',

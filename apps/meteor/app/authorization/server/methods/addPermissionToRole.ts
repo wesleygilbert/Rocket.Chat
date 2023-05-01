@@ -1,18 +1,10 @@
 import { Meteor } from 'meteor/meteor';
 import { Permissions } from '@rocket.chat/models';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
-import { hasPermissionAsync } from '../functions/hasPermission';
+import { hasPermission } from '../functions/hasPermission';
 import { CONSTANTS, AuthorizationUtils } from '../../lib';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		'authorization:addPermissionToRole'(permissionId: string, role: string): void;
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	async 'authorization:addPermissionToRole'(permissionId, role) {
 		if (AuthorizationUtils.isPermissionRestrictedForRole(permissionId, role)) {
 			throw new Meteor.Error('error-action-not-allowed', 'Permission is restricted', {
@@ -33,8 +25,8 @@ Meteor.methods<ServerMethods>({
 
 		if (
 			!uid ||
-			!(await hasPermissionAsync(uid, 'access-permissions')) ||
-			(permission.level === CONSTANTS.SETTINGS_LEVEL && !(await hasPermissionAsync(uid, 'access-setting-permissions')))
+			!hasPermission(uid, 'access-permissions') ||
+			(permission.level === CONSTANTS.SETTINGS_LEVEL && !hasPermission(uid, 'access-setting-permissions'))
 		) {
 			throw new Meteor.Error('error-action-not-allowed', 'Adding permission is not allowed', {
 				method: 'authorization:addPermissionToRole',
@@ -43,9 +35,9 @@ Meteor.methods<ServerMethods>({
 		}
 		// for setting-based-permissions, authorize the group access as well
 		if (permission.groupPermissionId) {
-			await Permissions.addRole(permission.groupPermissionId, role);
+			Permissions.addRole(permission.groupPermissionId, role);
 		}
 
-		await Permissions.addRole(permission._id, role);
+		return Permissions.addRole(permission._id, role);
 	},
 });

@@ -1,35 +1,32 @@
 import { Meteor } from 'meteor/meteor';
 import { Match, check } from 'meteor/check';
-import {
-	LivechatInquiry,
-	Users,
-	LivechatRooms,
-	LivechatDepartment as LivechatDepartmentRaw,
-	OmnichannelServiceLevelAgreements,
-	LivechatTag,
-	LivechatUnitMonitors,
-	LivechatUnit,
-} from '@rocket.chat/models';
-import { Message } from '@rocket.chat/core-services';
+import { LivechatInquiry, Users, LivechatRooms } from '@rocket.chat/models';
 
-import { hasLicense } from '../../../license/server/license';
-import { updateDepartmentAgents } from '../../../../../app/livechat/server/lib/Helper';
-import { addUserRolesAsync } from '../../../../../server/lib/roles/addUserRoles';
-import { removeUserFromRolesAsync } from '../../../../../server/lib/roles/removeUserFromRoles';
-import { processWaitingQueue, updateSLAInquiries } from './Helper';
-import { removeSLAFromRooms } from './SlaHelper';
+import LivechatUnit from '../../../models/server/models/LivechatUnit';
+import LivechatTag from '../../../models/server/models/LivechatTag';
+import { Messages } from '../../../../../app/models/server';
+import LivechatPriority from '../../../models/server/models/LivechatPriority';
+import { addUserRoles } from '../../../../../server/lib/roles/addUserRoles';
+import { removeUserFromRoles } from '../../../../../server/lib/roles/removeUserFromRoles';
+import {
+	processWaitingQueue,
+	removePriorityFromRooms,
+	updateInquiryQueuePriority,
+	updatePriorityInquiries,
+	updateRoomPriorityHistory,
+} from './Helper';
 import { RoutingManager } from '../../../../../app/livechat/server/lib/RoutingManager';
 import { settings } from '../../../../../app/settings/server';
 import { logger, queueLogger } from './logger';
 import { callbacks } from '../../../../../lib/callbacks';
 import { AutoCloseOnHoldScheduler } from './AutoCloseOnHoldScheduler';
-import { getInquirySortMechanismSetting } from '../../../../../app/livechat/server/lib/settings';
+import { LivechatUnitMonitors } from '../../../models/server';
 
 export const LivechatEnterprise = {
 	async addMonitor(username) {
 		check(username, String);
 
-		const user = await Users.findOneByUsername(username, { projection: { _id: 1, username: 1 } });
+		const user = await Users.findOneByUsername(username, { fields: { _id: 1, username: 1 } });
 
 		if (!user) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
@@ -37,7 +34,7 @@ export const LivechatEnterprise = {
 			});
 		}
 
-		if (await addUserRolesAsync(user._id, ['livechat-monitor'])) {
+		if (addUserRoles(user._id, ['livechat-monitor'])) {
 			return user;
 		}
 
@@ -47,7 +44,7 @@ export const LivechatEnterprise = {
 	async removeMonitor(username) {
 		check(username, String);
 
-		const user = await Users.findOneByUsername(username, { projection: { _id: 1 } });
+		const user = await Users.findOneByUsername(username, { fields: { _id: 1 } });
 
 		if (!user) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
@@ -55,21 +52,21 @@ export const LivechatEnterprise = {
 			});
 		}
 
-		const removeRoleResult = await removeUserFromRolesAsync(user._id, ['livechat-monitor']);
+		const removeRoleResult = removeUserFromRoles(user._id, ['livechat-monitor']);
 		if (!removeRoleResult) {
 			return false;
 		}
 
 		// remove this monitor from any unit it is assigned to
-		await LivechatUnitMonitors.removeByMonitorId(user._id);
+		LivechatUnitMonitors.removeByMonitorId(user._id);
 
 		return true;
 	},
 
-	async removeUnit(_id) {
+	removeUnit(_id) {
 		check(_id, String);
 
-		const unit = await LivechatUnit.findOneById(_id, { projection: { _id: 1 } });
+		const unit = LivechatUnit.findOneById(_id, { fields: { _id: 1 } });
 
 		if (!unit) {
 			throw new Meteor.Error('unit-not-found', 'Unit not found', { method: 'livechat:removeUnit' });
@@ -78,7 +75,7 @@ export const LivechatEnterprise = {
 		return LivechatUnit.removeById(_id);
 	},
 
-	async saveUnit(_id, unitData, unitMonitors, unitDepartments) {
+	saveUnit(_id, unitData, unitMonitors, unitDepartments) {
 		check(_id, Match.Maybe(String));
 
 		check(unitData, {
@@ -105,7 +102,7 @@ export const LivechatEnterprise = {
 
 		let ancestors = [];
 		if (_id) {
-			const unit = await LivechatUnit.findOneById(_id);
+			const unit = LivechatUnit.findOneById(_id);
 			if (!unit) {
 				throw new Meteor.Error('error-unit-not-found', 'Unit not found', {
 					method: 'livechat:saveUnit',
@@ -118,10 +115,10 @@ export const LivechatEnterprise = {
 		return LivechatUnit.createOrUpdateUnit(_id, unitData, ancestors, unitMonitors, unitDepartments);
 	},
 
-	async removeTag(_id) {
+	removeTag(_id) {
 		check(_id, String);
 
-		const tag = await LivechatTag.findOneById(_id, { projection: { _id: 1 } });
+		const tag = LivechatTag.findOneById(_id, { fields: { _id: 1 } });
 
 		if (!tag) {
 			throw new Meteor.Error('tag-not-found', 'Tag not found', { method: 'livechat:removeTag' });
@@ -130,7 +127,7 @@ export const LivechatEnterprise = {
 		return LivechatTag.removeById(_id);
 	},
 
-	async saveTag(_id, tagData, tagDepartments) {
+	saveTag(_id, tagData, tagDepartments) {
 		check(_id, Match.Maybe(String));
 
 		check(tagData, {
@@ -143,40 +140,51 @@ export const LivechatEnterprise = {
 		return LivechatTag.createOrUpdateTag(_id, tagData, tagDepartments);
 	},
 
-	async saveSLA(_id, slaData) {
-		const oldSLA = _id && (await OmnichannelServiceLevelAgreements.findOneById(_id, { projection: { dueTimeInMinutes: 1 } }));
-		const exists = await OmnichannelServiceLevelAgreements.findDuplicate(_id, slaData.name, slaData.dueTimeInMinutes);
-		if (exists) {
-			throw new Error('error-duplicated-sla');
+	savePriority(_id, priorityData) {
+		check(_id, Match.Maybe(String));
+
+		check(priorityData, {
+			name: String,
+			description: Match.Optional(String),
+			dueTimeInMinutes: String,
+		});
+
+		const oldPriority = _id && LivechatPriority.findOneById(_id, { fields: { dueTimeInMinutes: 1 } });
+		const priority = LivechatPriority.createOrUpdatePriority(_id, priorityData);
+		if (!oldPriority) {
+			return priority;
 		}
 
-		const sla = await OmnichannelServiceLevelAgreements.createOrUpdatePriority(slaData, _id);
-		if (!oldSLA) {
-			return sla;
-		}
-
-		const { dueTimeInMinutes: oldDueTimeInMinutes } = oldSLA;
-		const { dueTimeInMinutes } = sla;
+		const { dueTimeInMinutes: oldDueTimeInMinutes } = oldPriority;
+		const { dueTimeInMinutes } = priority;
 
 		if (oldDueTimeInMinutes !== dueTimeInMinutes) {
-			await updateSLAInquiries(sla);
+			updatePriorityInquiries(priority);
 		}
 
-		return sla;
+		return priority;
 	},
 
-	async removeSLA(_id) {
-		const sla = await OmnichannelServiceLevelAgreements.findOneById(_id, { projection: { _id: 1 } });
-		if (!sla) {
-			throw new Error(`SLA with id ${_id} not found`);
-		}
+	async removePriority(_id) {
+		check(_id, String);
 
-		const removedResult = await OmnichannelServiceLevelAgreements.removeById(_id);
-		if (!removedResult || removedResult.deletedCount !== 1) {
-			throw new Error(`Error removing SLA with id ${_id}`);
-		}
+		const priority = LivechatPriority.findOneById(_id, { fields: { _id: 1 } });
 
-		await removeSLAFromRooms(_id);
+		if (!priority) {
+			throw new Meteor.Error('error-invalid-priority', 'Invalid priority', {
+				method: 'livechat:removePriority',
+			});
+		}
+		const removed = LivechatPriority.removeById(_id);
+		if (removed) {
+			await removePriorityFromRooms(_id);
+		}
+		return removed;
+	},
+
+	updateRoomPriority(roomId, user, priority) {
+		updateInquiryQueuePriority(roomId, priority);
+		updateRoomPriorityHistory(roomId, user, priority);
 	},
 
 	async placeRoomOnHold(room, comment, onHoldBy) {
@@ -186,11 +194,13 @@ export const LivechatEnterprise = {
 			logger.debug(`Room ${roomId} invalid or already on hold. Skipping`);
 			return false;
 		}
+
 		await LivechatRooms.setOnHoldByRoomId(roomId);
 
-		await Message.saveSystemMessage('omnichannel_placed_chat_on_hold', roomId, '', onHoldBy, { comment });
-
-		await callbacks.run('livechat:afterOnHold', room);
+		Messages.createOnHoldHistoryWithRoomIdMessageAndUser(roomId, comment, onHoldBy);
+		Meteor.defer(() => {
+			callbacks.run('livechat:afterOnHold', room);
+		});
 
 		logger.debug(`Room ${room._id} set on hold succesfully`);
 		return true;
@@ -204,98 +214,6 @@ export const LivechatEnterprise = {
 
 		await AutoCloseOnHoldScheduler.unscheduleRoom(roomId);
 		await LivechatRooms.unsetOnHoldAndPredictedVisitorAbandonmentByRoomId(roomId);
-	},
-
-	/**
-	 * @param {string|null} _id - The department id
-	 * @param {Partial<import('@rocket.chat/core-typings').ILivechatDepartment>} departmentData
-	 * @param {{upsert?: { agentId: string; count?: number; order?: number; }[], remove?: { agentId: string; count?: number; order?: number; }}} [departmentAgents] - The department agents
-	 */
-	async saveDepartment(_id, departmentData, departmentAgents) {
-		check(_id, Match.Maybe(String));
-
-		const department = _id && (await LivechatDepartmentRaw.findOneById(_id, { projection: { _id: 1, archived: 1 } }));
-
-		if (!hasLicense('livechat-enterprise')) {
-			const totalDepartments = await LivechatDepartmentRaw.countTotal();
-			if (!department && totalDepartments >= 1) {
-				throw new Meteor.Error('error-max-departments-number-reached', 'Maximum number of departments reached', {
-					method: 'livechat:saveDepartment',
-				});
-			}
-		}
-
-		if (department?.archived && departmentData.enabled) {
-			throw new Meteor.Error('error-archived-department-cant-be-enabled', 'Archived departments cant be enabled', {
-				method: 'livechat:saveDepartment',
-			});
-		}
-
-		const defaultValidations = {
-			enabled: Boolean,
-			name: String,
-			description: Match.Optional(String),
-			showOnRegistration: Boolean,
-			email: String,
-			showOnOfflineForm: Boolean,
-			requestTagBeforeClosingChat: Match.Optional(Boolean),
-			chatClosingTags: Match.Optional([String]),
-			fallbackForwardDepartment: Match.Optional(String),
-			departmentsAllowedToForward: Match.Optional([String]),
-		};
-
-		// The Livechat Form department support addition/custom fields, so those fields need to be added before validating
-		Object.keys(departmentData).forEach((field) => {
-			if (!defaultValidations.hasOwnProperty(field)) {
-				defaultValidations[field] = Match.OneOf(String, Match.Integer, Boolean);
-			}
-		});
-
-		check(departmentData, defaultValidations);
-		check(
-			departmentAgents,
-			Match.Maybe({
-				upsert: Match.Maybe(Array),
-				remove: Match.Maybe(Array),
-			}),
-		);
-
-		const { requestTagBeforeClosingChat, chatClosingTags, fallbackForwardDepartment } = departmentData;
-		if (requestTagBeforeClosingChat && (!chatClosingTags || chatClosingTags.length === 0)) {
-			throw new Meteor.Error(
-				'error-validating-department-chat-closing-tags',
-				'At least one closing tag is required when the department requires tag(s) on closing conversations.',
-				{ method: 'livechat:saveDepartment' },
-			);
-		}
-
-		if (_id && !department) {
-			throw new Meteor.Error('error-department-not-found', 'Department not found', {
-				method: 'livechat:saveDepartment',
-			});
-		}
-
-		if (fallbackForwardDepartment === _id) {
-			throw new Meteor.Error(
-				'error-fallback-department-circular',
-				'Cannot save department. Circular reference between fallback department and department',
-			);
-		}
-
-		if (fallbackForwardDepartment && !(await LivechatDepartmentRaw.findOneById(fallbackForwardDepartment))) {
-			throw new Meteor.Error('error-fallback-department-not-found', 'Fallback department not found', { method: 'livechat:saveDepartment' });
-		}
-
-		const departmentDB = await LivechatDepartmentRaw.createOrUpdateDepartment(_id, departmentData);
-		if (departmentDB && departmentAgents) {
-			await updateDepartmentAgents(departmentDB._id, departmentAgents, departmentDB.enabled);
-		}
-
-		return departmentDB;
-	},
-
-	async isDepartmentCreationAvailable() {
-		return hasLicense('livechat-enterprise') || (await LivechatDepartmentRaw.countTotal()) === 0;
 	},
 };
 
@@ -351,7 +269,7 @@ const queueWorker = {
 	async checkQueue(queue) {
 		queueLogger.debug(`Processing items for queue ${queue || 'Public'}`);
 		try {
-			const nextInquiry = await LivechatInquiry.findNextAndLock(getInquirySortMechanismSetting(), queue);
+			const nextInquiry = await LivechatInquiry.findNextAndLock(queue);
 			if (!nextInquiry) {
 				queueLogger.debug(`No more items for queue ${queue || 'Public'}`);
 				return;

@@ -12,9 +12,9 @@ const HomepageHeader = (): ReactElement => {
 	const title = useSetting('Layout_Home_Title') as string;
 	const canEditLayout = useAllPermissions(EDIT_LAYOUT_PERMISSIONS);
 	return (
-		<PageHeader title={title} data-qa-id='home-header' role='heading'>
+		<PageHeader title={title} data-qa-id='home-header'>
 			{canEditLayout && (
-				<Button is='a' href='/admin/settings/Layout' role='button'>
+				<Button is='a' href='/admin/settings/Layout' data-qa-id='home-header-customize-button'>
 					<Icon name='pencil' size='x16' /> {t('Customize')}
 				</Button>
 			)}

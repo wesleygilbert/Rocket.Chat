@@ -40,7 +40,7 @@ export class MultipleBusinessHoursBehavior extends AbstractBusinessHourBehavior 
 		});
 		const businessHoursToOpen = await filterBusinessHoursThatMustBeOpened(activeBusinessHours);
 		for (const businessHour of businessHoursToOpen) {
-			void this.openBusinessHour(businessHour);
+			this.openBusinessHour(businessHour);
 		}
 	}
 
@@ -52,7 +52,7 @@ export class MultipleBusinessHoursBehavior extends AbstractBusinessHourBehavior 
 			},
 		});
 		for (const businessHour of businessHours) {
-			void this.openBusinessHour(businessHour);
+			this.openBusinessHour(businessHour);
 		}
 	}
 
@@ -64,7 +64,7 @@ export class MultipleBusinessHoursBehavior extends AbstractBusinessHourBehavior 
 			},
 		});
 		for (const businessHour of businessHours) {
-			void this.closeBusinessHour(businessHour);
+			this.closeBusinessHour(businessHour);
 		}
 	}
 
@@ -231,7 +231,6 @@ export class MultipleBusinessHoursBehavior extends AbstractBusinessHourBehavior 
 			if ((await LivechatDepartmentAgents.findByAgentId(agentId).count()) === 0) {
 				agentIdsWithoutDepartment.push(agentId);
 			}
-			// TODO: We're doing a full fledged aggregation with lookups and getting the whole array just for getting the length? :(
 			if (!(await LivechatDepartmentAgents.findAgentsByAgentIdAndBusinessHourId(agentId, department.businessHourId)).length) {
 				// eslint-disable-line no-await-in-loop
 				agentIdsToRemoveCurrentBusinessHour.push(agentId);
@@ -271,6 +270,6 @@ export class MultipleBusinessHoursBehavior extends AbstractBusinessHourBehavior 
 	}
 
 	private async closeBusinessHour(businessHour: Record<string, any>): Promise<void> {
-		await closeBusinessHour(businessHour);
+		closeBusinessHour(businessHour);
 	}
 }

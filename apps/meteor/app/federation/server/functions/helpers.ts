@@ -1,7 +1,8 @@
 import { isDirectMessageRoom } from '@rocket.chat/core-typings';
-import type { ISubscription, IUser, IRoom } from '@rocket.chat/core-typings';
-import { Settings, Users, Subscriptions } from '@rocket.chat/models';
+import type { ISubscription, IRegisterUser, IUser, IRoom } from '@rocket.chat/core-typings';
+import { Settings } from '@rocket.chat/models';
 
+import { Subscriptions, Users } from '../../../models/server';
 import { STATUS_ENABLED, STATUS_REGISTERING } from '../constants';
 
 export const getNameAndDomain = (fullyQualifiedName: string): string[] => fullyQualifiedName.split('@');
@@ -22,7 +23,7 @@ export async function updateEnabled(enabled: boolean): Promise<void> {
 }
 
 export const checkRoomType = (room: IRoom): boolean => room.t === 'p' || room.t === 'd';
-export const checkRoomDomainsLength = (domains: unknown[]): boolean => domains.length <= Number(process.env.FEDERATED_DOMAINS_LENGTH ?? 10);
+export const checkRoomDomainsLength = (domains: unknown[]): boolean => domains.length <= (process.env.FEDERATED_DOMAINS_LENGTH || 10);
 
 export const hasExternalDomain = ({ federation }: { federation: { origin: string; domains: string[] } }): boolean => {
 	// same test as isFederated(room)
@@ -36,13 +37,13 @@ export const hasExternalDomain = ({ federation }: { federation: { origin: string
 export const isLocalUser = ({ federation }: { federation: { origin: string } }, localDomain: string): boolean =>
 	!federation || federation.origin === localDomain;
 
-export const getFederatedRoomData = async (
+export const getFederatedRoomData = (
 	room: IRoom,
-): Promise<{
+): {
 	hasFederatedUser: boolean;
 	users: IUser[];
 	subscriptions: { [k: string]: ISubscription } | undefined;
-}> => {
+} => {
 	if (isDirectMessageRoom(room)) {
 		// Check if there is a federated user on this room
 
@@ -54,7 +55,7 @@ export const getFederatedRoomData = async (
 	}
 
 	// Find all subscriptions of this room
-	const s = await Subscriptions.findByRoomIdWhenUsernameExists(room._id).toArray();
+	const s = Subscriptions.findByRoomIdWhenUsernameExists(room._id).fetch() as ISubscription[];
 	const subscriptions = s.reduce((acc, s) => {
 		acc[s.u._id] = s;
 		return acc;
@@ -64,10 +65,10 @@ export const getFederatedRoomData = async (
 	const userIds = Object.keys(subscriptions);
 
 	// Load all the users
-	const users = await Users.findUsersWithUsernameByIds(userIds).toArray();
+	const users: IRegisterUser[] = Users.findUsersWithUsernameByIds(userIds).fetch();
 
 	// Check if there is a federated user on this room
-	const hasFederatedUser = users.some((u) => u.username && isFullyQualified(u.username));
+	const hasFederatedUser = users.some((u) => isFullyQualified(u.username));
 
 	return {
 		hasFederatedUser,

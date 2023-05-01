@@ -12,10 +12,7 @@ export interface IRolesModel extends IBaseModel<IRole> {
 
 	findOneByIdOrName(_idOrName: IRole['_id'] | IRole['name'], options: FindOptions<IRole>): Promise<IRole | null>;
 
-	findOneByIdOrName<P extends Document>(
-		_idOrName: IRole['_id'] | IRole['name'],
-		options: FindOptions<P extends IRole ? IRole : P>,
-	): Promise<P | null>;
+	findOneByIdOrName<P>(_idOrName: IRole['_id'] | IRole['name'], options: FindOptions<P extends IRole ? IRole : P>): Promise<P | null>;
 
 	findOneByIdOrName<P>(_idOrName: IRole['_id'] | IRole['name'], options?: any): Promise<IRole | P | null>;
 	findOneByName<P = IRole>(name: IRole['name'], options?: any): Promise<IRole | P | null>;
@@ -37,7 +34,7 @@ export interface IRolesModel extends IBaseModel<IRole> {
 
 	findUsersInRole(roleId: IRole['_id'], scope: IRoom['_id'] | undefined, options: FindOptions<IUser>): Promise<FindCursor<IUser>>;
 
-	findUsersInRole<P extends Document>(
+	findUsersInRole<P>(
 		roleId: IRole['_id'],
 		scope: IRoom['_id'] | undefined,
 		options: FindOptions<P extends IUser ? IUser : P>,
@@ -49,8 +46,6 @@ export interface IRolesModel extends IBaseModel<IRole> {
 		scope: IRoom['_id'] | undefined,
 		options?: any | undefined,
 	): Promise<FindCursor<IUser> | FindCursor<P>>;
-
-	findCustomRoles(options?: FindOptions<IRole>): FindCursor<IRole>;
 
 	createWithRandomId(
 		name: IRole['name'],

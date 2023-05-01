@@ -1,6 +1,5 @@
 import { Button, Icon, Pagination, States, StatesIcon, StatesActions, StatesAction, StatesTitle } from '@rocket.chat/fuselage';
 import { useDebouncedValue } from '@rocket.chat/fuselage-hooks';
-import { escapeRegExp } from '@rocket.chat/string-helpers';
 import { useRoute, useRouteParameter, usePermission, useTranslation, useEndpoint, useToastMessageDispatch } from '@rocket.chat/ui-contexts';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
@@ -36,7 +35,7 @@ const CustomSoundsRoute = (): ReactElement => {
 	const query = useDebouncedValue(
 		useMemo(
 			() => ({
-				query: JSON.stringify({ name: { $regex: escapeRegExp(text), $options: 'i' } }),
+				query: JSON.stringify({ name: { $regex: text || '', $options: 'i' } }),
 				sort: `{ "${sortBy}": ${sortDirection === 'asc' ? 1 : -1} }`,
 				...(itemsPerPage && { count: itemsPerPage }),
 				...(current && { offset: current }),
@@ -54,6 +53,9 @@ const CustomSoundsRoute = (): ReactElement => {
 		async () => {
 			const { sounds } = await getSounds(query);
 
+			if (sounds.length === 0) {
+				throw new Error(t('No_results_found'));
+			}
 			return sounds;
 		},
 		{
@@ -109,7 +111,6 @@ const CustomSoundsRoute = (): ReactElement => {
 				</Page.Header>
 				<Page.Content>
 					<>
-						<FilterByText onChange={({ text }): void => setParams(text)} />
 						{isLoading && (
 							<GenericTable>
 								<GenericTableHeader>{headers}</GenericTableHeader>
@@ -120,6 +121,7 @@ const CustomSoundsRoute = (): ReactElement => {
 						)}
 						{isSuccess && data && data.length > 0 && (
 							<>
+								<FilterByText onChange={({ text }): void => setParams(text)} />
 								<GenericTable>
 									<GenericTableHeader>{headers}</GenericTableHeader>
 									<GenericTableBody>

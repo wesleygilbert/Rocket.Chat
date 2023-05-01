@@ -1,19 +1,18 @@
-import type { MessageTypesValues, IRoom } from '@rocket.chat/core-typings';
+import type { IRoom } from '@rocket.chat/core-typings';
 
 import { settings } from '../../../settings/server';
 
-const hideMessagesOfTypeServer = new Set<MessageTypesValues>();
+const hideMessagesOfTypeServer = new Set<string>();
 
-settings.watch<MessageTypesValues[]>('Hide_System_Messages', function (values) {
+settings.watch<string[]>('Hide_System_Messages', function (values) {
 	if (!values || !Array.isArray(values)) {
 		return;
 	}
 
-	const hiddenTypes = values.reduce((array, value): MessageTypesValues[] => {
-		const newValue: MessageTypesValues[] = value === 'mute_unmute' ? ['user-muted', 'user-unmuted'] : [value];
-
-		return [...array, ...newValue];
-	}, [] as MessageTypesValues[]);
+	const hiddenTypes = values.reduce(
+		(array: string[], value: string) => [...array, ...(value === 'mute_unmute' ? ['user-muted', 'user-unmuted'] : [value])],
+		[],
+	);
 
 	hideMessagesOfTypeServer.clear();
 
@@ -21,6 +20,6 @@ settings.watch<MessageTypesValues[]>('Hide_System_Messages', function (values) {
 });
 
 // TODO probably remove on chained event system
-export function getHiddenSystemMessages(room: IRoom): MessageTypesValues[] {
+export function getHiddenSystemMessages(room: IRoom): string[] {
 	return Array.isArray(room?.sysMes) ? room.sysMes : [...hideMessagesOfTypeServer];
 }

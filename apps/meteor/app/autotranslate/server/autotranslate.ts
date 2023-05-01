@@ -10,13 +10,12 @@ import type {
 	ISupportedLanguage,
 	ITranslationResult,
 } from '@rocket.chat/core-typings';
-import { Messages, Subscriptions } from '@rocket.chat/models';
 
 import { settings } from '../../settings/server';
 import { callbacks } from '../../../lib/callbacks';
+import { Subscriptions, Messages } from '../../models/server';
 import { Markdown } from '../../markdown/server';
 import { Logger } from '../../logger/server';
-import { isTruthy } from '../../../lib/isTruthy';
 
 const translationLogger = new Logger('AutoTranslate');
 
@@ -64,21 +63,14 @@ export class TranslationProviderRegistry {
 		return TranslationProviderRegistry[Providers][provider];
 	}
 
-	static async getSupportedLanguages(target: string): Promise<ISupportedLanguage[] | undefined> {
+	static getSupportedLanguages(target: string): ISupportedLanguage[] | undefined {
 		return TranslationProviderRegistry.enabled ? TranslationProviderRegistry.getActiveProvider()?.getSupportedLanguages(target) : undefined;
 	}
 
-	static async translateMessage(message: IMessage, room: IRoom, targetLanguage?: string): Promise<IMessage | null> {
-		if (!TranslationProviderRegistry.enabled) {
-			return null;
-		}
-
-		const provider = TranslationProviderRegistry.getActiveProvider();
-		if (!provider) {
-			return null;
-		}
-
-		return provider.translateMessage(message, room, targetLanguage);
+	static translateMessage(message: IMessage, room: IRoom, targetLanguage?: string): IMessage | undefined {
+		return TranslationProviderRegistry.enabled
+			? TranslationProviderRegistry.getActiveProvider()?.translateMessage(message, room, targetLanguage)
+			: undefined;
 	}
 
 	static getProviders(): AutoTranslate[] {
@@ -173,7 +165,7 @@ export abstract class AutoTranslate {
 	tokenizeURLs(message: IMessage): IMessage {
 		let count = message.tokens?.length || 0;
 
-		const schemes = 'http,https';
+		const schemes = settings.get<string>('Markdown_SupportSchemesForLink')?.split(',').join('|');
 
 		// Support ![alt text](http://image url) and [text](http://link)
 		message.msg = message.msg.replace(
@@ -289,37 +281,37 @@ export abstract class AutoTranslate {
 	 * @param {object} targetLanguage
 	 * @returns {object} unmodified message object.
 	 */
-	async translateMessage(message: IMessage, room: IRoom, targetLanguage?: string): Promise<IMessage | null> {
+	translateMessage(message: IMessage, room: IRoom, targetLanguage?: string): IMessage {
 		let targetLanguages: string[];
 		if (targetLanguage) {
 			targetLanguages = [targetLanguage];
 		} else {
-			targetLanguages = (await Subscriptions.getAutoTranslateLanguagesByRoomAndNotUser(room._id, message.u?._id)).filter(isTruthy);
+			targetLanguages = Subscriptions.getAutoTranslateLanguagesByRoomAndNotUser(room._id, message.u?._id);
 		}
 		if (message.msg) {
-			setImmediate(async () => {
+			Meteor.defer(() => {
 				let targetMessage = Object.assign({}, message);
 				targetMessage.html = escapeHTML(String(targetMessage.msg));
 				targetMessage = this.tokenize(targetMessage);
 
-				const translations = await this._translateMessage(targetMessage, targetLanguages);
+				const translations = this._translateMessage(targetMessage, targetLanguages);
 				if (!_.isEmpty(translations)) {
-					await Messages.addTranslations(message._id, translations, TranslationProviderRegistry[Provider] || '');
+					Messages.addTranslations(message._id, translations, TranslationProviderRegistry[Provider]);
 				}
 			});
 		}
 
 		if (message.attachments && message.attachments.length > 0) {
-			setImmediate(async () => {
-				for await (const [index, attachment] of message.attachments?.entries() ?? []) {
+			Meteor.defer(() => {
+				for (const [index, attachment] of message.attachments?.entries() ?? []) {
 					if (attachment.description || attachment.text) {
 						// Removes the initial link `[ ](quoterl)` from quote message before translation
 						const translatedText = attachment?.text?.replace(/\[(.*?)\]\(.*?\)/g, '$1') || attachment?.text;
 						const attachmentMessage = { ...attachment, text: translatedText };
-						const translations = await this._translateAttachmentDescriptions(attachmentMessage, targetLanguages);
+						const translations = this._translateAttachmentDescriptions(attachmentMessage, targetLanguages);
 
 						if (!_.isEmpty(translations)) {
-							await Messages.addAttachmentTranslations(message._id, String(index), translations);
+							Messages.addAttachmentTranslations(message._id, index, translations);
 						}
 					}
 				}
@@ -345,7 +337,7 @@ export abstract class AutoTranslate {
 	 * @param {string} target - the language into which shall be translated
 	 * @returns [{ language, name }]
 	 */
-	abstract getSupportedLanguages(target: string): Promise<ISupportedLanguage[]>;
+	abstract getSupportedLanguages(target: string): ISupportedLanguage[];
 
 	/**
 	 * Performs the actual translation of a message,
@@ -356,7 +348,7 @@ export abstract class AutoTranslate {
 	 * @param {object} targetLanguages
 	 * @return {object}
 	 */
-	abstract _translateMessage(message: IMessage, targetLanguages: string[]): Promise<ITranslationResult>;
+	abstract _translateMessage(message: IMessage, targetLanguages: string[]): ITranslationResult;
 
 	/**
 	 * Performs the actual translation of an attachment (precisely its description),
@@ -366,7 +358,7 @@ export abstract class AutoTranslate {
 	 * @param {object} targetLanguages
 	 * @returns {object} translated messages for each target language
 	 */
-	abstract _translateAttachmentDescriptions(attachment: MessageAttachment, targetLanguages: string[]): Promise<ITranslationResult>;
+	abstract _translateAttachmentDescriptions(attachment: MessageAttachment, targetLanguages: string[]): ITranslationResult;
 }
 
 Meteor.startup(() => {

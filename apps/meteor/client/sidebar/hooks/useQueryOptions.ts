@@ -4,15 +4,15 @@ import { useMemo } from 'react';
 export const useQueryOptions = (): {
 	sort:
 		| {
-				lm?: -1 | 1 | undefined;
+				lm?: number | undefined;
 		  }
 		| {
-				lowerCaseFName: -1 | 1;
-				lm?: -1 | 1 | undefined;
+				lowerCaseFName: number;
+				lm?: number | undefined;
 		  }
 		| {
-				lowerCaseName: -1 | 1;
-				lm?: -1 | 1 | undefined;
+				lowerCaseName: number;
+				lm?: number | undefined;
 		  };
 } => {
 	const sortBy = useUserPreference('sidebarSortby');

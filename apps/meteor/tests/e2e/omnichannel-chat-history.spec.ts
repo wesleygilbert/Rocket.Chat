@@ -1,10 +1,17 @@
 import { faker } from '@faker-js/faker';
-import type { Page } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
 
-import { createAuxContext } from './fixtures/createAuxContext';
-import { Users } from './fixtures/userStates';
-import { OmnichannelLiveChat, HomeOmnichannel } from './page-objects';
 import { test, expect } from './utils/test';
+import { OmnichannelLiveChat, HomeOmnichannel } from './page-objects';
+
+const createAuxContext = async (browser: Browser, storageState: string): Promise<{ page: Page; poHomeOmnichannel: HomeOmnichannel }> => {
+	const page = await browser.newPage({ storageState });
+	const poHomeOmnichannel = new HomeOmnichannel(page);
+	await page.goto('/');
+	await page.locator('.main-content').waitFor();
+
+	return { page, poHomeOmnichannel };
+};
 
 test.describe('Omnichannel chat histr', () => {
 	let poLiveChat: OmnichannelLiveChat;
@@ -21,8 +28,7 @@ test.describe('Omnichannel chat histr', () => {
 		// Set user user 1 as manager and agent
 		await api.post('/livechat/users/agent', { username: 'user1' });
 		await api.post('/livechat/users/manager', { username: 'user1' });
-		const { page } = await createAuxContext(browser, Users.user1);
-		agent = { page, poHomeOmnichannel: new HomeOmnichannel(page) };
+		agent = await createAuxContext(browser, 'user1-session.json');
 	});
 	test.beforeEach(async ({ page }) => {
 		poLiveChat = new OmnichannelLiveChat(page);
@@ -31,7 +37,6 @@ test.describe('Omnichannel chat histr', () => {
 	test.afterAll(async ({ api }) => {
 		await api.delete('/livechat/users/agent/user1');
 		await api.delete('/livechat/users/manager/user1');
-		await agent.page.close();
 	});
 
 	test('Receiving a message from visitor', async ({ page }) => {

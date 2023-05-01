@@ -1,10 +1,11 @@
 import type { IRoom, IUser, RoomType } from '@rocket.chat/core-typings';
-import { Rooms } from '@rocket.chat/models';
 
-export const getRoomData = async (
+import { Rooms } from '../../../app/models/server';
+
+export const getRoomData = (
 	roomId: IRoom['_id'],
 	ownUserId?: IUser['_id'],
-): Promise<
+):
 	| {
 			roomId: string;
 			roomName: string;
@@ -14,9 +15,8 @@ export const getRoomData = async (
 			type: RoomType;
 			targetFile: string;
 	  }
-	| Record<string, never>
-> => {
-	const roomData = await Rooms.findOneById(roomId);
+	| Record<string, never> => {
+	const roomData: IRoom = Rooms.findOneById(roomId);
 
 	if (!roomData) {
 		return {};

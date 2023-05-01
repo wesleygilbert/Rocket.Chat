@@ -13,7 +13,6 @@ import { canAccessRoomIdAsync } from '../../../authorization/server/functions/ca
 import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
 import { videoConfProviders } from '../../../../server/lib/videoConfProviders';
 import { availabilityErrors } from '../../../../lib/videoConference/constants';
-import { getPaginationItems } from '../helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'video-conference.start',
@@ -148,7 +147,7 @@ API.v1.addRoute(
 			const { roomId } = this.queryParams;
 			const { userId } = this;
 
-			const { offset, count } = await getPaginationItems(this.queryParams);
+			const { offset, count } = this.getPaginationItems();
 
 			if (!userId || !(await canAccessRoomIdAsync(roomId, userId))) {
 				return API.v1.failure('invalid-params');

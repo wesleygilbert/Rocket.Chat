@@ -1,16 +1,15 @@
 import { Meteor } from 'meteor/meteor';
-import EJSON from 'ejson';
+import { EJSON } from 'meteor/ejson';
 import { FlowRouter } from 'meteor/kadira:flow-router';
 import { escapeHTML } from '@rocket.chat/string-helpers';
 import type { Filter } from 'mongodb';
 import type { IUser } from '@rocket.chat/core-typings';
-import { Users } from '@rocket.chat/models';
 
 import { placeholders } from '../../../utils/server';
 import { SystemLogger } from '../../../../server/lib/logger/system';
-import * as Mailer from '../../../mailer/server/api';
+import * as Mailer from '../../../mailer';
 
-export const sendMail = async function ({
+export const sendMail = function ({
 	from,
 	subject,
 	body,
@@ -22,7 +21,7 @@ export const sendMail = async function ({
 	body: string;
 	dryrun?: boolean;
 	query?: string;
-}): Promise<void> {
+}): void {
 	Mailer.checkAddressFormatAndThrow(from, 'Mailer.sendMail');
 
 	if (body.indexOf('[unsubscribe]') === -1) {
@@ -36,34 +35,36 @@ export const sendMail = async function ({
 		userQuery = { $and: [userQuery, EJSON.parse(query)] };
 	}
 
-	const users = await Users.find(userQuery).toArray();
-
 	if (dryrun) {
-		for await (const u of users) {
-			const user: Partial<IUser> & Pick<IUser, '_id'> = u;
-			const email = `${user.name} <${user.emails?.[0].address}>`;
-			const html = placeholders.replace(body, {
-				unsubscribe: Meteor.absoluteUrl(
-					FlowRouter.path('mailer/unsubscribe/:_id/:createdAt', {
-						_id: user._id,
-						createdAt: user.createdAt?.getTime().toString() || '',
-					}),
-				),
-				name: user.name,
-				email,
-			});
+		return Meteor.users
+			.find({
+				'emails.address': from,
+			})
+			.forEach((u): void => {
+				const user: Partial<IUser> & Pick<IUser, '_id'> = u;
+				const email = `${user.name} <${user.emails?.[0].address}>`;
+				const html = placeholders.replace(body, {
+					unsubscribe: Meteor.absoluteUrl(
+						FlowRouter.path('mailer/unsubscribe/:_id/:createdAt', {
+							_id: user._id,
+							createdAt: user.createdAt?.getTime().toString() || '',
+						}),
+					),
+					name: user.name,
+					email,
+				});
 
-			SystemLogger.debug(`Sending email to ${email}`);
-			await Mailer.send({
-				to: email,
-				from,
-				subject,
-				html,
+				SystemLogger.debug(`Sending email to ${email}`);
+				return Mailer.send({
+					to: email,
+					from,
+					subject,
+					html,
+				});
 			});
-		}
 	}
 
-	for await (const u of users) {
+	return Meteor.users.find(userQuery).forEach(function (u) {
 		const user: Partial<IUser> & Pick<IUser, '_id'> = u;
 		if (user?.emails && Array.isArray(user.emails) && user.emails.length) {
 			const email = `${user.name} <${user.emails[0].address}>`;
@@ -79,12 +80,12 @@ export const sendMail = async function ({
 				email: escapeHTML(email),
 			});
 			SystemLogger.debug(`Sending email to ${email}`);
-			await Mailer.send({
+			return Mailer.send({
 				to: email,
 				from,
 				subject,
 				html,
 			});
 		}
-	}
+	});
 };

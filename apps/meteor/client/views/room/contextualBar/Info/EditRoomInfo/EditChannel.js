@@ -205,7 +205,7 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 		canViewJoinCode,
 		canViewEncrypted,
 	] = useMemo(() => {
-		const isAllowed = roomCoordinator.getRoomDirectives(room.t).allowRoomSettingChange || (() => {});
+		const isAllowed = roomCoordinator.getRoomDirectives(room.t)?.allowRoomSettingChange || (() => {});
 		return [
 			isAllowed(room, RoomSettingsEnum.NAME),
 			isAllowed(room, RoomSettingsEnum.TOPIC),
@@ -289,8 +289,6 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 		handleRetentionMaxAge(Math.max(1, Number(e.currentTarget.value)));
 	});
 
-	const isFederated = useMemo(() => isRoomFederated(room), [room]);
-
 	return (
 		<>
 			<VerticalBar.Header>
@@ -313,7 +311,7 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 					<Field>
 						<Field.Label>{t('Description')}</Field.Label>
 						<Field.Row>
-							<TextAreaInput disabled={isFederated} rows={4} value={roomDescription} onChange={handleRoomDescription} flexGrow={1} />
+							<TextAreaInput rows={4} value={roomDescription} onChange={handleRoomDescription} flexGrow={1} />
 						</Field.Row>
 					</Field>
 				)}
@@ -321,7 +319,7 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 					<Field>
 						<Field.Label>{t('Announcement')}</Field.Label>
 						<Field.Row>
-							<TextAreaInput disabled={isFederated} rows={4} value={roomAnnouncement} onChange={handleRoomAnnouncement} flexGrow={1} />
+							<TextAreaInput rows={4} value={roomAnnouncement} onChange={handleRoomAnnouncement} flexGrow={1} />
 						</Field.Row>
 					</Field>
 				)}
@@ -338,7 +336,7 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 						<Box display='flex' flexDirection='row' justifyContent='space-between' flexGrow={1}>
 							<Field.Label>{t('Private')}</Field.Label>
 							<Field.Row>
-								<ToggleSwitch disabled={!canChangeType || isFederated} checked={roomType === 'p'} onChange={changeRoomType} />
+								<ToggleSwitch disabled={!canChangeType || isRoomFederated(room)} checked={roomType === 'p'} onChange={changeRoomType} />
 							</Field.Row>
 						</Box>
 						<Field.Hint>{t('Teams_New_Private_Description_Enabled')}</Field.Hint>
@@ -349,7 +347,7 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 						<Box display='flex' flexDirection='row' justifyContent='space-between' flexGrow={1}>
 							<Field.Label>{t('Read_only')}</Field.Label>
 							<Field.Row>
-								<ToggleSwitch disabled={!canSetRo || isFederated} checked={readOnly} onChange={handleReadOnly} />
+								<ToggleSwitch disabled={!canSetRo || isRoomFederated(room)} checked={readOnly} onChange={handleReadOnly} />
 							</Field.Row>
 						</Box>
 						<Field.Hint>{t('Only_authorized_users_can_write_new_messages')}</Field.Hint>
@@ -381,7 +379,7 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 						<Box display='flex' flexDirection='row' justifyContent='space-between' flexGrow={1}>
 							<Field.Label>{t('Password_to_access')}</Field.Label>
 							<Field.Row>
-								<ToggleSwitch disabled={isFederated} checked={joinCodeRequired} onChange={handleJoinCodeRequired} />
+								<ToggleSwitch checked={joinCodeRequired} onChange={handleJoinCodeRequired} />
 							</Field.Row>
 						</Box>
 						<Field.Row>
@@ -400,14 +398,14 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 						<Box display='flex' flexDirection='row' justifyContent='space-between' flexGrow={1}>
 							<Field.Label>{t('Hide_System_Messages')}</Field.Label>
 							<Field.Row>
-								<ToggleSwitch checked={hideSysMes} disabled={isFederated} onChange={handleHideSysMes} />
+								<ToggleSwitch checked={hideSysMes} onChange={handleHideSysMes} />
 							</Field.Row>
 						</Box>
 						<Field.Row>
 							<MultiSelect
 								maxWidth='100%'
 								options={sysMesOptions}
-								disabled={!hideSysMes || isFederated}
+								disabled={!hideSysMes}
 								value={systemMessages}
 								onChange={handleSystemMessages}
 								placeholder={t('Select_an_option')}
@@ -421,7 +419,7 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 						<Box display='flex' flexDirection='row' justifyContent='space-between' flexGrow={1}>
 							<Field.Label>{t('Encrypted')}</Field.Label>
 							<Field.Row>
-								<ToggleSwitch disabled={!canToggleEncryption || isFederated} checked={encrypted} onChange={handleEncrypted} />
+								<ToggleSwitch disabled={!canToggleEncryption} checked={encrypted} onChange={handleEncrypted} />
 							</Field.Row>
 						</Box>
 					</Field>
@@ -499,7 +497,7 @@ function EditChannel({ room, onClickClose, onClickBack }) {
 				</Field>
 				<Field>
 					<Field.Row>
-						<Button flexGrow={1} danger disabled={!canDelete || isFederated} onClick={handleDelete}>
+						<Button flexGrow={1} danger disabled={!canDelete} onClick={handleDelete}>
 							<Icon name='trash' size='x16' />
 							{t('Delete')}
 						</Button>

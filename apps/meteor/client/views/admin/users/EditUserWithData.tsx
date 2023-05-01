@@ -67,7 +67,7 @@ const EditUserWithData = ({ uid, onReload, ...props }: EditUserWithDataProps): R
 		);
 	}
 
-	if (data?.user && isUserFederated(data?.user as unknown as IUser)) {
+	if (data?.user && isUserFederated({ federated: data?.user.federated })) {
 		return (
 			<Callout m='x16' type='danger'>
 				{t('Edit_Federated_User_Not_Allowed')}

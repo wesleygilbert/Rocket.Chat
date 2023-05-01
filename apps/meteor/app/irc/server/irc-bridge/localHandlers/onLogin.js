@@ -1,6 +1,8 @@
-import { Rooms, Users } from '@rocket.chat/models';
+import { Meteor } from 'meteor/meteor';
 
-export default async function handleOnLogin(login) {
+import { Users, Rooms } from '../../../../models/server';
+
+export default function handleOnLogin(login) {
 	if (login.user === null) {
 		return this.log('Invalid handleOnLogin call');
 	}
@@ -13,7 +15,7 @@ export default async function handleOnLogin(login) {
 
 	this.loggedInUsers.push(login.user._id);
 
-	await Users.updateOne(
+	Meteor.users.update(
 		{ _id: login.user._id },
 		{
 			$set: {
@@ -25,12 +27,12 @@ export default async function handleOnLogin(login) {
 		},
 	);
 
-	const user = await Users.findOne({
+	const user = Users.findOne({
 		_id: login.user._id,
 	});
 
 	this.sendCommand('registerUser', user);
-	const rooms = await Rooms.findBySubscriptionUserId(user._id).toArray();
+	const rooms = Rooms.findBySubscriptionUserId(user._id).fetch();
 
 	rooms.forEach((room) => {
 		if (room.t === 'd') {

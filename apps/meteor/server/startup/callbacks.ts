@@ -2,7 +2,7 @@ import { performance } from 'universal-perf-hooks';
 
 import { callbacks } from '../../lib/callbacks';
 import { Logger } from '../lib/logger/Logger';
-import { metrics, StatsTracker } from '../../app/metrics/server';
+import { metrics, StatsTracker } from '../../app/metrics';
 
 callbacks.setLogger(new Logger('Callbacks'));
 

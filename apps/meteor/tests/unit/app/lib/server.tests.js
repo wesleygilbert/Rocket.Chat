@@ -9,7 +9,7 @@ const { default: PasswordPolicyClass } = proxyquire.noCallThru().load('../../../
 			},
 		},
 	},
-	'@rocket.chat/random': {
+	'meteor/random': {
 		Random: {
 			id: () => 1,
 		},

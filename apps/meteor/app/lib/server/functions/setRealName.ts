@@ -1,14 +1,15 @@
 import { Meteor } from 'meteor/meteor';
+import s from 'underscore.string';
 import type { IUser } from '@rocket.chat/core-typings';
 import { api } from '@rocket.chat/core-services';
-import { Users } from '@rocket.chat/models';
 
+import { Users } from '../../../models/server';
 import { settings } from '../../../settings/server';
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { hasPermission } from '../../../authorization/server';
 import { RateLimiter } from '../lib';
 
-export const _setRealName = async function (userId: string, name: string, fullUser: IUser): Promise<IUser | undefined> {
-	name = name.trim();
+export const _setRealName = function (userId: string, name: string, fullUser: IUser): IUser | undefined {
+	name = s.trim(name);
 
 	if (!userId || (settings.get('Accounts_RequireNameForSignUp') && !name)) {
 		return;
@@ -21,26 +22,26 @@ export const _setRealName = async function (userId: string, name: string, fullUs
 	}
 
 	// User already has desired name, return
-	if (user.name && user.name.trim() === name) {
+	if (user.name && s.trim(user.name) === name) {
 		return user;
 	}
 
 	// Set new name
 	if (name) {
-		await Users.setName(user._id, name);
+		Users.setName(user._id, name);
 	} else {
-		await Users.unsetName(user._id);
+		Users.unsetName(user._id);
 	}
 	user.name = name;
 
 	if (settings.get('UI_Use_Real_Name') === true) {
-		void api.broadcast('user.nameChanged', {
+		api.broadcast('user.nameChanged', {
 			_id: user._id,
 			name: user.name,
 			username: user.username,
 		});
 	}
-	void api.broadcast('user.realNameChanged', {
+	api.broadcast('user.realNameChanged', {
 		_id: user._id,
 		name,
 		username: user.username,
@@ -50,8 +51,8 @@ export const _setRealName = async function (userId: string, name: string, fullUs
 };
 
 export const setRealName = RateLimiter.limitFunction(_setRealName, 1, 60000, {
-	async 0() {
+	0() {
 		const userId = Meteor.userId();
-		return !userId || !(await hasPermissionAsync(userId, 'edit-other-user-info'));
+		return !userId || !hasPermission(userId, 'edit-other-user-info');
 	}, // Administrators have permission to change others names, so don't limit those
 });

@@ -21,6 +21,7 @@ type Values = {
 	displayAvatars: boolean;
 	clockMode: 0 | 1 | 2;
 	sendOnEnter: 'normal' | 'alternative' | 'desktop';
+	messageViewMode: 0 | 1 | 2;
 };
 
 const PreferencesMessagesSection = ({ onChange, commitRef, ...props }: FormSectionProps): ReactElement => {
@@ -41,6 +42,7 @@ const PreferencesMessagesSection = ({ onChange, commitRef, ...props }: FormSecti
 		hideFlexTab: useUserPreference('hideFlexTab'),
 		clockMode: useUserPreference('clockMode') ?? 0,
 		sendOnEnter: useUserPreference('sendOnEnter'),
+		messageViewMode: useUserPreference('messageViewMode'),
 		displayAvatars: useUserPreference('displayAvatars'),
 	};
 
@@ -60,6 +62,7 @@ const PreferencesMessagesSection = ({ onChange, commitRef, ...props }: FormSecti
 		displayAvatars,
 		clockMode,
 		sendOnEnter,
+		messageViewMode,
 	} = values as Values;
 
 	const {
@@ -76,6 +79,7 @@ const PreferencesMessagesSection = ({ onChange, commitRef, ...props }: FormSecti
 		handleDisplayAvatars,
 		handleClockMode,
 		handleSendOnEnter,
+		handleMessageViewMode,
 	} = handlers;
 
 	const alsoSendThreadMessageToChannelOptions = useMemo(
@@ -101,6 +105,15 @@ const PreferencesMessagesSection = ({ onChange, commitRef, ...props }: FormSecti
 			['normal', t('Enter_Normal')],
 			['alternative', t('Enter_Alternative')],
 			['desktop', t('Only_On_Desktop')],
+		],
+		[t],
+	);
+
+	const messageViewModeOptions = useMemo(
+		(): SelectOption[] => [
+			[0 as any, t('Normal')], // TO DO: update SelectOption type to accept number as first item
+			[1, t('Cozy')],
+			[2, t('Compact')],
 		],
 		[t],
 	);
@@ -261,6 +274,18 @@ const PreferencesMessagesSection = ({ onChange, commitRef, ...props }: FormSecti
 						</Field>
 					),
 					[handleSendOnEnter, sendOnEnter, sendOnEnterOptions, t],
+				)}
+				{useMemo(
+					() => (
+						<Field>
+							<Field.Label>{t('View_mode')}</Field.Label>
+							<Field.Row>
+								<Select value={messageViewMode} onChange={handleMessageViewMode} options={messageViewModeOptions} />
+							</Field.Row>
+							<Field.Hint>{t('Message_view_mode_info')}</Field.Hint>
+						</Field>
+					),
+					[handleMessageViewMode, messageViewMode, messageViewModeOptions, t],
 				)}
 			</FieldGroup>
 		</Accordion.Item>

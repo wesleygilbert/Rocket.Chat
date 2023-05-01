@@ -1,16 +1,15 @@
 import { Meteor } from 'meteor/meteor';
 import { Tracker } from 'meteor/tracker';
-import { Users } from '@rocket.chat/models';
 
-import { settings } from '../../../settings/client';
-import { getUserPreference } from '../../../utils/client';
-import { Subscriptions } from '../../../models/client';
+import { settings } from '../../../settings';
+import { getUserPreference } from '../../../utils';
+import { Subscriptions, Users } from '../../../models/client';
 import { CustomSounds } from '../../../custom-sounds/client';
 
 let audio = null;
 
 Meteor.startup(() => {
-	Tracker.autorun(async () => {
+	Tracker.autorun(() => {
 		if (!settings.get('Livechat_continuous_sound_notification_new_livechat_room')) {
 			audio && audio.pause();
 			return;
@@ -22,8 +21,8 @@ Meteor.startup(() => {
 			return;
 		}
 
-		const user = await Users.findOne(Meteor.userId(), {
-			projection: {
+		const user = Users.findOne(Meteor.userId(), {
+			fields: {
 				'settings.preferences.newRoomNotification': 1,
 			},
 		});

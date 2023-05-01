@@ -1,4 +1,4 @@
-import type { IRoom } from '@rocket.chat/core-typings';
+import type { IRoom, IUser } from '@rocket.chat/core-typings';
 import { css } from '@rocket.chat/css-in-js';
 import { Field, TextInput, ButtonGroup, Button, Box, Icon, Callout, FieldGroup } from '@rocket.chat/fuselage';
 import { useMutableCallback } from '@rocket.chat/fuselage-hooks';
@@ -11,11 +11,12 @@ import UserAutoCompleteMultiple from '../../../../components/UserAutoCompleteMul
 import { useForm } from '../../../../hooks/useForm';
 import { roomCoordinator } from '../../../../lib/rooms/roomCoordinator';
 import { SelectedMessageContext, useCountSelected } from '../../MessageList/contexts/SelectedMessagesContext';
+import { useMessages } from '../../MessageList/hooks/useMessages';
 
 type MailExportFormValues = {
 	dateFrom: string;
 	dateTo: string;
-	toUsers: string[];
+	toUsers: IUser['username'][];
 	additionalEmails: string;
 	subject: string;
 };
@@ -37,6 +38,8 @@ const MailExportForm: FC<MailExportFormProps> = ({ onCancel, rid }) => {
 
 	const messages = selectedMessageStore.getSelectedMessages();
 	const count = useCountSelected();
+
+	const messageList = useMessages({ rid });
 
 	const { values, handlers } = useForm({
 		dateFrom: '',
@@ -61,7 +64,36 @@ const MailExportForm: FC<MailExportFormProps> = ({ onCancel, rid }) => {
 		};
 	}, [selectedMessageStore]);
 
+	// TODO: chapter day frontend -  after 5.0 remove
+	useEffect(() => {
+		const $root = $(`#chat-window-${rid}`);
+
+		$('.messages-box', $root).addClass('selectable');
+
+		const handler = function (this: any): void {
+			selectedMessageStore.toggle(this.id);
+			this.classList.toggle('selected');
+		};
+
+		$('.messages-box .message', $root).on('click', handler);
+
+		return (): void => {
+			$('.messages-box', $root).removeClass('selectable');
+			$('.messages-box .message', $root).off('click', handler).filter('.selected').removeClass('selected');
+		};
+	}, [rid, messageList, selectedMessageStore]);
+
 	const { handleToUsers, handleAdditionalEmails, handleSubject } = handlers;
+
+	const onChangeUsers = useMutableCallback((value, action) => {
+		if (!action) {
+			if (toUsers.includes(value)) {
+				return;
+			}
+			return handleToUsers([...toUsers, value]);
+		}
+		handleToUsers(toUsers.filter((current) => current !== value));
+	});
 
 	const roomsExport = useEndpoint('POST', '/v1/rooms.export');
 
@@ -118,7 +150,7 @@ const MailExportForm: FC<MailExportFormProps> = ({ onCancel, rid }) => {
 			<Field>
 				<Field.Label>{t('To_users')}</Field.Label>
 				<Field.Row>
-					<UserAutoCompleteMultiple value={toUsers} onChange={handleToUsers} />
+					<UserAutoCompleteMultiple value={toUsers} onChange={onChangeUsers} />
 				</Field.Row>
 			</Field>
 			<Field>

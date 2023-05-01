@@ -22,8 +22,6 @@ export class MessageList extends MemoizedComponent {
 
 	static SCROLL_FREE = 'free';
 
-	static SCROLL_AT_BOTTOM_AREA = 128;
-
 	// eslint-disable-next-line no-use-before-define
 	scrollPosition = MessageList.SCROLL_AT_BOTTOM;
 
@@ -35,15 +33,11 @@ export class MessageList extends MemoizedComponent {
 		}
 
 		let scrollPosition;
-		const scrollBottom = this.base.scrollHeight - (this.base.clientHeight + this.base.scrollTop);
-
 		if (this.base.scrollHeight <= this.base.clientHeight) {
 			scrollPosition = MessageList.SCROLL_AT_BOTTOM;
 		} else if (this.base.scrollTop === 0) {
 			scrollPosition = MessageList.SCROLL_AT_TOP;
-		} else if (scrollBottom <= MessageList.SCROLL_AT_BOTTOM_AREA) {
-			// TODO: Once we convert these classes to functional components we should use refs to check if the last message is within the viewport
-			// For now we are using a fixed value to check if the last message is within the bottom of the scroll area
+		} else if (this.base.scrollHeight === this.base.scrollTop + this.base.clientHeight) {
 			scrollPosition = MessageList.SCROLL_AT_BOTTOM;
 		} else {
 			scrollPosition = MessageList.SCROLL_FREE;
@@ -53,13 +47,6 @@ export class MessageList extends MemoizedComponent {
 			this.scrollPosition = scrollPosition;
 			const { onScrollTo } = this.props;
 			onScrollTo && onScrollTo(scrollPosition);
-		}
-
-		const { dispatch } = this.props;
-		const { messageListPosition } = store.state;
-
-		if (messageListPosition !== this.scrollPosition) {
-			dispatch({ messageListPosition: this.scrollPosition });
 		}
 	};
 
@@ -88,18 +75,7 @@ export class MessageList extends MemoizedComponent {
 		}
 	}
 
-	componentDidUpdate(prevProps) {
-		const { messages, uid } = this.props;
-		const { messages: prevMessages } = prevProps;
-
-		if (messages?.length !== prevMessages?.length) {
-			const lastMessage = messages[messages.length - 1];
-
-			if (lastMessage?.u?._id && lastMessage.u._id === uid) {
-				this.scrollPosition = MessageList.SCROLL_AT_BOTTOM;
-			}
-		}
-
+	componentDidUpdate() {
 		if (this.scrollPosition === MessageList.SCROLL_AT_BOTTOM) {
 			this.base.scrollTop = this.base.scrollHeight;
 			return;

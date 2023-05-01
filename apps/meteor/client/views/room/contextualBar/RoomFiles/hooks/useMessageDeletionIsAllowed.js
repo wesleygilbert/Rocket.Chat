@@ -8,7 +8,6 @@ export const useMessageDeletionIsAllowed = (rid, uid) => {
 	const deletionIsEnabled = useSetting('Message_AllowDeleting');
 	const userHasPermissonToDeleteAny = usePermission('delete-message', rid);
 	const userHasPermissonToDeleteOwn = usePermission('delete-own-message');
-	const bypassBlockTimeLimit = usePermission('bypass-time-limit-edit-and-delete');
 	const blockDeleteInMinutes = useSetting('Message_AllowDeleting_BlockDeleteInMinutes');
 
 	const isDeletionAllowed = (() => {
@@ -25,7 +24,7 @@ export const useMessageDeletionIsAllowed = (rid, uid) => {
 		}
 
 		const checkTimeframe =
-			!bypassBlockTimeLimit && blockDeleteInMinutes !== 0
+			blockDeleteInMinutes !== 0
 				? ({ ts }) => {
 						if (!ts) {
 							return false;

@@ -1,6 +1,6 @@
+import { HTTP } from 'meteor/http';
 import { Settings } from '@rocket.chat/models';
 import { NPS, Banner } from '@rocket.chat/core-services';
-import { serverFetch as fetch } from '@rocket.chat/server-fetch';
 
 import { buildWorkspaceRegistrationData } from './buildRegistrationData';
 import { retrieveRegistrationStatus } from './retrieveRegistrationStatus';
@@ -11,7 +11,7 @@ import { getAndCreateNpsSurvey } from '../../../../server/services/nps/getAndCre
 import { SystemLogger } from '../../../../server/lib/logger/system';
 
 export async function syncWorkspace(reconnectCheck = false) {
-	const { workspaceRegistered, connectToCloud } = await retrieveRegistrationStatus();
+	const { workspaceRegistered, connectToCloud } = retrieveRegistrationStatus();
 	if (!workspaceRegistered || (!connectToCloud && !reconnectCheck)) {
 		return false;
 	}
@@ -31,21 +31,15 @@ export async function syncWorkspace(reconnectCheck = false) {
 			return false;
 		}
 
-		const request = await fetch(`${workspaceUrl}/client`, {
+		result = HTTP.post(`${workspaceUrl}/client`, {
+			data: info,
 			headers,
-			body: info,
-			method: 'POST',
 		});
-
-		if (!request.ok) {
-			throw new Error((await request.json()).error);
-		}
-
-		result = await request.json();
 	} catch (err: any) {
 		SystemLogger.error({
 			msg: 'Failed to sync with Rocket.Chat Cloud',
 			url: '/client',
+			...(err.response?.data && { cloudError: err.response.data }),
 			err,
 		});
 
@@ -55,7 +49,7 @@ export async function syncWorkspace(reconnectCheck = false) {
 		await getWorkspaceLicense();
 	}
 
-	const data = result;
+	const { data } = result;
 	if (!data) {
 		return true;
 	}
@@ -86,7 +80,7 @@ export async function syncWorkspace(reconnectCheck = false) {
 		const now = new Date();
 
 		if (startAt.getFullYear() === now.getFullYear() && startAt.getMonth() === now.getMonth() && startAt.getDate() === now.getDate()) {
-			await getAndCreateNpsSurvey(npsId);
+			getAndCreateNpsSurvey(npsId);
 		}
 	}
 

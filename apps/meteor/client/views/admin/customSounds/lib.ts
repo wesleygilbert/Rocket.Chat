@@ -1,13 +1,24 @@
-import type { ICustomSoundData } from '../../../../app/custom-sounds/server/methods/insertOrUpdateSound';
-
-type ICustomSoundFile = {
+type soundFileType = {
 	name: string;
 	type: string;
 	extension?: string;
 };
 
+export type soundDataType = {
+	extension: string;
+	_id?: string;
+	previousName?: string;
+	previousSound?: {
+		extension?: string;
+	};
+	previousExtension?: string;
+	name?: string;
+	newFile?: boolean;
+	random?: number;
+};
+
 // Here previousData will define if it is an update or a new entry
-export function validate(soundData: ICustomSoundData, soundFile?: ICustomSoundFile): ('Name' | 'Sound File' | 'FileType')[] {
+export function validate(soundData: soundDataType, soundFile?: soundFileType): ('Name' | 'Sound File' | 'FileType')[] {
 	const errors: ('Name' | 'Sound File' | 'FileType')[] = [];
 
 	if (!soundData.name) {
@@ -29,33 +40,26 @@ export function validate(soundData: ICustomSoundData, soundFile?: ICustomSoundFi
 	return errors;
 }
 
-export const createSoundData = (
-	soundFile: ICustomSoundFile,
+export const createSoundData = function createSoundData(
+	soundFile: soundFileType,
 	name: string,
-	previousData?: {
-		_id: string;
-		extension: string;
-		previousName: string;
-		previousSound: {
-			extension?: string;
-		};
-	},
-): ICustomSoundData => {
-	if (!previousData) {
-		return {
-			name: name.trim(),
-			extension: soundFile?.name.split('.').pop() || '',
-			newFile: true,
-		};
+	previousData?: soundDataType,
+): soundDataType {
+	const soundData: soundDataType = {
+		extension: soundFile?.name.split('.').pop() || '',
+	};
+
+	if (previousData) {
+		soundData._id = previousData._id;
+		soundData.previousName = previousData.previousName;
+		soundData.previousSound = previousData.previousSound;
+		soundData.previousExtension = previousData.previousSound?.extension;
+		soundData.name = name;
+		soundData.newFile = false;
+	} else {
+		soundData.name = name.trim();
+		soundData.newFile = true;
 	}
 
-	return {
-		_id: previousData._id,
-		name,
-		extension: soundFile?.name.split('.').pop() || '',
-		previousName: previousData.previousName,
-		previousExtension: previousData.previousSound?.extension,
-		previousSound: previousData.previousSound,
-		newFile: false,
-	};
+	return soundData;
 };

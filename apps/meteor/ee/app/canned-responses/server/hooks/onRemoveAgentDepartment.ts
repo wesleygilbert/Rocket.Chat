@@ -1,13 +1,12 @@
-import { CannedResponse } from '@rocket.chat/models';
-
 import { callbacks } from '../../../../../lib/callbacks';
+import CannedResponse from '../../../models/server/models/CannedResponse';
 import notifications from '../../../../../app/notifications/server/lib/Notifications';
 
 callbacks.add(
 	'livechat.removeAgentDepartment',
 	async (options: Record<string, any>): Promise<any> => {
 		const { departmentId, agentsId } = options;
-		await CannedResponse.findByDepartmentId(departmentId, { projection: { _id: 1 } }).forEach((response: any) => {
+		CannedResponse.findByDepartmentId(departmentId, { fields: { _id: 1 } }).forEach((response: any) => {
 			const { _id } = response;
 			notifications.streamCannedResponses.emit('canned-responses', { type: 'removed', _id }, { agentsId });
 		});

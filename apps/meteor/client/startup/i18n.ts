@@ -1,4 +1,3 @@
-import type { IUser } from '@rocket.chat/core-typings';
 import { Meteor } from 'meteor/meteor';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
@@ -72,12 +71,7 @@ Meteor.startup(() => {
 	window.defaultUserLanguage = defaultUserLanguage;
 
 	Tracker.autorun(() => {
-		const uid = Meteor.userId();
-		if (!uid) {
-			return;
-		}
-
-		const user = Users.findOne(uid, { fields: { language: 1 } }) as IUser | undefined;
+		const user = Users.findOne(Meteor.userId(), { fields: { language: 1 } });
 
 		setLanguage(user?.language || defaultUserLanguage());
 	});

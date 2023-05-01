@@ -19,13 +19,13 @@ export const overrideLoginMethod = <A extends unknown[]>(
 	loginMethodTOTP: LoginMethodWithTotp<A>,
 	emailOrUsername: string,
 ): void => {
-	loginMethod.call(null, ...loginArgs, async (error: unknown, result?: unknown) => {
+	loginMethod.call(null, ...loginArgs, (error: unknown, result?: unknown) => {
 		if (!isTotpRequiredError(error)) {
 			callback(error);
 			return;
 		}
 
-		await process2faReturn({
+		process2faReturn({
 			error,
 			result,
 			emailOrUsername,

@@ -15,7 +15,7 @@ import { useResetTOTPAction } from './hooks/useResetTOTPAction';
 type AdminUserInfoActionsProps = {
 	username: IUser['username'];
 	userId: IUser['_id'];
-	isFederatedUser: IUser['federated'];
+	isAFederatedUser: IUser['federated'];
 	isActive: boolean;
 	isAdmin: boolean;
 	onChange: () => void;
@@ -25,7 +25,7 @@ type AdminUserInfoActionsProps = {
 const AdminUserInfoActions = ({
 	username,
 	userId,
-	isFederatedUser,
+	isAFederatedUser,
 	isActive,
 	isAdmin,
 	onChange,
@@ -65,7 +65,7 @@ const AdminUserInfoActions = ({
 		() => ({
 			...(canDirectMessage && {
 				directMessage: {
-					icon: 'balloon' as const,
+					icon: 'balloon',
 					label: t('Direct_Message'),
 					title: t('Direct_Message'),
 					action: directMessageClick,
@@ -73,18 +73,18 @@ const AdminUserInfoActions = ({
 			}),
 			...(canEditOtherUserInfo && {
 				editUser: {
-					icon: 'edit' as const,
+					icon: 'edit',
 					label: t('Edit'),
-					title: isFederatedUser ? t('Edit_Federated_User_Not_Allowed') : t('Edit'),
+					title: isAFederatedUser ? t('Edit_Federated_User_Not_Allowed') : t('Edit'),
 					action: editUserClick,
-					disabled: isFederatedUser,
+					disabled: isAFederatedUser,
 				},
 			}),
-			...(changeAdminStatusAction && !isFederatedUser && { makeAdmin: changeAdminStatusAction }),
-			...(resetE2EKeyAction && !isFederatedUser && { resetE2EKey: resetE2EKeyAction }),
-			...(resetTOTPAction && !isFederatedUser && { resetTOTP: resetTOTPAction }),
+			...(changeAdminStatusAction && { makeAdmin: changeAdminStatusAction }),
+			...(resetE2EKeyAction && { resetE2EKey: resetE2EKeyAction }),
+			...(resetTOTPAction && { resetTOTP: resetTOTPAction }),
 			...(deleteUserAction && { delete: deleteUserAction }),
-			...(changeUserStatusAction && !isFederatedUser && { changeActiveStatus: changeUserStatusAction }),
+			...(changeUserStatusAction && { changeActiveStatus: changeUserStatusAction }),
 		}),
 		[
 			t,
@@ -97,7 +97,7 @@ const AdminUserInfoActions = ({
 			deleteUserAction,
 			resetE2EKeyAction,
 			resetTOTPAction,
-			isFederatedUser,
+			isAFederatedUser,
 		],
 	);
 

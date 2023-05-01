@@ -1,17 +1,17 @@
 import { Meteor } from 'meteor/meteor';
 import _ from 'underscore';
+import s from 'underscore.string';
 
 import { getRoomByNameOrIdWithOptionToJoin } from './getRoomByNameOrIdWithOptionToJoin';
 import { sendMessage } from './sendMessage';
-import { validateRoomMessagePermissionsAsync } from '../../../authorization/server/functions/canSendMessage';
+import { validateRoomMessagePermissions } from '../../../authorization/server/functions/canSendMessage';
 import { SystemLogger } from '../../../../server/lib/logger/system';
-import { trim } from '../../../../lib/utils/stringUtils';
 
-export const processWebhookMessage = async function (messageObj, user, defaultValues = { channel: '', alias: '', avatar: '', emoji: '' }) {
+export const processWebhookMessage = function (messageObj, user, defaultValues = { channel: '', alias: '', avatar: '', emoji: '' }) {
 	const sentData = [];
 	const channels = [].concat(messageObj.channel || messageObj.roomId || defaultValues.channel);
 
-	for await (const channel of channels) {
+	for (const channel of channels) {
 		const channelType = channel[0];
 
 		let channelValue = channel.substr(1);
@@ -19,15 +19,15 @@ export const processWebhookMessage = async function (messageObj, user, defaultVa
 
 		switch (channelType) {
 			case '#':
-				room = await getRoomByNameOrIdWithOptionToJoin({
-					user,
+				room = getRoomByNameOrIdWithOptionToJoin({
+					currentUserId: user._id,
 					nameOrId: channelValue,
 					joinChannel: true,
 				});
 				break;
 			case '@':
-				room = await getRoomByNameOrIdWithOptionToJoin({
-					user,
+				room = getRoomByNameOrIdWithOptionToJoin({
+					currentUserId: user._id,
 					nameOrId: channelValue,
 					type: 'd',
 				});
@@ -36,8 +36,8 @@ export const processWebhookMessage = async function (messageObj, user, defaultVa
 				channelValue = channelType + channelValue;
 
 				// Try to find the room by id or name if they didn't include the prefix.
-				room = await getRoomByNameOrIdWithOptionToJoin({
-					user,
+				room = getRoomByNameOrIdWithOptionToJoin({
+					currentUserId: user._id,
 					nameOrId: channelValue,
 					joinChannel: true,
 					errorOnEmpty: false,
@@ -47,8 +47,8 @@ export const processWebhookMessage = async function (messageObj, user, defaultVa
 				}
 
 				// We didn't get a room, let's try finding direct messages
-				room = await getRoomByNameOrIdWithOptionToJoin({
-					user,
+				room = getRoomByNameOrIdWithOptionToJoin({
+					currentUserId: user._id,
 					nameOrId: channelValue,
 					tryDirectByUserIdOnly: true,
 					type: 'd',
@@ -71,7 +71,7 @@ export const processWebhookMessage = async function (messageObj, user, defaultVa
 
 		const message = {
 			alias: messageObj.username || messageObj.alias || defaultValues.alias,
-			msg: trim(messageObj.text || messageObj.msg || ''),
+			msg: s.trim(messageObj.text || messageObj.msg || ''),
 			attachments: messageObj.attachments || [],
 			parseUrls: messageObj.parseUrls !== undefined ? messageObj.parseUrls : !messageObj.attachments,
 			bot: messageObj.bot,
@@ -89,19 +89,19 @@ export const processWebhookMessage = async function (messageObj, user, defaultVa
 			message.emoji = defaultValues.emoji;
 		}
 
-		if (Array.isArray(message.attachments)) {
+		if (_.isArray(message.attachments)) {
 			for (let i = 0; i < message.attachments.length; i++) {
 				const attachment = message.attachments[i];
 				if (attachment.msg) {
-					attachment.text = trim(attachment.msg);
+					attachment.text = s.trim(attachment.msg);
 					delete attachment.msg;
 				}
 			}
 		}
 
-		await validateRoomMessagePermissionsAsync(room, { uid: user._id, ...user });
+		validateRoomMessagePermissions(room, { uid: user._id, ...user });
 
-		const messageReturn = await sendMessage(user, message, room);
+		const messageReturn = sendMessage(user, message, room);
 		sentData.push({ channel, message: messageReturn });
 	}
 

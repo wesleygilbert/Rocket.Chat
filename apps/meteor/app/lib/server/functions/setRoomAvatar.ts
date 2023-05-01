@@ -1,29 +1,23 @@
 import { Meteor } from 'meteor/meteor';
 import type { IUser } from '@rocket.chat/core-typings';
-import { isRegisterUser } from '@rocket.chat/core-typings';
-import { Avatars, Rooms } from '@rocket.chat/models';
-import { api, Message } from '@rocket.chat/core-services';
+import { Avatars } from '@rocket.chat/models';
+import { api } from '@rocket.chat/core-services';
 
-import { RocketChatFile } from '../../../file/server';
+import { RocketChatFile } from '../../../file';
 import { FileUpload } from '../../../file-upload/server';
+import { Rooms, Messages } from '../../../models/server';
 
 export const setRoomAvatar = async function (rid: string, dataURI: string, user: IUser): Promise<void> {
-	if (!isRegisterUser(user)) {
-		throw new Meteor.Error('invalid-user', 'Invalid user', {
-			function: 'RocketChat.setRoomAvatar',
-		});
-	}
-
 	const fileStore = FileUpload.getStore('Avatars');
 
 	const current = await Avatars.findOneByRoomId(rid);
 
 	if (!dataURI) {
-		await fileStore.deleteByRoomId(rid);
-		await Message.saveSystemMessage('room_changed_avatar', rid, '', user);
-		void api.broadcast('room.avatarUpdate', { _id: rid });
-		await Rooms.unsetAvatarData(rid);
-		return;
+		fileStore.deleteByRoomId(rid);
+		Messages.createRoomSettingsChangedWithTypeRoomIdMessageAndUser('room_changed_avatar', rid, '', user);
+		api.broadcast('room.avatarUpdate', { _id: rid });
+
+		return Rooms.unsetAvatarData(rid);
 	}
 
 	const fileData = RocketChatFile.dataURIParse(dataURI);
@@ -38,14 +32,18 @@ export const setRoomAvatar = async function (rid: string, dataURI: string, user:
 	};
 
 	if (current) {
-		await fileStore.deleteById(current._id);
+		fileStore.deleteById(current._id);
 	}
 
-	const result = await fileStore.insert(file, buffer);
+	fileStore.insert(file, buffer, (err: unknown, result: { etag: string }) => {
+		if (err) {
+			throw err;
+		}
 
-	setTimeout(async function () {
-		result.etag && (await Rooms.setAvatarData(rid, 'upload', result.etag));
-		await Message.saveSystemMessage('room_changed_avatar', rid, '', user);
-		void api.broadcast('room.avatarUpdate', { _id: rid, avatarETag: result.etag });
-	}, 500);
+		Meteor.setTimeout(function () {
+			Rooms.setAvatarData(rid, 'upload', result.etag);
+			Messages.createRoomSettingsChangedWithTypeRoomIdMessageAndUser('room_changed_avatar', rid, '', user);
+			api.broadcast('room.avatarUpdate', { _id: rid, avatarETag: result.etag });
+		}, 500);
+	});
 };

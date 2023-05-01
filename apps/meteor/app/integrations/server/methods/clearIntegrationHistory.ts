@@ -1,18 +1,10 @@
 import { Meteor } from 'meteor/meteor';
 import { Integrations, IntegrationHistory } from '@rocket.chat/models';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { hasPermission } from '../../../authorization/server';
 import notifications from '../../../notifications/server/lib/Notifications';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		clearIntegrationHistory(integrationId: string): Promise<boolean>;
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	async clearIntegrationHistory(integrationId) {
 		let integration;
 
@@ -22,9 +14,9 @@ Meteor.methods<ServerMethods>({
 			});
 		}
 
-		if (await hasPermissionAsync(this.userId, 'manage-outgoing-integrations')) {
+		if (hasPermission(this.userId, 'manage-outgoing-integrations')) {
 			integration = await Integrations.findOneById(integrationId);
-		} else if (await hasPermissionAsync(this.userId, 'manage-own-outgoing-integrations')) {
+		} else if (hasPermission(this.userId, 'manage-own-outgoing-integrations')) {
 			integration = await Integrations.findOne({
 				'_id': integrationId,
 				'_createdBy._id': this.userId,

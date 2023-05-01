@@ -14,7 +14,6 @@ import {
 	EmailInbox,
 	PbxEvents,
 	Permissions,
-	LivechatPriority,
 } from '@rocket.chat/models';
 
 export const watchCollections = [
@@ -33,5 +32,4 @@ export const watchCollections = [
 	EmailInbox.getCollectionName(),
 	PbxEvents.getCollectionName(),
 	Settings.getCollectionName(),
-	LivechatPriority.getCollectionName(),
 ];

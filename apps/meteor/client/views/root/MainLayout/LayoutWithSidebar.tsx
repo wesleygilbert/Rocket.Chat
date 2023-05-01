@@ -1,7 +1,5 @@
 import { Box } from '@rocket.chat/fuselage';
 import { useLayout, useCurrentRoute, useRoutePath, useSetting, useCurrentModal, useRoute } from '@rocket.chat/ui-contexts';
-import { PaletteStyleTag } from '@rocket.chat/ui-theming/src/PaletteStyleTag';
-import { SidebarPaletteStyleTag } from '@rocket.chat/ui-theming/src/SidebarPaletteStyleTag';
 import type { ReactElement, ReactNode } from 'react';
 import React, { useEffect, useRef } from 'react';
 
@@ -47,8 +45,6 @@ const LayoutWithSidebar = ({ children }: { children: ReactNode }): ReactElement 
 			className={[embeddedLayout ? 'embedded-view' : undefined, 'menu-nav'].filter(Boolean).join(' ')}
 			aria-hidden={Boolean(modal)}
 		>
-			<PaletteStyleTag />
-			<SidebarPaletteStyleTag />
 			{!removeSidenav ? <Sidebar /> : null}
 			<div className={['rc-old', 'main-content', readReceiptsEnabled ? 'read-receipts-enabled' : undefined].filter(Boolean).join(' ')}>
 				{children}

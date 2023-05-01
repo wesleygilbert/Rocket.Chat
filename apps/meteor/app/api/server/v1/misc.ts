@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
-import EJSON from 'ejson';
+import { EJSON } from 'meteor/ejson';
 import { DDPRateLimiter } from 'meteor/ddp-rate-limiter';
 import { escapeHTML } from '@rocket.chat/string-helpers';
 import {
@@ -16,20 +16,17 @@ import {
 	validateParamsPwGetPolicyRest,
 } from '@rocket.chat/rest-typings';
 import type { IUser } from '@rocket.chat/core-typings';
-import { Users } from '@rocket.chat/models';
+import { Users as UsersRaw } from '@rocket.chat/models';
 
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { hasPermission } from '../../../authorization/server';
+import { Users } from '../../../models/server';
 import { settings } from '../../../settings/server';
 import { API } from '../api';
 import { getDefaultUserFields } from '../../../utils/server/functions/getDefaultUserFields';
-import { getURL } from '../../../utils/server/getURL';
+import { getURL } from '../../../utils/lib/getURL';
 import { getLogs } from '../../../../server/stream/stdout';
 import { SystemLogger } from '../../../../server/lib/logger/system';
 import { passwordPolicy } from '../../../lib/server';
-import { getLoggedInUser } from '../helpers/getLoggedInUser';
-import { getUserInfo } from '../helpers/getUserInfo';
-import { getPaginationItems } from '../helpers/getPaginationItems';
-import { getUserFromParams } from '../helpers/getUserFromParams';
 
 /**
  * @openapi
@@ -173,10 +170,10 @@ API.v1.addRoute(
 	{
 		async get() {
 			const fields = getDefaultUserFields();
-			const { services, ...user } = (await Users.findOneById(this.userId, { projection: fields })) as IUser;
+			const { services, ...user } = Users.findOneById(this.userId, { fields }) as IUser;
 
 			return API.v1.success(
-				await getUserInfo({
+				this.getUserInfo({
 					...user,
 					...(services && {
 						services: {
@@ -208,7 +205,7 @@ API.v1.addRoute(
 		validateParams: isShieldSvgProps,
 	},
 	{
-		async get() {
+		get() {
 			const { type, icon } = this.queryParams;
 			let { channel, name } = this.queryParams;
 			if (!settings.get('API_Enable_Shields')) {
@@ -240,7 +237,7 @@ API.v1.addRoute(
 			switch (type) {
 				case 'online':
 					if (Date.now() - onlineCacheDate > cacheInvalid) {
-						onlineCache = await Users.countUsersNotOffline();
+						onlineCache = Users.findUsersNotOffline().count();
 						onlineCacheDate = Date.now();
 					}
 
@@ -254,10 +251,10 @@ API.v1.addRoute(
 					text = `#${channel}`;
 					break;
 				case 'user':
-					if (settings.get('API_Shield_user_require_auth') && !(await getLoggedInUser(this.request))) {
+					if (settings.get('API_Shield_user_require_auth') && !this.getLoggedInUser()) {
 						return API.v1.failure('You must be logged in to do this.');
 					}
-					const user = await getUserFromParams(this.queryParams);
+					const user = this.getUserFromParams();
 
 					// Respect the server's choice for using their real names or not
 					if (user.name && settings.get('UI_Use_Real_Name')) {
@@ -337,10 +334,10 @@ API.v1.addRoute(
 		validateParams: isSpotlightProps,
 	},
 	{
-		async get() {
+		get() {
 			const { query } = this.queryParams;
 
-			const result = await Meteor.callAsync('spotlight', query);
+			const result = Meteor.call('spotlight', query);
 
 			return API.v1.success(result);
 		},
@@ -354,9 +351,9 @@ API.v1.addRoute(
 		validateParams: isDirectoryProps,
 	},
 	{
-		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { sort, query } = await this.parseJsonQuery();
+		get() {
+			const { offset, count } = this.getPaginationItems();
+			const { sort, query } = this.parseJsonQuery();
 
 			const { text, type, workspace = 'local' } = query;
 
@@ -366,7 +363,7 @@ API.v1.addRoute(
 			const sortBy = sort ? Object.keys(sort)[0] : undefined;
 			const sortDirection = sort && Object.values(sort)[0] === 1 ? 'asc' : 'desc';
 
-			const result = await Meteor.callAsync('browseChannels', {
+			const result = Meteor.call('browseChannels', {
 				text,
 				type,
 				workspace,
@@ -417,7 +414,7 @@ API.v1.addRoute(
 			);
 			const { token } = this.queryParams;
 
-			const user = await Users.findOneByResetToken(token, { projection: { _id: 1 } });
+			const user = await UsersRaw.findOneByResetToken(token, { projection: { _id: 1 } });
 			if (!user) {
 				return API.v1.unauthorized();
 			}
@@ -467,8 +464,8 @@ API.v1.addRoute(
 	'stdout.queue',
 	{ authRequired: true },
 	{
-		async get() {
-			if (!(await hasPermissionAsync(this.userId, 'view-logs'))) {
+		get() {
+			if (!hasPermission(this.userId, 'view-logs')) {
 				return API.v1.unauthorized();
 			}
 			return API.v1.success({ queue: getLogs() });
@@ -517,7 +514,7 @@ API.v1.addRoute(
 		validateParams: isMeteorCall,
 	},
 	{
-		async post() {
+		post() {
 			check(this.bodyParams, {
 				message: String,
 			});
@@ -554,12 +551,10 @@ API.v1.addRoute(
 					});
 				}
 
-				const result = await Meteor.callAsync(method, ...params);
+				const result = Meteor.call(method, ...params);
 				return API.v1.success(mountResult({ id, result }));
 			} catch (err) {
-				if (!(err as any).isClientSafe && !(err as any).meteorError) {
-					SystemLogger.error({ msg: `Exception while invoking method ${method}`, err });
-				}
+				SystemLogger.error({ msg: `Exception while invoking method ${method}`, err });
 
 				if (settings.get('Log_Level') === '2') {
 					Meteor._debug(`Exception while invoking method ${method}`, err);
@@ -577,7 +572,7 @@ API.v1.addRoute(
 		validateParams: isMeteorCall,
 	},
 	{
-		async post() {
+		post() {
 			check(this.bodyParams, {
 				message: String,
 			});
@@ -607,7 +602,6 @@ API.v1.addRoute(
 
 			try {
 				DDPRateLimiter._increment(rateLimiterInput);
-
 				const rateLimitResult = DDPRateLimiter._check(rateLimiterInput);
 				if (!rateLimitResult.allowed) {
 					throw new Meteor.Error('too-many-requests', DDPRateLimiter.getErrorMessage(rateLimitResult), {
@@ -615,29 +609,16 @@ API.v1.addRoute(
 					});
 				}
 
-				const result = await Meteor.callAsync(method, ...params);
+				const result = Meteor.call(method, ...params);
 				return API.v1.success(mountResult({ id, result }));
 			} catch (err) {
-				if (!(err as any).isClientSafe && !(err as any).meteorError) {
-					SystemLogger.error({ msg: `Exception while invoking method ${method}`, err });
-				}
+				SystemLogger.error({ msg: `Exception while invoking method ${method}`, err });
+
 				if (settings.get('Log_Level') === '2') {
 					Meteor._debug(`Exception while invoking method ${method}`, err);
 				}
 				return API.v1.success(mountResult({ id, error: err }));
 			}
-		},
-	},
-);
-
-API.v1.addRoute(
-	'smtp.check',
-	{ authRequired: true },
-	{
-		async get() {
-			const isMailURLSet = !(process.env.MAIL_URL === 'undefined' || process.env.MAIL_URL === undefined);
-			const isSMTPConfigured = Boolean(settings.get('SMTP_Host')) || isMailURLSet;
-			return API.v1.success({ isSMTPConfigured });
 		},
 	},
 );

@@ -3,6 +3,7 @@ import React from 'react';
 
 import { OmnichannelRoomIconProvider } from '../components/RoomIcon/OmnichannelRoomIcon/provider/OmnichannelRoomIconProvider';
 import ActionManagerProvider from './ActionManagerProvider';
+import AttachmentProvider from './AttachmentProvider';
 import AuthorizationProvider from './AuthorizationProvider';
 import AvatarUrlProvider from './AvatarUrlProvider';
 import { CallProvider } from './CallProvider';
@@ -44,7 +45,9 @@ const MeteorProvider: FC = ({ children }) => (
 																		<ActionManagerProvider>
 																			<VideoConfProvider>
 																				<CallProvider>
-																					<OmnichannelProvider>{children}</OmnichannelProvider>
+																					<OmnichannelProvider>
+																						<AttachmentProvider>{children}</AttachmentProvider>
+																					</OmnichannelProvider>
 																				</CallProvider>
 																			</VideoConfProvider>
 																		</ActionManagerProvider>

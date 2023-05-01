@@ -1,1 +1,1 @@
-export { default } from './DiscussionsListContextBar';
+export { default } from './DiscussionList';

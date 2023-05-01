@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { Match, check } from 'meteor/check';
 import _ from 'underscore';
 import { OAuth } from 'meteor/oauth';
-import { serverFetch as fetch } from '@rocket.chat/server-fetch';
+import { HTTP } from 'meteor/http';
 
 import { registerAccessTokenService } from './oauth';
 
@@ -12,32 +12,26 @@ const whitelisted = ['id', 'email', 'name', 'first_name', 'last_name', 'link', '
 const FB_API_VERSION = 'v2.9';
 const FB_URL = 'https://graph.facebook.com';
 
-const getIdentity = async function (accessToken, fields, secret) {
+const getIdentity = function (accessToken, fields, secret) {
 	const hmac = crypto.createHmac('sha256', OAuth.openSecret(secret));
 	hmac.update(accessToken);
 
 	try {
-		const request = await fetch(`${FB_URL}/${FB_API_VERSION}/me`, {
+		return HTTP.get(`${FB_URL}/${FB_API_VERSION}/me`, {
 			params: {
 				access_token: accessToken,
 				appsecret_proof: hmac.digest('hex'),
 				fields: fields.join(','),
 			},
-		});
-
-		if (!request.ok) {
-			throw new Error(await request.text());
-		}
-
-		return request.json();
+		}).data;
 	} catch (err) {
 		throw _.extend(new Error(`Failed to fetch identity from Facebook. ${err.message}`), {
-			response: err.message,
+			response: err.response,
 		});
 	}
 };
 
-registerAccessTokenService('facebook', async function (options) {
+registerAccessTokenService('facebook', function (options) {
 	check(
 		options,
 		Match.ObjectIncluding({
@@ -47,7 +41,7 @@ registerAccessTokenService('facebook', async function (options) {
 		}),
 	);
 
-	const identity = await getIdentity(options.accessToken, whitelisted, options.secret);
+	const identity = getIdentity(options.accessToken, whitelisted, options.secret);
 
 	const serviceData = {
 		accessToken: options.accessToken,

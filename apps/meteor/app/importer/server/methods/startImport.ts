@@ -1,13 +1,12 @@
 import { Meteor } from 'meteor/meteor';
 import type { StartImportParamsPOST } from '@rocket.chat/rest-typings';
-import { Imports } from '@rocket.chat/models';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { hasPermission } from '../../../authorization/server';
+import { Imports } from '../../../models/server';
 import { Importers, Selection, SelectionChannel, SelectionUser } from '..';
 
-export const executeStartImport = async ({ input }: StartImportParamsPOST) => {
-	const operation = await Imports.findLastImport();
+export const executeStartImport = ({ input }: StartImportParamsPOST) => {
+	const operation = Imports.findLastImport();
 	if (!operation) {
 		throw new Meteor.Error('error-operation-not-found', 'Import Operation Not Found', 'startImport');
 	}
@@ -19,7 +18,6 @@ export const executeStartImport = async ({ input }: StartImportParamsPOST) => {
 	}
 
 	importer.instance = new importer.importer(importer, operation); // eslint-disable-line new-cap
-	await importer.instance.build();
 
 	const usersSelection = input.users.map(
 		(user) => new SelectionUser(user.user_id, user.username, user.email, user.is_deleted, user.is_bot, user.do_import),
@@ -40,22 +38,15 @@ export const executeStartImport = async ({ input }: StartImportParamsPOST) => {
 	return importer.instance.startImport(selection);
 };
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		startImport(params: StartImportParamsPOST): void;
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async startImport({ input }: StartImportParamsPOST) {
+Meteor.methods({
+	startImport({ input }: StartImportParamsPOST) {
 		const userId = Meteor.userId();
 		// Takes name and object with users / channels selected to import
 		if (!userId) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', 'startImport');
 		}
 
-		if (!(await hasPermissionAsync(userId, 'run-import'))) {
+		if (!hasPermission(userId, 'run-import')) {
 			throw new Meteor.Error('error-action-not-allowed', 'Importing is not allowed', 'startImport');
 		}
 

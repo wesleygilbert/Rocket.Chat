@@ -6,9 +6,9 @@ import { logFailedLoginAttempts } from '../lib/logLoginAttempts';
 import { callbacks } from '../../../../lib/callbacks';
 import { settings } from '../../../settings/server';
 
-Accounts.onLoginFailure(async (login: ILoginAttempt) => {
+Accounts.onLoginFailure((login: ILoginAttempt) => {
 	if (settings.get('Block_Multiple_Failed_Logins_Enabled')) {
-		await saveFailedLoginAttempts(login);
+		saveFailedLoginAttempts(login);
 	}
 
 	logFailedLoginAttempts(login);
@@ -19,5 +19,5 @@ callbacks.add('afterValidateLogin', (login: ILoginAttempt) => {
 		return;
 	}
 
-	return saveSuccessfulLogin(login);
+	saveSuccessfulLogin(login);
 });

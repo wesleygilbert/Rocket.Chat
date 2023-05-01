@@ -1,6 +1,5 @@
-import { Subscriptions, LivechatInquiry, LivechatRooms } from '@rocket.chat/models';
-
 import { callbacks } from '../../../../../lib/callbacks';
+import { LivechatInquiry, Subscriptions, LivechatRooms } from '../../../../../app/models/server';
 import { queueInquiry } from '../../../../../app/livechat/server/lib/QueueManager';
 import { settings } from '../../../../../app/settings/server';
 import { cbLogger } from '../lib/logger';
@@ -28,12 +27,12 @@ const handleOnAgentAssignmentFailed = async ({
 		const { _id: roomId } = room;
 
 		const { _id: inquiryId } = inquiry;
-		await LivechatInquiry.queueInquiryAndRemoveDefaultAgent(inquiryId);
-		await LivechatRooms.removeAgentByRoomId(roomId);
-		await Subscriptions.removeByRoomId(roomId);
-		await dispatchAgentDelegated(roomId, null);
+		LivechatInquiry.queueInquiryAndRemoveDefaultAgent(inquiryId);
+		LivechatRooms.removeAgentByRoomId(roomId);
+		Subscriptions.removeByRoomId(roomId);
+		dispatchAgentDelegated(roomId, null);
 
-		const newInquiry = await LivechatInquiry.findOneById(inquiryId);
+		const newInquiry = LivechatInquiry.findOneById(inquiryId);
 
 		await queueInquiry(room, newInquiry);
 
@@ -65,7 +64,7 @@ const handleOnAgentAssignmentFailed = async ({
 
 callbacks.add(
 	'livechat.onAgentAssignmentFailed',
-	handleOnAgentAssignmentFailed,
+	({ inquiry, room, options }) => Promise.await(handleOnAgentAssignmentFailed({ inquiry, room, options })),
 	callbacks.priority.HIGH,
 	'livechat-agent-assignment-failed',
 );

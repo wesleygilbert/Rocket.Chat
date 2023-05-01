@@ -1,29 +1,29 @@
 import { VM, VMScript } from 'vm2';
 import { Meteor } from 'meteor/meteor';
-import { Random } from '@rocket.chat/random';
+import { Random } from 'meteor/random';
+import { HTTP } from 'meteor/http';
 import _ from 'underscore';
+import s from 'underscore.string';
 import moment from 'moment';
 import Fiber from 'fibers';
 import Future from 'fibers/future';
-import { Integrations, IntegrationHistory, Users, Rooms, Messages } from '@rocket.chat/models';
-import * as Models from '@rocket.chat/models';
-import { serverFetch as fetch } from '@rocket.chat/server-fetch';
+import { Integrations, IntegrationHistory } from '@rocket.chat/models';
 
-import * as s from '../../../../lib/utils/stringUtils';
+import * as Models from '../../../models/server';
 import { settings } from '../../../settings/server';
-import { getRoomByNameOrIdWithOptionToJoin } from '../../../lib/server/functions/getRoomByNameOrIdWithOptionToJoin';
-import { processWebhookMessage } from '../../../lib/server/functions/processWebhookMessage';
+import { getRoomByNameOrIdWithOptionToJoin, processWebhookMessage } from '../../../lib/server';
 import { outgoingLogger } from '../logger';
 import { outgoingEvents } from '../../lib/outgoingEvents';
+import { fetch } from '../../../../server/lib/http/fetch';
 import { omit } from '../../../../lib/utils/omit';
-import { forbiddenModelMethods } from '../api/api';
-import { httpCall } from '../../../../server/lib/http/call';
 
-class RocketChatIntegrationHandler {
+export class RocketChatIntegrationHandler {
 	constructor() {
 		this.successResults = [200, 201, 202];
 		this.compiledScripts = {};
 		this.triggers = {};
+
+		Promise.await(Integrations.find({ type: 'webhook-outgoing' }).forEach((data) => this.addIntegration(data)));
 	}
 
 	addIntegration(record) {
@@ -66,7 +66,7 @@ class RocketChatIntegrationHandler {
 		return false;
 	}
 
-	async updateHistory({
+	updateHistory({
 		historyId,
 		step,
 		integration,
@@ -161,7 +161,7 @@ class RocketChatIntegrationHandler {
 		}
 
 		if (historyId) {
-			await IntegrationHistory.updateOne({ _id: historyId }, { $set: history });
+			Promise.await(IntegrationHistory.updateOne({ _id: historyId }, { $set: history }));
 			return historyId;
 		}
 
@@ -169,33 +169,33 @@ class RocketChatIntegrationHandler {
 
 		const _id = Random.id();
 
-		await IntegrationHistory.insertOne({ _id, ...history });
+		Promise.await(IntegrationHistory.insertOne({ _id, ...history }));
 
 		return _id;
 	}
 
 	// Trigger is the trigger, nameOrId is a string which is used to try and find a room, room is a room, message is a message, and data contains "user_name" if trigger.impersonateUser is truthful.
-	async sendMessage({ trigger, nameOrId = '', room, message, data }) {
+	sendMessage({ trigger, nameOrId = '', room, message, data }) {
 		let user;
 		// Try to find the user who we are impersonating
 		if (trigger.impersonateUser) {
-			user = await Users.findOneByUsernameIgnoringCase(data.user_name);
+			user = Models.Users.findOneByUsernameIgnoringCase(data.user_name);
 		}
 
 		// If they don't exist (aka the trigger didn't contain a user) then we set the user based upon the
 		// configured username for the integration since this is required at all times.
 		if (!user) {
-			user = await Users.findOneByUsernameIgnoringCase(trigger.username);
+			user = Models.Users.findOneByUsernameIgnoringCase(trigger.username);
 		}
 
 		let tmpRoom;
 		if (nameOrId || trigger.targetRoom || message.channel) {
 			tmpRoom =
-				(await getRoomByNameOrIdWithOptionToJoin({
-					user,
+				getRoomByNameOrIdWithOptionToJoin({
+					currentUserId: user._id,
 					nameOrId: nameOrId || message.channel || trigger.targetRoom,
 					errorOnEmpty: false,
-				})) || room;
+				}) || room;
 		} else {
 			tmpRoom = room;
 		}
@@ -224,7 +224,7 @@ class RocketChatIntegrationHandler {
 			message.channel = `#${tmpRoom._id}`;
 		}
 
-		message = await processWebhookMessage(message, user, defaultValues);
+		message = processWebhookMessage(message, user, defaultValues);
 		return message;
 	}
 
@@ -247,9 +247,8 @@ class RocketChatIntegrationHandler {
 			},
 			HTTP: (method, url, options) => {
 				try {
-					// Need to review how we will handle this, possible breaking change on removing fibers
 					return {
-						result: Promise.await(httpCall(method, url, options)),
+						result: HTTP.call(method, url, options),
 					};
 				} catch (error) {
 					return { error };
@@ -258,7 +257,7 @@ class RocketChatIntegrationHandler {
 		};
 
 		Object.keys(Models)
-			.filter((k) => !forbiddenModelMethods.includes(k))
+			.filter((k) => !k.startsWith('_'))
 			.forEach((k) => {
 				sandbox[k] = Models[k];
 			});
@@ -324,12 +323,12 @@ class RocketChatIntegrationHandler {
 		return typeof script[method] !== 'undefined';
 	}
 
-	async executeScript(integration, method, params, historyId) {
+	executeScript(integration, method, params, historyId) {
 		let script;
 		try {
 			script = this.getIntegrationScript(integration);
 		} catch (e) {
-			await this.updateHistory({
+			this.updateHistory({
 				historyId,
 				step: 'execute-script-getting-script',
 				error: true,
@@ -340,7 +339,7 @@ class RocketChatIntegrationHandler {
 
 		if (!script[method]) {
 			outgoingLogger.error(`Method "${method}" no found in the Integration "${integration.name}"`);
-			await this.updateHistory({ historyId, step: `execute-script-no-method-${method}` });
+			this.updateHistory({ historyId, step: `execute-script-no-method-${method}` });
 			return;
 		}
 
@@ -350,7 +349,7 @@ class RocketChatIntegrationHandler {
 			sandbox.method = method;
 			sandbox.params = params;
 
-			await this.updateHistory({ historyId, step: `execute-script-before-running-${method}` });
+			this.updateHistory({ historyId, step: `execute-script-before-running-${method}` });
 
 			const vm = new VM({
 				timeout: 3000,
@@ -379,7 +378,7 @@ class RocketChatIntegrationHandler {
 
 			return result;
 		} catch (err) {
-			await this.updateHistory({
+			this.updateHistory({
 				historyId,
 				step: `execute-script-error-running-${method}`,
 				error: true,
@@ -614,7 +613,7 @@ class RocketChatIntegrationHandler {
 		return [...triggersToExecute];
 	}
 
-	async executeTriggers(...args) {
+	executeTriggers(...args) {
 		outgoingLogger.debug({ msg: 'Execute Trigger:', arg: args[0] });
 
 		const argObject = this.eventNameArgumentsToObject(...args);
@@ -640,23 +639,23 @@ class RocketChatIntegrationHandler {
 
 		outgoingLogger.debug(`Found ${triggersToExecute.length} to iterate over and see if the match the event.`);
 
-		for await (const triggerToExecute of triggersToExecute) {
+		for (const triggerToExecute of triggersToExecute) {
 			outgoingLogger.debug(
 				`Is "${triggerToExecute.name}" enabled, ${triggerToExecute.enabled}, and what is the event? ${triggerToExecute.event}`,
 			);
 			if (triggerToExecute.enabled === true && triggerToExecute.event === event) {
-				await this.executeTrigger(triggerToExecute, argObject);
+				this.executeTrigger(triggerToExecute, argObject);
 			}
 		}
 	}
 
-	async executeTrigger(trigger, argObject) {
-		for await (const url of trigger.urls) {
-			await this.executeTriggerUrl(url, trigger, argObject, 0);
+	executeTrigger(trigger, argObject) {
+		for (const url of trigger.urls) {
+			this.executeTriggerUrl(url, trigger, argObject, 0);
 		}
 	}
 
-	async executeTriggerUrl(url, trigger, { event, message, room, owner, user }, theHistoryId, tries = 0) {
+	executeTriggerUrl(url, trigger, { event, message, room, owner, user }, theHistoryId, tries = 0) {
 		if (!this.isTriggerEnabled(trigger)) {
 			outgoingLogger.warn(`The trigger "${trigger.name}" is no longer enabled, stopping execution of it at try: ${tries}`);
 			return;
@@ -691,7 +690,7 @@ class RocketChatIntegrationHandler {
 			return;
 		}
 
-		const historyId = await this.updateHistory({
+		const historyId = this.updateHistory({
 			step: 'start-execute-trigger-url',
 			integration: trigger,
 			event,
@@ -707,7 +706,7 @@ class RocketChatIntegrationHandler {
 		}
 
 		this.mapEventArgsToData(data, { trigger, event, message, room, owner, user });
-		await this.updateHistory({ historyId, step: 'mapped-args-to-data', data, triggerWord: word });
+		this.updateHistory({ historyId, step: 'mapped-args-to-data', data, triggerWord: word });
 
 		outgoingLogger.info(`Will be executing the Integration "${trigger.name}" to the url: ${url}`);
 		outgoingLogger.debug({ data });
@@ -724,19 +723,19 @@ class RocketChatIntegrationHandler {
 		};
 
 		if (this.hasScriptAndMethod(trigger, 'prepare_outgoing_request')) {
-			opts = await this.executeScript(trigger, 'prepare_outgoing_request', { request: opts }, historyId);
+			opts = this.executeScript(trigger, 'prepare_outgoing_request', { request: opts }, historyId);
 		}
 
-		await this.updateHistory({ historyId, step: 'after-maybe-ran-prepare', ranPrepareScript: true });
+		this.updateHistory({ historyId, step: 'after-maybe-ran-prepare', ranPrepareScript: true });
 
 		if (!opts) {
-			await this.updateHistory({ historyId, step: 'after-prepare-no-opts', finished: true });
+			this.updateHistory({ historyId, step: 'after-prepare-no-opts', finished: true });
 			return;
 		}
 
 		if (opts.message) {
-			const prepareMessage = await this.sendMessage({ trigger, room, message: opts.message, data });
-			await this.updateHistory({
+			const prepareMessage = this.sendMessage({ trigger, room, message: opts.message, data });
+			this.updateHistory({
 				historyId,
 				step: 'after-prepare-send-message',
 				prepareSentMessage: prepareMessage,
@@ -744,7 +743,7 @@ class RocketChatIntegrationHandler {
 		}
 
 		if (!opts.url || !opts.method) {
-			await this.updateHistory({ historyId, step: 'after-prepare-no-url_or_method', finished: true });
+			this.updateHistory({ historyId, step: 'after-prepare-no-url_or_method', finished: true });
 			return;
 		}
 
@@ -758,7 +757,7 @@ class RocketChatIntegrationHandler {
 			opts.headers.Authorization = `Basic ${base64}`;
 		}
 
-		await this.updateHistory({
+		this.updateHistory({
 			historyId,
 			step: 'pre-http-call',
 			url: opts.url,
@@ -774,7 +773,7 @@ class RocketChatIntegrationHandler {
 			{
 				method: opts.method,
 				headers: opts.headers,
-				...(opts.data && { body: opts.data }),
+				...(opts.data && { body: JSON.stringify(opts.data) }),
 			},
 			settings.get('Allow_Invalid_SelfSigned_Certs'),
 		)
@@ -799,7 +798,7 @@ class RocketChatIntegrationHandler {
 					}
 				})();
 
-				await this.updateHistory({
+				this.updateHistory({
 					historyId,
 					step: 'after-http-call',
 					httpError: null,
@@ -818,16 +817,16 @@ class RocketChatIntegrationHandler {
 						},
 					};
 
-					const scriptResult = await this.executeScript(trigger, 'process_outgoing_response', sandbox, historyId);
+					const scriptResult = this.executeScript(trigger, 'process_outgoing_response', sandbox, historyId);
 
 					if (scriptResult && scriptResult.content) {
-						const resultMessage = await this.sendMessage({
+						const resultMessage = this.sendMessage({
 							trigger,
 							room,
 							message: scriptResult.content,
 							data,
 						});
-						await this.updateHistory({
+						this.updateHistory({
 							historyId,
 							step: 'after-process-send-message',
 							processSentMessage: resultMessage,
@@ -837,7 +836,7 @@ class RocketChatIntegrationHandler {
 					}
 
 					if (scriptResult === false) {
-						await this.updateHistory({ historyId, step: 'after-process-false-result', finished: true });
+						this.updateHistory({ historyId, step: 'after-process-false-result', finished: true });
 						return;
 					}
 				}
@@ -851,14 +850,14 @@ class RocketChatIntegrationHandler {
 						});
 
 						if (res.status === 410) {
-							await this.updateHistory({ historyId, step: 'after-process-http-status-410', error: true });
+							this.updateHistory({ historyId, step: 'after-process-http-status-410', error: true });
 							outgoingLogger.error(`Disabling the Integration "${trigger.name}" because the status code was 401 (Gone).`);
 							await Integrations.updateOne({ _id: trigger._id }, { $set: { enabled: false } });
 							return;
 						}
 
 						if (res.status === 500) {
-							await this.updateHistory({ historyId, step: 'after-process-http-status-500', error: true });
+							this.updateHistory({ historyId, step: 'after-process-http-status-500', error: true });
 							outgoingLogger.error({
 								msg: `Error "500" for the Integration "${trigger.name}" to ${url}.`,
 								content,
@@ -869,7 +868,7 @@ class RocketChatIntegrationHandler {
 
 					if (trigger.retryFailedCalls) {
 						if (tries < trigger.retryCount && trigger.retryDelay) {
-							await this.updateHistory({ historyId, error: true, step: `going-to-retry-${tries + 1}` });
+							this.updateHistory({ historyId, error: true, step: `going-to-retry-${tries + 1}` });
 
 							let waitTime;
 
@@ -888,7 +887,7 @@ class RocketChatIntegrationHandler {
 									break;
 								default:
 									const er = new Error("The integration's retryDelay setting is invalid.");
-									await this.updateHistory({
+									this.updateHistory({
 										historyId,
 										step: 'failed-and-retry-delay-is-invalid',
 										error: true,
@@ -898,14 +897,14 @@ class RocketChatIntegrationHandler {
 							}
 
 							outgoingLogger.info(`Trying the Integration ${trigger.name} to ${url} again in ${waitTime} milliseconds.`);
-							setTimeout(() => {
-								void this.executeTriggerUrl(url, trigger, { event, message, room, owner, user }, historyId, tries + 1);
+							Meteor.setTimeout(() => {
+								this.executeTriggerUrl(url, trigger, { event, message, room, owner, user }, historyId, tries + 1);
 							}, waitTime);
 						} else {
-							await this.updateHistory({ historyId, step: 'too-many-retries', error: true });
+							this.updateHistory({ historyId, step: 'too-many-retries', error: true });
 						}
 					} else {
-						await this.updateHistory({
+						this.updateHistory({
 							historyId,
 							step: 'failed-and-not-configured-to-retry',
 							error: true,
@@ -918,8 +917,8 @@ class RocketChatIntegrationHandler {
 				// process outgoing webhook response as a new message
 				if (content && this.successResults.includes(res.status)) {
 					if (data?.text || data?.attachments) {
-						const resultMsg = await this.sendMessage({ trigger, room, message: data, data });
-						await this.updateHistory({
+						const resultMsg = this.sendMessage({ trigger, room, message: data, data });
+						this.updateHistory({
 							historyId,
 							step: 'url-response-sent-message',
 							resultMessage: resultMsg,
@@ -928,9 +927,9 @@ class RocketChatIntegrationHandler {
 					}
 				}
 			})
-			.catch(async (error) => {
+			.catch((error) => {
 				outgoingLogger.error(error);
-				await this.updateHistory({
+				this.updateHistory({
 					historyId,
 					step: 'after-http-call',
 					httpError: error,
@@ -939,7 +938,7 @@ class RocketChatIntegrationHandler {
 			});
 	}
 
-	async replay(integration, history) {
+	replay(integration, history) {
 		if (!integration || integration.type !== 'webhook-outgoing') {
 			throw new Meteor.Error('integration-type-must-be-outgoing', 'The integration type to replay must be an outgoing webhook.');
 		}
@@ -949,16 +948,16 @@ class RocketChatIntegrationHandler {
 		}
 
 		const { event } = history;
-		const message = await Messages.findOneById(history.data.message_id);
-		const room = await Rooms.findOneById(history.data.channel_id);
-		const user = await Users.findOneById(history.data.user_id);
+		const message = Models.Messages.findOneById(history.data.message_id);
+		const room = Models.Rooms.findOneById(history.data.channel_id);
+		const user = Models.Users.findOneById(history.data.user_id);
 		let owner;
 
 		if (history.data.owner && history.data.owner._id) {
-			owner = await Users.findOneById(history.data.owner._id);
+			owner = Models.Users.findOneById(history.data.owner._id);
 		}
 
-		return this.executeTriggerUrl(history.url, integration, { event, message, room, owner, user });
+		this.executeTriggerUrl(history.url, integration, { event, message, room, owner, user });
 	}
 }
 const triggerHandler = new RocketChatIntegrationHandler();

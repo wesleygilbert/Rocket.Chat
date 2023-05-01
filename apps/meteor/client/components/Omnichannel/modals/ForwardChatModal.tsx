@@ -1,5 +1,5 @@
 import type { IOmnichannelRoom } from '@rocket.chat/core-typings';
-import { Field, Button, TextAreaInput, Modal, Box, PaginatedSelectFiltered, Divider } from '@rocket.chat/fuselage';
+import { Field, Button, TextAreaInput, Modal, Box, PaginatedSelectFiltered } from '@rocket.chat/fuselage';
 import { useDebouncedValue } from '@rocket.chat/fuselage-hooks';
 import { useEndpoint, useSetting, useTranslation } from '@rocket.chat/ui-contexts';
 import type { ReactElement } from 'react';
@@ -10,6 +10,7 @@ import { useRecordList } from '../../../hooks/lists/useRecordList';
 import { AsyncStatePhase } from '../../../hooks/useAsyncState';
 import UserAutoComplete from '../../UserAutoComplete';
 import { useDepartmentsList } from '../hooks/useDepartmentsList';
+import ModalSeparator from './ModalSeparator';
 
 const ForwardChatModal = ({
 	onForward,
@@ -94,7 +95,7 @@ const ForwardChatModal = ({
 	}, [register]);
 
 	return (
-		<Modal wrapperFunction={(props) => <Box is='form' onSubmit={handleSubmit(onSubmit)} {...props} />} {...props}>
+		<Modal {...props} is='form' onSubmit={handleSubmit(onSubmit)}>
 			<Modal.Header>
 				<Modal.Icon name='baloon-arrow-top-right' />
 				<Modal.Title>{t('Forward_chat')}</Modal.Title>
@@ -109,7 +110,7 @@ const ForwardChatModal = ({
 								withTitle
 								filter={departmentsFilter as string}
 								setFilter={setDepartmentsFilter}
-								options={departments}
+								options={departments.map(({ _id, name }) => ({ value: _id, label: name }))}
 								maxWidth='100%'
 								placeholder={t('Select_an_option')}
 								onChange={(value: string): void => {
@@ -121,14 +122,14 @@ const ForwardChatModal = ({
 						}
 					</Field.Row>
 				</Field>
-				<Divider children={t('or')} />
+				<ModalSeparator text={t('or')} />
 				<Field {...(hasDepartments && { mbs: 'x30' })}>
 					<Field.Label>{t('Forward_to_user')}</Field.Label>
 					<Field.Row>
 						<UserAutoComplete
 							conditions={conditions}
 							placeholder={t('Username')}
-							onChange={(value) => {
+							onChange={(value: any): void => {
 								setValue('username', value);
 							}}
 							value={getValues().username}

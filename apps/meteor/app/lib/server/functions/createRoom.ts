@@ -1,48 +1,36 @@
 import { AppsEngineException } from '@rocket.chat/apps-engine/definition/exceptions';
 import { Meteor } from 'meteor/meteor';
+import _ from 'underscore';
+import s from 'underscore.string';
 import type { ICreatedRoom, IUser, IRoom, RoomType } from '@rocket.chat/core-typings';
-import { Message, Team } from '@rocket.chat/core-services';
+import { Team } from '@rocket.chat/core-services';
 import type { ICreateRoomParams, ISubscriptionExtraData } from '@rocket.chat/core-services';
-import { Rooms, Subscriptions, Users } from '@rocket.chat/models';
 
-import { Apps } from '../../../../ee/server/apps';
-import { addUserRolesAsync } from '../../../../server/lib/roles/addUserRoles';
+import { Apps } from '../../../apps/server';
+import { addUserRoles } from '../../../../server/lib/roles/addUserRoles';
 import { callbacks } from '../../../../lib/callbacks';
+import { Messages, Rooms, Subscriptions, Users } from '../../../models/server';
 import { getValidRoomName } from '../../../utils/server';
 import { createDirectRoom } from './createDirectRoom';
 
 const isValidName = (name: unknown): name is string => {
-	return typeof name === 'string' && name.trim().length > 0;
+	return typeof name === 'string' && s.trim(name).length > 0;
 };
 
-const onlyUsernames = (members: unknown): members is string[] =>
-	Array.isArray(members) && members.every((member) => typeof member === 'string');
-
-// eslint-disable-next-line complexity
-export const createRoom = async <T extends RoomType>(
+export const createRoom = function <T extends RoomType>(
 	type: T,
 	name: T extends 'd' ? undefined : string,
-	ownerUsername: string | undefined,
+	ownerUsername: string,
 	members: T extends 'd' ? IUser[] : string[] = [],
 	readOnly?: boolean,
 	roomExtraData?: Partial<IRoom>,
 	options?: ICreateRoomParams['options'],
-): Promise<
-	ICreatedRoom & {
-		rid: string;
-	}
-> => {
+): ICreatedRoom {
 	const { teamId, ...extraData } = roomExtraData || ({} as IRoom);
-	await callbacks.run('beforeCreateRoom', { type, name, owner: ownerUsername, members, readOnly, extraData, options });
+	callbacks.run('beforeCreateRoom', { type, name, owner: ownerUsername, members, readOnly, extraData, options });
+
 	if (type === 'd') {
 		return createDirectRoom(members as IUser[], extraData, { ...options, creator: options?.creator || ownerUsername });
-	}
-
-	if (!onlyUsernames(members)) {
-		throw new Meteor.Error(
-			'error-invalid-members',
-			'members should be an array of usernames if provided for rooms other than direct messages',
-		);
 	}
 
 	if (!isValidName(name)) {
@@ -51,21 +39,15 @@ export const createRoom = async <T extends RoomType>(
 		});
 	}
 
-	if (!ownerUsername) {
+	const owner = Users.findOneByUsernameIgnoringCase(ownerUsername, { fields: { username: 1 } });
+
+	if (!owner) {
 		throw new Meteor.Error('error-invalid-user', 'Invalid user', {
 			function: 'RocketChat.createRoom',
 		});
 	}
 
-	const owner = await Users.findOneByUsernameIgnoringCase(ownerUsername, { projection: { username: 1, name: 1 } });
-
-	if (!ownerUsername || !owner) {
-		throw new Meteor.Error('error-invalid-user', 'Invalid user', {
-			function: 'RocketChat.createRoom',
-		});
-	}
-
-	if (owner.username && !members.includes(owner.username)) {
+	if (!_.contains(members, owner)) {
 		members.push(owner.username);
 	}
 
@@ -76,11 +58,10 @@ export const createRoom = async <T extends RoomType>(
 
 	const now = new Date();
 
-	const roomProps: Omit<IRoom, '_id' | '_updatedAt'> = {
+	const roomProps: Omit<IRoom, '_id' | '_updatedAt' | 'uids' | 'autoTranslateLanguage'> = {
 		fname: name,
-		_updatedAt: now,
 		...extraData,
-		name: await getValidRoomName(name.trim(), undefined, {
+		name: getValidRoomName(name.trim(), undefined, {
 			...(options?.nameValidationRegex && { nameValidationRegex: options.nameValidationRegex }),
 		}),
 		t: type,
@@ -89,14 +70,13 @@ export const createRoom = async <T extends RoomType>(
 		u: {
 			_id: owner._id,
 			username: owner.username,
-			name: owner.name,
 		},
 		ts: now,
 		ro: readOnly === true,
 	};
 
 	if (teamId) {
-		const team = await Team.getOneById(teamId, { projection: { _id: 1 } });
+		const team = Promise.await(Team.getOneById(teamId, { projection: { _id: 1 } }));
 		if (team) {
 			roomProps.teamId = team._id;
 		}
@@ -107,28 +87,32 @@ export const createRoom = async <T extends RoomType>(
 		_USERNAMES: members,
 	};
 
-	const prevent = await Apps.triggerEvent('IPreRoomCreatePrevent', tmp).catch((error) => {
-		if (error.name === AppsEngineException.name) {
-			throw new Meteor.Error('error-app-prevented', error.message);
-		}
+	const prevent = Promise.await(
+		Apps.triggerEvent('IPreRoomCreatePrevent', tmp).catch((error) => {
+			if (error instanceof AppsEngineException) {
+				throw new Meteor.Error('error-app-prevented', error.message);
+			}
 
-		throw error;
-	});
+			throw error;
+		}),
+	);
 
 	if (prevent) {
 		throw new Meteor.Error('error-app-prevented', 'A Rocket.Chat App prevented the room creation.');
 	}
 
-	const eventResult = await Apps.triggerEvent('IPreRoomCreateModify', await Apps.triggerEvent('IPreRoomCreateExtend', tmp));
+	const eventResult = Promise.await(
+		Apps.triggerEvent('IPreRoomCreateModify', Promise.await(Apps.triggerEvent('IPreRoomCreateExtend', tmp))),
+	);
 
 	if (eventResult && typeof eventResult === 'object' && delete eventResult._USERNAMES) {
 		Object.assign(roomProps, eventResult);
 	}
 
 	if (type === 'c') {
-		await callbacks.run('beforeCreateChannel', owner, roomProps);
+		callbacks.run('beforeCreateChannel', owner, roomProps);
 	}
-	const room = await Rooms.createWithFullRoomData(roomProps);
+	const room = Rooms.createWithFullRoomData(roomProps);
 	const shouldBeHandledByFederation = room.federated === true || ownerUsername.includes(':');
 	if (shouldBeHandledByFederation) {
 		const extra: Partial<ISubscriptionExtraData> = options?.subscriptionExtra || {};
@@ -139,18 +123,18 @@ export const createRoom = async <T extends RoomType>(
 			extra.prid = room.prid;
 		}
 
-		await Subscriptions.createWithRoomAndUser(room, owner, extra);
+		Subscriptions.createWithRoomAndUser(room, owner, extra);
 	} else {
-		for await (const username of [...new Set(members)]) {
-			const member = await Users.findOneByUsername(username, {
-				projection: { 'username': 1, 'settings.preferences': 1, 'federated': 1 },
+		for (const username of [...new Set(members as string[])]) {
+			const member = Users.findOneByUsername(username, {
+				fields: { 'username': 1, 'settings.preferences': 1, 'federated': 1 },
 			});
 			if (!member) {
 				continue;
 			}
 
 			try {
-				await callbacks.run('federation.beforeAddUserToARoom', { user: member, inviter: owner }, room);
+				callbacks.run('federation.beforeAddUserAToRoom', { user: member, inviter: owner }, room);
 			} catch (error) {
 				continue;
 			}
@@ -167,32 +151,30 @@ export const createRoom = async <T extends RoomType>(
 				extra.ls = now;
 			}
 
-			await Subscriptions.createWithRoomAndUser(room, member, extra);
+			Subscriptions.createWithRoomAndUser(room, member, extra);
 		}
 	}
 
-	await addUserRolesAsync(owner._id, ['owner'], room._id);
+	addUserRoles(owner._id, ['owner'], room._id);
 
 	if (type === 'c') {
 		if (room.teamId) {
-			const team = await Team.getOneById(room.teamId);
-			if (team) {
-				await Message.saveSystemMessage('user-added-room-to-team', team.roomId, room.name || '', owner);
-			}
+			const team = Promise.await(Team.getOneById(room.teamId));
+			team && Messages.createUserAddRoomToTeamWithRoomIdAndUser(team.roomId, room.name, owner);
 		}
-		await callbacks.run('afterCreateChannel', owner, room);
+		callbacks.run('afterCreateChannel', owner, room);
 	} else if (type === 'p') {
 		callbacks.runAsync('afterCreatePrivateGroup', owner, room);
 	}
 	callbacks.runAsync('afterCreateRoom', owner, room);
 	if (shouldBeHandledByFederation) {
-		callbacks.runAsync('federation.afterCreateFederatedRoom', room, { owner, originalMemberList: members });
+		callbacks.run('federation.afterCreateFederatedRoom', room, { owner, originalMemberList: members as string[] });
 	}
 
-	void Apps.triggerEvent('IPostRoomCreate', room);
+	Apps.triggerEvent('IPostRoomCreate', room);
+
 	return {
 		rid: room._id, // backwards compatible
-		inserted: true,
 		...room,
 	};
 };

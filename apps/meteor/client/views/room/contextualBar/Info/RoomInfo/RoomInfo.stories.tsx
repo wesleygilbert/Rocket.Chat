@@ -1,4 +1,3 @@
-import type { RoomType } from '@rocket.chat/core-typings';
 import type { ComponentMeta, ComponentStory } from '@storybook/react';
 import React from 'react';
 
@@ -18,39 +17,26 @@ export default {
 	},
 } as ComponentMeta<typeof RoomInfo>;
 
-const roomArgs = {
-	_id: 'myRoom',
-	t: 'c' as RoomType,
-	msgs: 5,
-	usersCount: 1,
-	u: {
-		_id: 'rocketchat.internal.admin.test',
-		username: 'rocketchat.internal.admin.test',
-	},
-	ts: new Date(),
-	autoTranslateLanguage: 'en',
-	_updatedAt: new Date(),
-	fname: 'rocketchat-frontend-team',
-	description:
-		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam mollis nisi vel arcu bibendum vehicula. Integer vitae suscipit libero',
-	announcement:
-		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam mollis nisi vel arcu bibendum vehicula. Integer vitae suscipit libero',
-	topic:
-		'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam mollis nisi vel arcu bibendum vehicula. Integer vitae suscipit libero',
-};
-
 const Template: ComponentStory<typeof RoomInfo> = (args) => <RoomInfo {...args} />;
 
 export const Default = Template.bind({});
 Default.args = {
-	room: roomArgs,
+	room: {
+		fname: 'rocketchat-frontend-team',
+		description:
+			'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam mollis nisi vel arcu bibendum vehicula. Integer vitae suscipit libero',
+		announcement:
+			'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam mollis nisi vel arcu bibendum vehicula. Integer vitae suscipit libero',
+		topic:
+			'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam mollis nisi vel arcu bibendum vehicula. Integer vitae suscipit libero',
+	},
 };
 
 export const Archived = Template.bind({});
 Archived.args = {
 	...Default.args,
 	room: {
-		...roomArgs,
+		...Default.args.room,
 		archived: true,
 	},
 };
@@ -59,7 +45,7 @@ export const Broadcast = Template.bind({});
 Broadcast.args = {
 	...Default.args,
 	room: {
-		...roomArgs,
+		...Default.args.room,
 		broadcast: true,
 	},
 };

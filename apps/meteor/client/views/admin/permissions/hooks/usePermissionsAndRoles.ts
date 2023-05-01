@@ -1,11 +1,11 @@
 import type { IRole, IPermission } from '@rocket.chat/core-typings';
 import { useMutableCallback } from '@rocket.chat/fuselage-hooks';
 import { escapeRegExp } from '@rocket.chat/string-helpers';
-import type { Mongo } from 'meteor/mongo';
 import { useCallback } from 'react';
 
+import { ChatPermissions } from '../../../../../app/authorization/client/lib/ChatPermissions';
 import { CONSTANTS } from '../../../../../app/authorization/lib';
-import { ChatPermissions, Roles } from '../../../../../app/models/client';
+import { Roles } from '../../../../../app/models/client';
 import { useReactiveValue } from '../../../../hooks/useReactiveValue';
 
 export const usePermissionsAndRoles = (
@@ -14,7 +14,7 @@ export const usePermissionsAndRoles = (
 	limit = 25,
 	skip = 0,
 ): { permissions: IPermission[]; total: number; roleList: IRole[]; reload: () => void } => {
-	const getFilter = useCallback((): Mongo.Selector<IPermission> => {
+	const getFilter = useCallback(() => {
 		const filterRegExp = new RegExp(escapeRegExp(filter), 'i');
 
 		return {

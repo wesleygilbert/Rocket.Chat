@@ -16,9 +16,8 @@ import {
 import type { ReactElement } from 'react';
 import React, { memo, useMemo } from 'react';
 
-import { LegacyRoomManager } from '../../app/ui-utils/client';
+import { RoomManager } from '../../app/ui-utils/client';
 import { UiTextContext } from '../../definition/IRoomTypeConfig';
-import { useOmnichannelPrioritiesMenu } from '../../ee/client/omnichannel/hooks/useOmnichannelPrioritiesMenu';
 import { GenericModalDoNotAskAgain } from '../components/GenericModal';
 import WarningModal from '../components/WarningModal';
 import { useDontAskAgain } from '../hooks/useDontAskAgain';
@@ -39,7 +38,6 @@ type RoomMenuProps = {
 	type: RoomType;
 	cl?: boolean;
 	name?: string;
-	hideDefaultOptions: boolean;
 };
 
 const closeEndpoints = {
@@ -60,17 +58,7 @@ const leaveEndpoints = {
 	l: '/v1/groups.leave',
 } as const;
 
-const RoomMenu = ({
-	rid,
-	unread,
-	threadUnread,
-	alert,
-	roomOpen,
-	type,
-	cl,
-	name = '',
-	hideDefaultOptions = false,
-}: RoomMenuProps): ReactElement | null => {
+const RoomMenu = ({ rid, unread, threadUnread, alert, roomOpen, type, cl, name = '' }: RoomMenuProps): ReactElement => {
 	const t = useTranslation();
 	const dispatchToastMessage = useToastMessageDispatch();
 	const setModal = useSetModal();
@@ -97,9 +85,6 @@ const RoomMenu = ({
 	const canLeaveChannel = usePermission('leave-c');
 	const canLeavePrivate = usePermission('leave-p');
 
-	const isOmnichannelRoom = type === 'l';
-	const prioritiesMenu = useOmnichannelPrioritiesMenu(rid);
-
 	const canLeave = ((): boolean => {
 		if (type === 'c' && !canLeaveChannel) {
 			return false;
@@ -117,14 +102,14 @@ const RoomMenu = ({
 				if (roomOpen) {
 					router.push({});
 				}
-				LegacyRoomManager.close(rid);
+				RoomManager.close(rid);
 			} catch (error) {
 				dispatchToastMessage({ type: 'error', message: error });
 			}
 			closeModal();
 		};
 
-		const warnText = roomCoordinator.getRoomDirectives(type).getUiText(UiTextContext.LEAVE_WARNING);
+		const warnText = roomCoordinator.getRoomDirectives(type)?.getUiText(UiTextContext.LEAVE_WARNING);
 
 		setModal(
 			<WarningModal
@@ -148,7 +133,7 @@ const RoomMenu = ({
 			closeModal();
 		};
 
-		const warnText = roomCoordinator.getRoomDirectives(type).getUiText(UiTextContext.HIDE_WARNING);
+		const warnText = roomCoordinator.getRoomDirectives(type)?.getUiText(UiTextContext.HIDE_WARNING);
 
 		if (dontAskHideRoom) {
 			return hide();
@@ -178,11 +163,11 @@ const RoomMenu = ({
 				await readMessages({ rid, readThreads: true });
 				return;
 			}
-			await unreadMessages(undefined, rid);
+			await unreadMessages(null, rid);
 			if (subscription == null) {
 				return;
 			}
-			LegacyRoomManager.close(subscription.t + subscription.name);
+			RoomManager.close(subscription.t + subscription.name);
 
 			router.push({});
 		} catch (error) {
@@ -200,49 +185,33 @@ const RoomMenu = ({
 
 	const menuOptions = useMemo(
 		() => ({
-			...(!hideDefaultOptions && {
-				hideRoom: {
-					label: { label: t('Hide'), icon: 'eye-off' },
-					action: handleHide,
-				},
-				toggleRead: {
-					label: { label: isUnread ? t('Mark_read') : t('Mark_unread'), icon: 'flag' },
-					action: handleToggleRead,
-				},
-				...(canFavorite
-					? {
-							toggleFavorite: {
-								label: {
-									label: isFavorite ? t('Unfavorite') : t('Favorite'),
-									icon: isFavorite ? 'star-filled' : 'star',
-								},
-								action: handleToggleFavorite,
+			hideRoom: {
+				label: { label: t('Hide'), icon: 'eye-off' },
+				action: handleHide,
+			},
+			toggleRead: {
+				label: { label: isUnread ? t('Mark_read') : t('Mark_unread'), icon: 'flag' },
+				action: handleToggleRead,
+			},
+			...(canFavorite
+				? {
+						toggleFavorite: {
+							label: {
+								label: isFavorite ? t('Unfavorite') : t('Favorite'),
+								icon: isFavorite ? 'star-filled' : 'star',
 							},
-					  }
-					: {}),
-				...(canLeave && {
-					leaveRoom: {
-						label: { label: t('Leave_room'), icon: 'sign-out' },
-						action: handleLeave,
-					},
-				}),
+							action: handleToggleFavorite,
+						},
+				  }
+				: {}),
+			...(canLeave && {
+				leaveRoom: {
+					label: { label: t('Leave_room'), icon: 'sign-out' },
+					action: handleLeave,
+				},
 			}),
-			...(isOmnichannelRoom && prioritiesMenu),
 		}),
-		[
-			hideDefaultOptions,
-			t,
-			handleHide,
-			isUnread,
-			handleToggleRead,
-			canFavorite,
-			isFavorite,
-			handleToggleFavorite,
-			canLeave,
-			handleLeave,
-			isOmnichannelRoom,
-			prioritiesMenu,
-		],
+		[t, handleHide, isUnread, handleToggleRead, canFavorite, isFavorite, handleToggleFavorite, canLeave, handleLeave],
 	);
 
 	return (
@@ -253,7 +222,6 @@ const RoomMenu = ({
 			aria-keyshortcuts='alt'
 			tabIndex={-1}
 			options={menuOptions}
-			maxHeight={300}
 			renderItem={({ label: { label, icon }, ...props }): JSX.Element => <Option label={label} icon={icon} {...props} />}
 		/>
 	);

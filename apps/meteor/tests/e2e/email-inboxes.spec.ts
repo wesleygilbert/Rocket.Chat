@@ -1,10 +1,9 @@
 import { faker } from '@faker-js/faker';
 
-import { Users } from './fixtures/userStates';
-import { AdminEmailInboxes, Utils } from './page-objects';
 import { test, expect } from './utils/test';
+import { AdminEmailInboxes, Utils } from './page-objects';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 test.describe.serial('email-inboxes', () => {
 	let poAdminEmailInboxes: AdminEmailInboxes;
@@ -43,7 +42,7 @@ test.describe.serial('email-inboxes', () => {
 	});
 
 	test('expect delete an email inbox', async () => {
-		await poAdminEmailInboxes.itemRow(email).click();
+		await poAdminEmailInboxes.findEmailInbox(email).click();
 		await poAdminEmailInboxes.btnDelete.click();
 		await poUtils.btnModalConfirmDelete.click();
 		await expect(poUtils.toastBarSuccess).toBeVisible();

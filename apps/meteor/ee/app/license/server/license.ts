@@ -1,21 +1,16 @@
 import { EventEmitter } from 'events';
 
-import { Apps } from '@rocket.chat/core-services';
-import type { IAppStorageItem } from '@rocket.chat/apps-engine/server/storage';
-import { Users } from '@rocket.chat/models';
-
+import { Users } from '../../../../app/models/server';
 import type { BundleFeature } from './bundles';
 import { getBundleModules, isBundle, getBundleFromModule } from './bundles';
 import decrypt from './decrypt';
 import { getTagColor } from './getTagColor';
-import type { ILicense } from '../definition/ILicense';
-import type { ILicenseTag } from '../definition/ILicenseTag';
-import { isUnderAppLimits } from './lib/isUnderAppLimits';
-import { getInstallationSourceFromAppStorageItem } from '../../../../lib/apps/getInstallationSourceFromAppStorageItem';
+import type { ILicense } from '../definitions/ILicense';
+import type { ILicenseTag } from '../definitions/ILicenseTag';
 
 const EnterpriseLicenses = new EventEmitter();
 
-interface IValidLicense {
+export interface IValidLicense {
 	valid?: boolean;
 	license: ILicense;
 }
@@ -34,11 +29,6 @@ class LicenseClass {
 
 	private modules = new Set<string>();
 
-	private appsConfig: NonNullable<ILicense['apps']> = {
-		maxPrivateApps: 3,
-		maxMarketplaceApps: 5,
-	};
-
 	private _validateExpiration(expiration: string): boolean {
 		return new Date() > new Date(expiration);
 	}
@@ -50,21 +40,6 @@ class LicenseClass {
 		const regex = new RegExp(`^${licenseURL}$`, 'i');
 
 		return !!regex.exec(url);
-	}
-
-	private _setAppsConfig(license: ILicense): void {
-		// If the license is valid, no limit is going to be applied to apps installation for now
-		// This guarantees that upgraded workspaces won't be affected by the new limit right away
-		// and gives us time to propagate the new limit schema to all licenses
-		const { maxPrivateApps = -1, maxMarketplaceApps = -1 } = license.apps || {};
-
-		if (maxPrivateApps === -1 || maxPrivateApps > this.appsConfig.maxPrivateApps) {
-			this.appsConfig.maxPrivateApps = maxPrivateApps;
-		}
-
-		if (maxMarketplaceApps === -1 || maxMarketplaceApps > this.appsConfig.maxMarketplaceApps) {
-			this.appsConfig.maxMarketplaceApps = maxMarketplaceApps;
-		}
 	}
 
 	private _validModules(licenseModules: string[]): void {
@@ -155,10 +130,6 @@ class LicenseClass {
 		return [...this.tags];
 	}
 
-	getAppsConfig(): NonNullable<ILicense['apps']> {
-		return this.appsConfig;
-	}
-
 	setURL(url: string): void {
 		this.url = url.replace(/\/$/, '').replace(/^https?:\/\/(.*)$/, '$1');
 
@@ -196,8 +167,6 @@ class LicenseClass {
 				maxActiveUsers = license.maxActiveUsers;
 			}
 
-			this._setAppsConfig(license);
-
 			this._validModules(license.modules);
 
 			this._addTags(license);
@@ -212,26 +181,12 @@ class LicenseClass {
 		this.showLicenses();
 	}
 
-	async canAddNewUser(): Promise<boolean> {
+	canAddNewUser(): boolean {
 		if (!maxActiveUsers) {
 			return true;
 		}
 
-		return maxActiveUsers > (await Users.getActiveLocalUserCount());
-	}
-
-	async canEnableApp(app: IAppStorageItem): Promise<boolean> {
-		if (!(await Apps.isInitialized())) {
-			return false;
-		}
-
-		// Migrated apps were installed before the validation was implemented
-		// so they're always allowed to be enabled
-		if (app.migrated) {
-			return true;
-		}
-
-		return isUnderAppLimits(this.appsConfig, getInstallationSourceFromAppStorageItem(app));
+		return maxActiveUsers > Users.getActiveLocalUserCount();
 	}
 
 	showLicenses(): void {
@@ -333,19 +288,11 @@ export function getTags(): ILicenseTag[] {
 	return License.getTags();
 }
 
-export function getAppsConfig(): NonNullable<ILicense['apps']> {
-	return License.getAppsConfig();
-}
-
-export async function canAddNewUser(): Promise<boolean> {
+export function canAddNewUser(): boolean {
 	return License.canAddNewUser();
 }
 
-export async function canEnableApp(app: IAppStorageItem): Promise<boolean> {
-	return License.canEnableApp(app);
-}
-
-export function onLicense(feature: BundleFeature, cb: (...args: any[]) => void): void | Promise<void> {
+export function onLicense(feature: BundleFeature, cb: (...args: any[]) => void): void {
 	if (hasLicense(feature)) {
 		return cb();
 	}
@@ -353,7 +300,7 @@ export function onLicense(feature: BundleFeature, cb: (...args: any[]) => void):
 	EnterpriseLicenses.once(`valid:${feature}`, cb);
 }
 
-function onValidFeature(feature: BundleFeature, cb: () => void): () => void {
+export function onValidFeature(feature: BundleFeature, cb: () => void): () => void {
 	EnterpriseLicenses.on(`valid:${feature}`, cb);
 
 	if (hasLicense(feature)) {
@@ -365,7 +312,7 @@ function onValidFeature(feature: BundleFeature, cb: () => void): () => void {
 	};
 }
 
-function onInvalidFeature(feature: BundleFeature, cb: () => void): () => void {
+export function onInvalidFeature(feature: BundleFeature, cb: () => void): () => void {
 	EnterpriseLicenses.on(`invalid:${feature}`, cb);
 
 	if (!hasLicense(feature)) {
@@ -383,28 +330,28 @@ export function onToggledFeature(
 		up,
 		down,
 	}: {
-		up?: () => Promise<void> | void;
-		down?: () => Promise<void> | void;
+		up?: () => void;
+		down?: () => void;
 	},
 ): () => void {
 	let enabled = hasLicense(feature);
 
 	const offValidFeature = onValidFeature(feature, () => {
 		if (!enabled) {
-			void up?.();
+			up?.();
 			enabled = true;
 		}
 	});
 
 	const offInvalidFeature = onInvalidFeature(feature, () => {
 		if (enabled) {
-			void down?.();
+			down?.();
 			enabled = false;
 		}
 	});
 
 	if (enabled) {
-		void up?.();
+		up?.();
 	}
 
 	return (): void => {
@@ -430,14 +377,14 @@ export function flatModules(modulesAndBundles: string[]): string[] {
 	return modules.concat(modulesFromBundles);
 }
 
-interface IOverrideClassProperties {
+export interface IOverrideClassProperties {
 	[key: string]: (...args: any[]) => any;
 }
 
 type Class = { new (...args: any[]): any };
 
-export async function overwriteClassOnLicense(license: BundleFeature, original: Class, overwrite: IOverrideClassProperties): Promise<void> {
-	await onLicense(license, () => {
+export function overwriteClassOnLicense(license: BundleFeature, original: Class, overwrite: IOverrideClassProperties): void {
+	onLicense(license, () => {
 		Object.entries(overwrite).forEach(([key, value]) => {
 			const originalFn = original.prototype[key];
 			original.prototype[key] = function (...args: any[]): any {

@@ -18,5 +18,4 @@ export interface IPresence extends IServiceClass {
 	setConnectionStatus(uid: string, status: UserStatus, session: string): Promise<boolean>;
 	updateUserPresence(uid: string): Promise<void>;
 	toggleBroadcast(enabled: boolean): void;
-	getConnectionCount(): { current: number; max: number };
 }

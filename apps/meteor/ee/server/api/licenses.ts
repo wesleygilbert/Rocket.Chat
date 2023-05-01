@@ -1,10 +1,11 @@
 import { check } from 'meteor/check';
-import { Settings, Users } from '@rocket.chat/models';
+import { Settings } from '@rocket.chat/models';
 
 import { getLicenses, validateFormat, flatModules, getMaxActiveUsers, isEnterprise } from '../../app/license/server/license';
+import { Users } from '../../../app/models/server';
 import { API } from '../../../app/api/server/api';
-import { hasPermissionAsync } from '../../../app/authorization/server/functions/hasPermission';
-import type { ILicense } from '../../app/license/definition/ILicense';
+import { hasPermission } from '../../../app/authorization/server';
+import type { ILicense } from '../../app/license/definitions/ILicense';
 
 function licenseTransform(license: ILicense): ILicense {
 	return {
@@ -17,8 +18,8 @@ API.v1.addRoute(
 	'licenses.get',
 	{ authRequired: true },
 	{
-		async get() {
-			if (!(await hasPermissionAsync(this.userId, 'view-privileged-setting'))) {
+		get() {
+			if (!hasPermission(this.userId, 'view-privileged-setting')) {
 				return API.v1.unauthorized();
 			}
 
@@ -40,7 +41,7 @@ API.v1.addRoute(
 				license: String,
 			});
 
-			if (!(await hasPermissionAsync(this.userId, 'edit-privileged-setting'))) {
+			if (!hasPermission(this.userId, 'edit-privileged-setting')) {
 				return API.v1.unauthorized();
 			}
 
@@ -60,9 +61,9 @@ API.v1.addRoute(
 	'licenses.maxActiveUsers',
 	{ authRequired: true },
 	{
-		async get() {
+		get() {
 			const maxActiveUsers = getMaxActiveUsers() || null;
-			const activeUsers = await Users.getActiveLocalUserCount();
+			const activeUsers = Users.getActiveLocalUserCount();
 
 			return API.v1.success({ maxActiveUsers, activeUsers });
 		},

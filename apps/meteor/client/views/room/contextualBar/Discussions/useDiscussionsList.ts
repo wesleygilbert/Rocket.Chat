@@ -10,16 +10,12 @@ import { getConfig } from '../../../../lib/utils/getConfig';
 
 export const useDiscussionsList = (
 	options: DiscussionsListOptions,
-	uid: IUser['_id'] | null,
+	uid: IUser['_id'],
 ): {
 	discussionsList: DiscussionsList;
 	initialItemCount: number;
 	loadMoreItems: (start: number, end: number) => void;
 } => {
-	if (!uid) {
-		throw new Error('User ID is undefined. Cannot load discussions list');
-	}
-
 	const discussionsList = useMemo(() => new DiscussionsList(options), [options]);
 
 	const getDiscussions = useEndpoint('GET', '/v1/chat.getDiscussions');
@@ -44,7 +40,10 @@ export const useDiscussionsList = (
 	const { loadMoreItems, initialItemCount } = useScrollableMessageList(
 		discussionsList,
 		fetchMessages,
-		useMemo(() => parseInt(`${getConfig('discussionListSize', 10)}`), []),
+		useMemo(() => {
+			const discussionListSize = getConfig('discussionListSize');
+			return discussionListSize ? parseInt(discussionListSize, 10) : undefined;
+		}, []),
 	);
 	useStreamUpdatesForMessageList(discussionsList, uid, options.rid);
 

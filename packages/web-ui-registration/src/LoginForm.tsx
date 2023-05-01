@@ -62,7 +62,7 @@ export const LoginForm = ({ setLoginRoute }: { setLoginRoute: DispatchLoginRoute
 		},
 		onError: (error: any) => {
 			if ([error.error, error.errorType].includes('error-invalid-email')) {
-				setError('email', { type: 'invalid-email', message: t('registration.page.login.errors.invalidEmail') });
+				setError('email', { type: 'invalid-email', message: t('Invalid_email') });
 			}
 
 			if ('error' in error && error.error !== 403) {
@@ -77,7 +77,12 @@ export const LoginForm = ({ setLoginRoute }: { setLoginRoute: DispatchLoginRoute
 	});
 
 	if (errors.email?.type === 'invalid-email') {
-		return <EmailConfirmationForm onBackToLogin={() => clearErrors('email')} email={getValues('email')} />;
+		return (
+			<EmailConfirmationForm
+				onBackToLogin={() => clearErrors('email')}
+				email={getValues('username')?.includes('@') ? getValues('username') : undefined}
+			/>
+		);
 	}
 
 	return (

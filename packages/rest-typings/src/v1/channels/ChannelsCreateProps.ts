@@ -5,7 +5,6 @@ const ajv = new Ajv();
 export type ChannelsCreateProps = {
 	name: string;
 	members?: string[];
-	teams?: string[];
 	readOnly?: boolean;
 	extraData?: {
 		broadcast?: boolean;
@@ -21,9 +20,6 @@ const channelsCreatePropsSchema = {
 			type: 'string',
 		},
 		members: {
-			type: 'array',
-		},
-		teams: {
 			type: 'array',
 		},
 		readonly: {

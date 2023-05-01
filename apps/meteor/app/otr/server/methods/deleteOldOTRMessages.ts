@@ -1,32 +1,24 @@
-import type { IRoom } from '@rocket.chat/core-typings';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
+import type { IRoom, ISubscription } from '@rocket.chat/core-typings';
 import { Meteor } from 'meteor/meteor';
-import { Messages, Subscriptions } from '@rocket.chat/models';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		deleteOldOTRMessages(roomId: IRoom['_id']): Promise<void>;
-	}
-}
+import { Subscriptions, Messages } from '../../../models/server';
 
-Meteor.methods<ServerMethods>({
-	async deleteOldOTRMessages(roomId: IRoom['_id']): Promise<void> {
-		const userId = Meteor.userId();
-		if (!userId) {
+Meteor.methods({
+	deleteOldOTRMessages(roomId: IRoom['_id']): void {
+		if (!Meteor.userId()) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
 				method: 'deleteOldOTRMessages',
 			});
 		}
 
 		const now = new Date();
-		const subscription = await Subscriptions.findOneByRoomIdAndUserId(roomId, userId);
+		const subscription: ISubscription = Subscriptions.findOneByRoomIdAndUserId(roomId, Meteor.userId());
 		if (subscription?.t !== 'd') {
 			throw new Meteor.Error('error-invalid-room', 'Invalid room', {
 				method: 'deleteOldOTRMessages',
 			});
 		}
 
-		await Messages.deleteOldOTRMessages(roomId, now);
+		Messages.deleteOldOTRMessages(roomId, now);
 	},
 });

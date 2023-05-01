@@ -11,7 +11,7 @@ import { settings } from '../../../settings/server';
  * @returns string
  */
 export async function getWorkspaceAccessToken(forceNew = false, scope = '', save = true) {
-	const { connectToCloud, workspaceRegistered } = await retrieveRegistrationStatus();
+	const { connectToCloud, workspaceRegistered } = retrieveRegistrationStatus();
 
 	if (!connectToCloud || !workspaceRegistered) {
 		return '';
@@ -28,7 +28,7 @@ export async function getWorkspaceAccessToken(forceNew = false, scope = '', save
 		return settings.get('Cloud_Workspace_Access_Token');
 	}
 
-	const accessToken = await getWorkspaceAccessTokenWithScope(scope);
+	const accessToken = getWorkspaceAccessTokenWithScope(scope);
 
 	if (save) {
 		await Promise.all([

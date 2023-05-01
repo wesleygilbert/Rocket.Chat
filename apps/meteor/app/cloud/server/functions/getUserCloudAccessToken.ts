@@ -1,17 +1,17 @@
+import { HTTP } from 'meteor/http';
 import { Users } from '@rocket.chat/models';
 import type { IUser } from '@rocket.chat/core-typings';
-import { serverFetch as fetch } from '@rocket.chat/server-fetch';
 
 import { getRedirectUri } from './getRedirectUri';
 import { retrieveRegistrationStatus } from './retrieveRegistrationStatus';
-import { removeWorkspaceRegistrationInfo } from './removeWorkspaceRegistrationInfo';
+import { unregisterWorkspace } from './unregisterWorkspace';
 import { userLoggedOut } from './userLoggedOut';
 import { settings } from '../../../settings/server';
 import { userScopes } from '../oauthScopes';
 import { SystemLogger } from '../../../../server/lib/logger/system';
 
 export async function getUserCloudAccessToken(userId: string, forceNew = false, scope = '', save = true) {
-	const { connectToCloud, workspaceRegistered } = await retrieveRegistrationStatus();
+	const { connectToCloud, workspaceRegistered } = retrieveRegistrationStatus();
 
 	if (!connectToCloud || !workspaceRegistered) {
 		return '';
@@ -53,39 +53,33 @@ export async function getUserCloudAccessToken(userId: string, forceNew = false, 
 
 	let authTokenResult;
 	try {
-		const request = await fetch(`${cloudUrl}/api/oauth/token`, {
+		authTokenResult = HTTP.post(`${cloudUrl}/api/oauth/token`, {
 			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			method: 'POST',
-			params: new URLSearchParams({
+			params: {
 				client_id: clientId,
 				client_secret: clientSecret,
 				refresh_token: refreshToken,
 				scope,
 				grant_type: 'refresh_token',
 				redirect_uri: redirectUri,
-			}),
+			},
 		});
-
-		if (!request.ok) {
-			throw new Error((await request.json()).error);
-		}
-
-		authTokenResult = await request.json();
 	} catch (err: any) {
 		SystemLogger.error({
 			msg: 'Failed to get User AccessToken from Rocket.Chat Cloud',
 			url: '/api/oauth/token',
+			...(err.response?.data && { cloudError: err.response.data }),
 			err,
 		});
 
-		if (err) {
-			if (err.message.includes('oauth_invalid_client_credentials')) {
+		if (err.response?.data?.error) {
+			if (err.response.data.error === 'oauth_invalid_client_credentials') {
 				SystemLogger.error('Server has been unregistered from cloud');
-				await removeWorkspaceRegistrationInfo();
+				unregisterWorkspace();
 			}
 
-			if (err.message.includes('unauthorized')) {
-				await userLoggedOut(userId);
+			if (err.response.data.error === 'unauthorized') {
+				userLoggedOut(userId);
 			}
 		}
 
@@ -94,14 +88,14 @@ export async function getUserCloudAccessToken(userId: string, forceNew = false, 
 
 	if (save) {
 		const willExpireAt = new Date();
-		willExpireAt.setSeconds(willExpireAt.getSeconds() + authTokenResult.expires_in);
+		willExpireAt.setSeconds(willExpireAt.getSeconds() + authTokenResult.data.expires_in);
 
 		await Users.updateOne(
 			{ _id: user._id },
 			{
 				$set: {
 					'services.cloud': {
-						accessToken: authTokenResult.access_token,
+						accessToken: authTokenResult.data.access_token,
 						expiresAt: willExpireAt,
 					},
 				},
@@ -109,5 +103,5 @@ export async function getUserCloudAccessToken(userId: string, forceNew = false, 
 		);
 	}
 
-	return authTokenResult.access_token;
+	return authTokenResult.data.access_token;
 }

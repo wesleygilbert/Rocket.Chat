@@ -1,23 +1,20 @@
 import { VM, VMScript } from 'vm2';
 import { Meteor } from 'meteor/meteor';
-import { Random } from '@rocket.chat/random';
+import { HTTP } from 'meteor/http';
+import { Random } from 'meteor/random';
 import { Livechat } from 'meteor/rocketchat:livechat';
 import Fiber from 'fibers';
 import Future from 'fibers/future';
 import _ from 'underscore';
+import s from 'underscore.string';
 import moment from 'moment';
-import { Integrations, Users } from '@rocket.chat/models';
-import * as Models from '@rocket.chat/models';
+import { Integrations } from '@rocket.chat/models';
 
-import * as s from '../../../../lib/utils/stringUtils';
 import { incomingLogger } from '../logger';
-import { processWebhookMessage } from '../../../lib/server/functions/processWebhookMessage';
+import { processWebhookMessage } from '../../../lib/server';
 import { API, APIClass, defaultRateLimiterOptions } from '../../../api/server';
+import * as Models from '../../../models/server';
 import { settings } from '../../../settings/server';
-import { httpCall } from '../../../../server/lib/http/call';
-import { deleteOutgoingIntegration } from '../methods/outgoing/deleteOutgoingIntegration';
-
-export const forbiddenModelMethods = ['registerModel', 'getCollectionName'];
 
 const compiledScripts = {};
 function buildSandbox(store = {}) {
@@ -43,9 +40,8 @@ function buildSandbox(store = {}) {
 		},
 		HTTP(method, url, options) {
 			try {
-				// Need to review how we will handle this, possible breaking change on removing fibers
 				return {
-					result: Promise.await(httpCall(method, url, options)),
+					result: HTTP.call(method, url, options),
 				};
 			} catch (error) {
 				return {
@@ -55,7 +51,7 @@ function buildSandbox(store = {}) {
 		},
 	};
 	Object.keys(Models)
-		.filter((k) => !forbiddenModelMethods.includes(k))
+		.filter((k) => !k.startsWith('_'))
 		.forEach((k) => {
 			sandbox[k] = Models[k];
 		});
@@ -104,11 +100,11 @@ function getIntegrationScript(integration) {
 	throw API.v1.failure('class-script-not-found');
 }
 
-async function createIntegration(options, user) {
+function createIntegration(options, user) {
 	incomingLogger.info({ msg: 'Add integration', integration: options.name });
 	incomingLogger.debug({ options });
 
-	await Meteor.runAsUser(user._id, async function () {
+	Meteor.runAsUser(user._id, function () {
 		switch (options.event) {
 			case 'newMessageOnChannel':
 				if (options.data == null) {
@@ -117,7 +113,7 @@ async function createIntegration(options, user) {
 				if (options.data.channel_name != null && options.data.channel_name.indexOf('#') === -1) {
 					options.data.channel_name = `#${options.data.channel_name}`;
 				}
-				return Meteor.callAsync('addOutgoingIntegration', {
+				return Meteor.call('addOutgoingIntegration', {
 					username: 'rocket.cat',
 					urls: [options.target_url],
 					name: options.name,
@@ -128,7 +124,7 @@ async function createIntegration(options, user) {
 				if (options.data.username.indexOf('@') === -1) {
 					options.data.username = `@${options.data.username}`;
 				}
-				return Meteor.callAsync('addOutgoingIntegration', {
+				return Meteor.call('addOutgoingIntegration', {
 					username: 'rocket.cat',
 					urls: [options.target_url],
 					name: options.name,
@@ -141,21 +137,21 @@ async function createIntegration(options, user) {
 	return API.v1.success();
 }
 
-async function removeIntegration(options, user) {
+function removeIntegration(options, user) {
 	incomingLogger.info('Remove integration');
 	incomingLogger.debug({ options });
 
-	const integrationToRemove = await Integrations.findOneByUrl(options.target_url);
+	const integrationToRemove = Promise.await(Integrations.findOneByUrl(options.target_url));
 	if (!integrationToRemove) {
 		return API.v1.failure('integration-not-found');
 	}
 
-	await deleteOutgoingIntegration(integrationToRemove._id, user._id);
+	Meteor.runAsUser(user._id, () => Meteor.call('deleteOutgoingIntegration', integrationToRemove._id));
 
 	return API.v1.success();
 }
 
-async function executeIntegrationRest() {
+function executeIntegrationRest() {
 	incomingLogger.info({ msg: 'Post integration:', integration: this.integration.name });
 	incomingLogger.debug({ urlParams: this.urlParams, bodyParams: this.bodyParams });
 
@@ -274,7 +270,7 @@ async function executeIntegrationRest() {
 	this.bodyParams.bot = { i: this.integration._id };
 
 	try {
-		const message = await processWebhookMessage(this.bodyParams, this.user, defaultValues);
+		const message = processWebhookMessage(this.bodyParams, this.user, defaultValues);
 		if (_.isEmpty(message)) {
 			return API.v1.failure('unknown-error');
 		}
@@ -293,7 +289,7 @@ function addIntegrationRest() {
 	return createIntegration(this.bodyParams, this.user);
 }
 
-async function removeIntegrationRest() {
+function removeIntegrationRest() {
 	return removeIntegration(this.bodyParams, this.user);
 }
 
@@ -357,7 +353,7 @@ class WebHookAPI extends APIClass {
 		);
 	}
 
-	async shouldVerifyRateLimit(/* route */) {
+	shouldVerifyRateLimit(/* route */) {
 		return (
 			settings.get('API_Enable_Rate_Limiter') === true &&
 			(process.env.NODE_ENV !== 'development' || settings.get('API_Enable_Rate_Limiter_Dev') === true)
@@ -368,7 +364,7 @@ class WebHookAPI extends APIClass {
 	There is only one generic route propagated to Restivus which has URL-path-parameters for the integration and the token.
 	Since the rate-limiter operates on absolute routes, we need to add a limiter to the absolute url before we can validate it
 	*/
-	async enforceRateLimit(objectForRateLimitMatch, request, response, userId) {
+	enforceRateLimit(objectForRateLimitMatch, request, response, userId) {
 		const { method, url } = request;
 		const route = url.replace(`/${this.apiPath}`, '');
 		const nameRoute = this.getFullRouteName(route, [method.toLowerCase()]);
@@ -397,7 +393,7 @@ const Api = new WebHookAPI({
 	enableCors: true,
 	apiPath: 'hooks/',
 	auth: {
-		async user() {
+		user() {
 			const payloadKeys = Object.keys(this.bodyParams);
 			const payloadIsWrapped = this.bodyParams && this.bodyParams.payload && payloadKeys.length === 1;
 			if (payloadIsWrapped && this.request.headers['content-type'] === 'application/x-www-form-urlencoded') {
@@ -416,10 +412,12 @@ const Api = new WebHookAPI({
 				}
 			}
 
-			this.integration = await Integrations.findOne({
-				_id: this.request.params.integrationId,
-				token: decodeURIComponent(this.request.params.token),
-			});
+			this.integration = Promise.await(
+				Integrations.findOne({
+					_id: this.request.params.integrationId,
+					token: decodeURIComponent(this.request.params.token),
+				}),
+			);
 
 			if (!this.integration) {
 				incomingLogger.info(`Invalid integration id ${this.request.params.integrationId} or token ${this.request.params.token}`);
@@ -435,7 +433,7 @@ const Api = new WebHookAPI({
 				};
 			}
 
-			const user = await Users.findOne({
+			const user = Models.Users.findOne({
 				_id: this.integration.userId,
 			});
 

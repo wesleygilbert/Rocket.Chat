@@ -22,7 +22,7 @@ function OutgoingWebhookHistoryPage(props: ComponentProps<typeof Page>): ReactEl
 
 	const router = useRoute('admin-integrations');
 
-	const clearIntegrationHistory = useMethod('clearIntegrationHistory');
+	const clearHistory = useMethod('clearIntegrationHistory');
 
 	const id = useRouteParameter('id') as string;
 
@@ -59,7 +59,7 @@ function OutgoingWebhookHistoryPage(props: ComponentProps<typeof Page>): ReactEl
 
 	const handleClearHistory = async (): Promise<void> => {
 		try {
-			await clearIntegrationHistory(id);
+			await clearHistory();
 			dispatchToastMessage({ type: 'success', message: t('Integration_History_Cleared') });
 			refetch();
 			setMounted(false);

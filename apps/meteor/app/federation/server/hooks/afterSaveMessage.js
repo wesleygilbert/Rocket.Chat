@@ -1,6 +1,5 @@
-import { FederationRoomEvents } from '@rocket.chat/models';
-
 import { clientLogger } from '../lib/logger';
+import { FederationRoomEvents } from '../../../models/server';
 import { normalizers } from '../normalizers';
 import { hasExternalDomain } from '../functions/helpers';
 import { getFederationDomain } from '../lib/getFederationDomain';
@@ -33,6 +32,6 @@ async function afterSaveMessage(message, room) {
 
 export const definition = {
 	hook: 'afterSaveMessage',
-	callback: afterSaveMessage,
+	callback: (message, room) => Promise.await(afterSaveMessage(message, room)),
 	id: 'federation-after-save-message',
 };

@@ -10,9 +10,9 @@ import {
 	isDownloadPendingAvatarsParamsPOST,
 	isGetCurrentImportOperationParamsGET,
 } from '@rocket.chat/rest-typings';
-import { Imports } from '@rocket.chat/models';
 
 import { API } from '../api';
+import { Imports } from '../../../models/server';
 import { Importers } from '../../../importer/server';
 import {
 	executeUploadImportFile,
@@ -30,10 +30,10 @@ API.v1.addRoute(
 		validateParams: isUploadImportFileParamsPOST,
 	},
 	{
-		async post() {
+		post() {
 			const { binaryContent, contentType, fileName, importerKey } = this.bodyParams;
 
-			return API.v1.success(await executeUploadImportFile(this.userId, binaryContent, contentType, fileName, importerKey));
+			return API.v1.success(executeUploadImportFile(this.userId, binaryContent, contentType, fileName, importerKey));
 		},
 	},
 );
@@ -46,9 +46,9 @@ API.v1.addRoute(
 		permissionsRequired: ['run-import'],
 	},
 	{
-		async post() {
+		post() {
 			const { fileUrl, importerKey } = this.bodyParams;
-			await executeDownloadPublicImportFile(this.userId, fileUrl, importerKey);
+			executeDownloadPublicImportFile(this.userId, fileUrl, importerKey);
 
 			return API.v1.success();
 		},
@@ -63,10 +63,10 @@ API.v1.addRoute(
 		permissionsRequired: ['run-import'],
 	},
 	{
-		async post() {
+		post() {
 			const { input } = this.bodyParams;
 
-			await executeStartImport({ input });
+			executeStartImport({ input });
 
 			return API.v1.success();
 		},
@@ -97,8 +97,8 @@ API.v1.addRoute(
 		permissionsRequired: ['run-import'],
 	},
 	{
-		async get() {
-			const result = await executeGetImportProgress();
+		get() {
+			const result = executeGetImportProgress();
 			return API.v1.success(result);
 		},
 	},
@@ -112,8 +112,8 @@ API.v1.addRoute(
 		permissionsRequired: ['view-import-operations'],
 	},
 	{
-		async get() {
-			const result = await executeGetLatestImportOperations();
+		get() {
+			const result = executeGetLatestImportOperations();
 			return API.v1.success(result);
 		},
 	},
@@ -127,15 +127,14 @@ API.v1.addRoute(
 		permissionsRequired: ['run-import'],
 	},
 	{
-		async post() {
+		post() {
 			const importer = Importers.get('pending-files');
 			if (!importer) {
 				throw new Meteor.Error('error-importer-not-defined', 'The Pending File Importer was not found.', 'downloadPendingFiles');
 			}
 
 			importer.instance = new importer.importer(importer); // eslint-disable-line new-cap
-			await importer.instance.build();
-			const count = await importer.instance.prepareFileCount();
+			const count = importer.instance.prepareFileCount();
 
 			return API.v1.success({
 				count,
@@ -152,15 +151,14 @@ API.v1.addRoute(
 		permissionsRequired: ['run-import'],
 	},
 	{
-		async post() {
+		post() {
 			const importer = Importers.get('pending-avatars');
 			if (!importer) {
 				throw new Meteor.Error('error-importer-not-defined', 'The Pending File Importer was not found.', 'downloadPendingAvatars');
 			}
 
 			importer.instance = new importer.importer(importer); // eslint-disable-line new-cap
-			await importer.instance.build();
-			const count = await importer.instance.prepareFileCount();
+			const count = importer.instance.prepareFileCount();
 
 			return API.v1.success({
 				count,
@@ -177,8 +175,8 @@ API.v1.addRoute(
 		permissionsRequired: ['run-import'],
 	},
 	{
-		async get() {
-			const operation = await Imports.findLastImport();
+		get() {
+			const operation = Imports.findLastImport();
 			return API.v1.success({
 				operation,
 			});

@@ -1,20 +1,11 @@
 import { Meteor } from 'meteor/meteor';
 import { WebdavAccounts } from '@rocket.chat/models';
-import type { IWebdavAccount, IWebdavNode } from '@rocket.chat/core-typings';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
 import { settings } from '../../../settings/server';
 import { getWebdavCredentials } from '../lib/getWebdavCredentials';
 import { WebdavClientAdapter } from '../lib/webdavClientAdapter';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		getWebdavFileList(accountId: IWebdavAccount['_id'], path: string): { success: boolean; data: IWebdavNode[] };
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	async getWebdavFileList(accountId, path) {
 		const userId = Meteor.userId();
 
@@ -38,7 +29,7 @@ Meteor.methods<ServerMethods>({
 		try {
 			const cred = getWebdavCredentials(account);
 			const client = new WebdavClientAdapter(account.serverURL, cred);
-			const data = (await client.getDirectoryContents(path)) as IWebdavNode[];
+			const data = await client.getDirectoryContents(path);
 			return { success: true, data };
 		} catch (error) {
 			throw new Meteor.Error('could-not-access-webdav', 'Could not access webdav', {

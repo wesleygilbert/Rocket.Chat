@@ -1,10 +1,11 @@
 import _ from 'underscore';
-import { Messages, Settings, ImportData } from '@rocket.chat/models';
+import { Settings } from '@rocket.chat/models';
 
 import { Base, ProgressStep, ImporterWebsocket } from '../../importer/server';
+import { Messages, ImportData } from '../../models/server';
 import { settings } from '../../settings/server';
 import { MentionsParser } from '../../mentions/lib/MentionsParser';
-import { getUserAvatarURL } from '../../utils/server/getUserAvatarURL';
+import { getUserAvatarURL } from '../../utils/lib/getUserAvatarURL';
 
 export class SlackImporter extends Base {
 	parseData(data) {
@@ -18,16 +19,16 @@ export class SlackImporter extends Base {
 		}
 	}
 
-	async prepareChannelsFile(entry) {
-		await super.updateProgress(ProgressStep.PREPARING_CHANNELS);
+	prepareChannelsFile(entry) {
+		super.updateProgress(ProgressStep.PREPARING_CHANNELS);
 		const data = JSON.parse(entry.getData().toString()).filter((channel) => channel.creator != null);
 
 		this.logger.debug(`loaded ${data.length} channels.`);
 
-		await this.addCountToTotal(data.length);
+		this.addCountToTotal(data.length);
 
-		for await (const channel of data) {
-			await this.converter.addChannel({
+		for (const channel of data) {
+			this.converter.addChannel({
 				_id: channel.is_general ? 'general' : undefined,
 				u: {
 					_id: this._replaceSlackUserId(channel.creator),
@@ -46,16 +47,16 @@ export class SlackImporter extends Base {
 		return data.length;
 	}
 
-	async prepareGroupsFile(entry) {
-		await super.updateProgress(ProgressStep.PREPARING_CHANNELS);
+	prepareGroupsFile(entry) {
+		super.updateProgress(ProgressStep.PREPARING_CHANNELS);
 		const data = JSON.parse(entry.getData().toString()).filter((channel) => channel.creator != null);
 
 		this.logger.debug(`loaded ${data.length} groups.`);
 
-		await this.addCountToTotal(data.length);
+		this.addCountToTotal(data.length);
 
-		for await (const channel of data) {
-			await this.converter.addChannel({
+		for (const channel of data) {
+			this.converter.addChannel({
 				u: {
 					_id: this._replaceSlackUserId(channel.creator),
 				},
@@ -73,18 +74,18 @@ export class SlackImporter extends Base {
 		return data.length;
 	}
 
-	async prepareMpimpsFile(entry) {
-		await super.updateProgress(ProgressStep.PREPARING_CHANNELS);
+	prepareMpimpsFile(entry) {
+		super.updateProgress(ProgressStep.PREPARING_CHANNELS);
 		const data = JSON.parse(entry.getData().toString()).filter((channel) => channel.creator != null);
 
 		this.logger.debug(`loaded ${data.length} mpims.`);
 
-		await this.addCountToTotal(data.length);
+		this.addCountToTotal(data.length);
 
 		const maxUsers = settings.get('DirectMesssage_maxUsers') || 1;
 
-		for await (const channel of data) {
-			await this.converter.addChannel({
+		for (const channel of data) {
+			this.converter.addChannel({
 				u: {
 					_id: this._replaceSlackUserId(channel.creator),
 				},
@@ -102,15 +103,15 @@ export class SlackImporter extends Base {
 		return data.length;
 	}
 
-	async prepareDMsFile(entry) {
-		await super.updateProgress(ProgressStep.PREPARING_CHANNELS);
+	prepareDMsFile(entry) {
+		super.updateProgress(ProgressStep.PREPARING_CHANNELS);
 		const data = JSON.parse(entry.getData().toString());
 
 		this.logger.debug(`loaded ${data.length} dms.`);
 
-		await this.addCountToTotal(data.length);
-		for await (const channel of data) {
-			await this.converter.addChannel({
+		this.addCountToTotal(data.length);
+		for (const channel of data) {
+			this.converter.addChannel({
 				importIds: [channel.id],
 				users: this._replaceSlackUserIds(channel.members),
 				t: 'd',
@@ -121,17 +122,17 @@ export class SlackImporter extends Base {
 		return data.length;
 	}
 
-	async prepareUsersFile(entry) {
-		await super.updateProgress(ProgressStep.PREPARING_USERS);
+	prepareUsersFile(entry) {
+		super.updateProgress(ProgressStep.PREPARING_USERS);
 		const data = JSON.parse(entry.getData().toString());
 
 		this.logger.debug(`loaded ${data.length} users.`);
 
 		// Insert the users record
-		await this.updateRecord({ 'count.users': data.length });
-		await this.addCountToTotal(data.length);
+		this.updateRecord({ 'count.users': data.length });
+		this.addCountToTotal(data.length);
 
-		for await (const user of data) {
+		for (const user of data) {
 			const newUser = {
 				emails: [],
 				importIds: [user.id],
@@ -154,20 +155,18 @@ export class SlackImporter extends Base {
 				newUser.type = 'bot';
 			}
 
-			await this.converter.addUser(newUser);
+			this.converter.addUser(newUser);
+			Promise.await(Settings.incrementValueById('Slack_Importer_Count'));
 		}
-
-		return data.length;
 	}
 
-	async prepareUsingLocalFile(fullFilePath) {
+	prepareUsingLocalFile(fullFilePath) {
 		this.logger.debug('start preparing import operation');
-		await this.converter.clearImportData();
+		this.converter.clearImportData();
 
 		const zip = new this.AdmZip(fullFilePath);
 		const totalEntries = zip.getEntryCount();
 
-		let userCount = 0;
 		let messagesCount = 0;
 		let channelCount = 0;
 		let count = 0;
@@ -190,64 +189,55 @@ export class SlackImporter extends Base {
 
 		try {
 			// we need to iterate the zip file twice so that all channels are loaded before the messages
-			for await (const entry of zip.getEntries()) {
+
+			zip.forEach((entry) => {
 				try {
 					if (entry.entryName === 'channels.json') {
-						channelCount += await this.prepareChannelsFile(entry);
-						await this.updateRecord({ 'count.channels': channelCount });
-						increaseProgress();
-						continue;
+						channelCount += this.prepareChannelsFile(entry);
+						this.updateRecord({ 'count.channels': channelCount });
+						return increaseProgress();
 					}
 
 					if (entry.entryName === 'groups.json') {
-						channelCount += await this.prepareGroupsFile(entry);
-						await this.updateRecord({ 'count.channels': channelCount });
-						increaseProgress();
-						continue;
+						channelCount += this.prepareGroupsFile(entry);
+						this.updateRecord({ 'count.channels': channelCount });
+						return increaseProgress();
 					}
 
 					if (entry.entryName === 'mpims.json') {
-						channelCount += await this.prepareMpimpsFile(entry);
-						await this.updateRecord({ 'count.channels': channelCount });
-						increaseProgress();
-						continue;
+						channelCount += this.prepareMpimpsFile(entry);
+						this.updateRecord({ 'count.channels': channelCount });
+						return increaseProgress();
 					}
 
 					if (entry.entryName === 'dms.json') {
-						channelCount += await this.prepareDMsFile(entry);
-						await this.updateRecord({ 'count.channels': channelCount });
-						increaseProgress();
-						continue;
+						channelCount += this.prepareDMsFile(entry);
+						this.updateRecord({ 'count.channels': channelCount });
+						return increaseProgress();
 					}
 
 					if (entry.entryName === 'users.json') {
-						userCount = await this.prepareUsersFile(entry);
-						increaseProgress();
-						continue;
+						this.prepareUsersFile(entry);
+						return increaseProgress();
 					}
 				} catch (e) {
 					this.logger.error(e);
 				}
-			}
-
-			if (userCount) {
-				await Settings.incrementValueById('Slack_Importer_Count', userCount);
-			}
+			});
 
 			const missedTypes = {};
 			// If we have no slack message yet, then we can insert them instead of upserting
-			this._useUpsert = !(await Messages.findOne({ _id: /slack\-.*/ }));
+			this._useUpsert = !Messages.findOne({ _id: /slack\-.*/ });
 
-			for await (const entry of zip.getEntries()) {
+			zip.forEach((entry) => {
 				try {
 					if (entry.entryName.includes('__MACOSX') || entry.entryName.includes('.DS_Store')) {
 						count++;
-						this.logger.debug(`Ignoring the file: ${entry.entryName}`);
-						continue;
+						return this.logger.debug(`Ignoring the file: ${entry.entryName}`);
 					}
 
 					if (['channels.json', 'groups.json', 'mpims.json', 'dms.json', 'users.json'].includes(entry.entryName)) {
-						continue;
+						return;
 					}
 
 					if (!entry.isDirectory && entry.entryName.includes('/')) {
@@ -259,19 +249,19 @@ export class SlackImporter extends Base {
 						try {
 							// Insert the messages records
 							if (this.progress.step !== ProgressStep.PREPARING_MESSAGES) {
-								await super.updateProgress(ProgressStep.PREPARING_MESSAGES);
+								super.updateProgress(ProgressStep.PREPARING_MESSAGES);
 							}
 
 							const tempMessages = JSON.parse(entry.getData().toString());
 							messagesCount += tempMessages.length;
-							await this.updateRecord({ messagesstatus: `${channel}/${date}` });
-							await this.addCountToTotal(tempMessages.length);
+							this.updateRecord({ messagesstatus: `${channel}/${date}` });
+							this.addCountToTotal(tempMessages.length);
 
-							const slackChannelId = await ImportData.findChannelImportIdByNameOrImportId(channel);
+							const slackChannelId = ImportData.findChannelImportIdByNameOrImportId(channel);
 
 							if (slackChannelId) {
-								for await (const message of tempMessages) {
-									await this.prepareMessageObject(message, missedTypes, slackChannelId);
+								for (const message of tempMessages) {
+									this.prepareMessageObject(message, missedTypes, slackChannelId);
 								}
 							}
 						} catch (error) {
@@ -283,7 +273,7 @@ export class SlackImporter extends Base {
 				}
 
 				increaseProgress();
-			}
+			});
 
 			if (!_.isEmpty(missedTypes)) {
 				this.logger.info('Missed import types:', missedTypes);
@@ -294,7 +284,7 @@ export class SlackImporter extends Base {
 		}
 
 		ImporterWebsocket.progressUpdated({ rate: 100 });
-		await this.updateRecord({ 'count.messages': messagesCount, 'messagesstatus': null });
+		this.updateRecord({ 'count.messages': messagesCount, 'messagesstatus': null });
 	}
 
 	parseMentions(newMessage) {
@@ -327,7 +317,7 @@ export class SlackImporter extends Base {
 		}
 	}
 
-	async processMessageSubType(message, slackChannelId, newMessage, missedTypes) {
+	processMessageSubType(message, slackChannelId, newMessage, missedTypes) {
 		const ignoreTypes = { bot_add: true, file_comment: true, file_mention: true };
 
 		switch (message.subtype) {
@@ -390,7 +380,7 @@ export class SlackImporter extends Base {
 						fileMessage.tmid = this.makeSlackMessageId(slackChannelId, message.thread_ts);
 					}
 
-					await this.converter.addMessage(fileMessage, this._useUpsert);
+					this.converter.addMessage(fileMessage, this._useUpsert);
 				}
 				break;
 
@@ -412,7 +402,7 @@ export class SlackImporter extends Base {
 		return base;
 	}
 
-	async prepareMessageObject(message, missedTypes, slackChannelId) {
+	prepareMessageObject(message, missedTypes, slackChannelId) {
 		const id = this.makeSlackMessageId(slackChannelId, message.ts);
 		const newMessage = {
 			_id: id,
@@ -441,7 +431,7 @@ export class SlackImporter extends Base {
 		if (message.type === 'message') {
 			if (message.files) {
 				let fileIndex = 0;
-				const promises = message.files.map(async (file) => {
+				message.files.forEach((file) => {
 					fileIndex++;
 
 					const fileId = this.makeSlackMessageId(slackChannelId, message.ts, fileIndex);
@@ -460,9 +450,8 @@ export class SlackImporter extends Base {
 						fileMessage.tmid = this.makeSlackMessageId(slackChannelId, message.thread_ts);
 					}
 
-					await this.converter.addMessage(fileMessage, this._useUpsert);
+					this.converter.addMessage(fileMessage, this._useUpsert);
 				});
-				await Promise.all(promises);
 			}
 
 			const regularTypes = ['me_message', 'thread_broadcast'];
@@ -471,7 +460,7 @@ export class SlackImporter extends Base {
 
 			if (message.subtype && !regularTypes.includes(message.subtype) && !isBotMessage) {
 				if (this.processMessageSubType(message, slackChannelId, newMessage, missedTypes)) {
-					await this.converter.addMessage(newMessage, this._useUpsert);
+					this.converter.addMessage(newMessage, this._useUpsert);
 				}
 			} else {
 				const text = this.convertSlackMessageToRocketChat(message.text);
@@ -533,7 +522,7 @@ export class SlackImporter extends Base {
 				}
 
 				this.parseMentions(newMessage);
-				await this.converter.addMessage(newMessage, this._useUpsert);
+				this.converter.addMessage(newMessage, this._useUpsert);
 			}
 		}
 	}

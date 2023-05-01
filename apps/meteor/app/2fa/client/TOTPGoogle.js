@@ -1,6 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import { Google } from 'meteor/google-oauth';
+import _ from 'underscore';
 
 import { overrideLoginMethod } from '../../../client/lib/2fa/overrideLoginMethod';
 
@@ -24,8 +25,8 @@ const loginWithGoogleAndTOTP = function (options, code, callback) {
 	// has the proper email address after the OAuth conversation.
 
 	if (typeof Accounts._options.restrictCreationByEmailDomain === 'string') {
-		options = Object.assign({}, options || {});
-		options.loginUrlParameters = Object.assign({}, options.loginUrlParameters || {});
+		options = _.extend({}, options || {});
+		options.loginUrlParameters = _.extend({}, options.loginUrlParameters || {});
 		options.loginUrlParameters.hd = Accounts._options.restrictCreationByEmailDomain;
 	}
 

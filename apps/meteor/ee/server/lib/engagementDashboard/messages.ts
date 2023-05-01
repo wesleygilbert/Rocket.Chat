@@ -5,31 +5,33 @@ import { Messages, Analytics } from '@rocket.chat/models';
 import { convertDateToInt, diffBetweenDaysInclusive, convertIntToDate, getTotalOfWeekItems } from './date';
 import { roomCoordinator } from '../../../../server/lib/rooms/roomCoordinator';
 
-export const handleMessagesSent = async (message: IMessage, room?: IRoom): Promise<IMessage> => {
+export const handleMessagesSent = (message: IMessage, room?: IRoom): IMessage => {
 	const roomTypesToShow = roomCoordinator.getTypesToShowOnDashboard();
 	if (!room || !roomTypesToShow.includes(room.t)) {
 		return message;
 	}
 
-	await Analytics.saveMessageSent({
-		date: convertDateToInt(message.ts),
-		room,
-	});
-
+	Promise.await(
+		Analytics.saveMessageSent({
+			date: convertDateToInt(message.ts),
+			room,
+		}),
+	);
 	return message;
 };
 
-export const handleMessagesDeleted = async (message: IMessage, room?: IRoom): Promise<IMessage> => {
+export const handleMessagesDeleted = (message: IMessage, room?: IRoom): IMessage => {
 	const roomTypesToShow = roomCoordinator.getTypesToShowOnDashboard();
 	if (!room || !roomTypesToShow.includes(room.t)) {
 		return message;
 	}
 
-	await Analytics.saveMessageDeleted({
-		date: convertDateToInt(message.ts),
-		room,
-	});
-
+	Promise.await(
+		Analytics.saveMessageDeleted({
+			date: convertDateToInt(message.ts),
+			room,
+		}),
+	);
 	return message;
 };
 

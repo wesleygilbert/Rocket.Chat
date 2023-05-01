@@ -1,6 +1,6 @@
 import type { IUser } from '@rocket.chat/core-typings';
 
-import { getUserAvatarURL } from '../../../app/utils/client/getUserAvatarURL';
+import { getUserAvatarURL } from '../../../app/utils/lib/getUserAvatarURL';
 
 export const getAvatarAsPng = (username: IUser['username'], cb: (dataURL: string) => void): (() => void) => {
 	const image = new Image();
@@ -27,7 +27,7 @@ export const getAvatarAsPng = (username: IUser['username'], cb: (dataURL: string
 
 	image.onload = onLoad;
 	image.onerror = onError;
-	image.src = getUserAvatarURL(username || '') as string;
+	image.src = getUserAvatarURL(username);
 
 	return onError;
 };

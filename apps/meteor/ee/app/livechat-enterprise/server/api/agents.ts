@@ -6,19 +6,18 @@ import {
 
 import { API } from '../../../../../app/api/server';
 import {
-	findAllAverageServiceTimeAsync,
-	findAllServiceTimeAsync,
-	findAvailableServiceTimeHistoryAsync,
+	findAllAverageServiceTime,
+	findAllServiceTime,
+	findAvailableServiceTimeHistory,
 } from '../../../../../app/livechat/server/lib/analytics/agents';
-import { getPaginationItems } from '../../../../../app/api/server/helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'livechat/analytics/agents/average-service-time',
 	{ authRequired: true, permissionsRequired: ['view-livechat-manager'], validateParams: isLivechatAnalyticsAgentsAverageServiceTimeProps },
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -30,7 +29,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { agents, total } = await findAllAverageServiceTimeAsync({
+			const { agents, total } = findAllAverageServiceTime({
 				start: startDate,
 				end: endDate,
 				options: { offset, count },
@@ -50,8 +49,8 @@ API.v1.addRoute(
 	{ authRequired: true, permissionsRequired: ['view-livechat-manager'], validateParams: isLivechatAnalyticsAgentsTotalServiceTimeProps },
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -63,7 +62,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { agents, total } = await findAllServiceTimeAsync({
+			const { agents, total } = findAllServiceTime({
 				start: startDate,
 				end: endDate,
 				options: { offset, count },
@@ -87,9 +86,9 @@ API.v1.addRoute(
 	},
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { start, end } = this.queryParams;
-			const { fullReport } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { start, end } = this.requestParams();
+			const { fullReport } = this.requestParams();
 
 			if (isNaN(Date.parse(start))) {
 				return API.v1.failure('The "start" query parameter must be a valid date.');
@@ -101,7 +100,7 @@ API.v1.addRoute(
 			}
 			const endDate = new Date(end);
 
-			const { agents, total } = await findAvailableServiceTimeHistoryAsync({
+			const { agents, total } = findAvailableServiceTimeHistory({
 				start: startDate,
 				end: endDate,
 				fullReport: fullReport && fullReport === 'true',

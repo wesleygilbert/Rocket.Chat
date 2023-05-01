@@ -33,7 +33,7 @@ import { Users, VideoConference as VideoConferenceModel, Rooms, Messages, Subscr
 import type { IVideoConfService, VideoConferenceJoinOptions } from '@rocket.chat/core-services';
 import { api, ServiceClassInternal } from '@rocket.chat/core-services';
 
-import { Apps } from '../../../ee/server/apps';
+import { Apps } from '../../../app/apps/server';
 import { sendMessage } from '../../../app/lib/server/functions/sendMessage';
 import { settings } from '../../../app/settings/server';
 import { videoConfProviders } from '../../lib/videoConfProviders';
@@ -227,7 +227,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 	}
 
 	public async setProviderData(callId: VideoConference['_id'], data: VideoConference['providerData'] | undefined): Promise<void> {
-		await VideoConferenceModel.setProviderDataById(callId, data);
+		VideoConferenceModel.setProviderDataById(callId, data);
 	}
 
 	public async setEndedBy(callId: VideoConference['_id'], endedBy: IUser['_id']): Promise<void> {
@@ -238,7 +238,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 			throw new Error('Invalid User');
 		}
 
-		await VideoConferenceModel.setEndedById(callId, {
+		VideoConferenceModel.setEndedById(callId, {
 			_id: user._id,
 			username: user.username,
 			name: user.name,
@@ -246,7 +246,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 	}
 
 	public async setEndedAt(callId: VideoConference['_id'], endedAt: Date): Promise<void> {
-		await VideoConferenceModel.setEndedById(callId, undefined, endedAt);
+		VideoConferenceModel.setEndedById(callId, undefined, endedAt);
 	}
 
 	public async setStatus(callId: VideoConference['_id'], status: VideoConference['status']): Promise<void> {
@@ -257,7 +257,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 				return this.expireCall(callId);
 		}
 
-		await VideoConferenceModel.setStatusById(callId, status);
+		VideoConferenceModel.setStatusById(callId, status);
 	}
 
 	public async addUser(callId: VideoConference['_id'], userId?: IUser['_id'], ts?: Date): Promise<void> {
@@ -281,7 +281,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 			throw new Error('Invalid User');
 		}
 
-		await this.addUserToCall(call, {
+		this.addUserToCall(call, {
 			_id: user._id,
 			username: user.username,
 			name: user.name,
@@ -338,7 +338,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 			}
 		} catch (error: unknown) {
 			if (error instanceof Error) {
-				await this.createEphemeralMessage(uid, rid, error.message);
+				this.createEphemeralMessage(uid, rid, error.message);
 				return error.message;
 			}
 		}
@@ -401,7 +401,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 		if (call.endedAt || call.status > VideoConferenceStatus.STARTED) {
 			// If the caller is still calling about a call that has already ended, notify it
 			if (action === 'call' && caller === call.createdBy._id) {
-				this.notifyUser(call.createdBy._id, 'end', { rid, uid, callId });
+				Notifications.notifyUser(call.createdBy._id, 'video-conference.end', { rid, uid, callId });
 			}
 
 			return false;
@@ -410,19 +410,8 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 		return true;
 	}
 
-	private notifyUser(
-		userId: IUser['_id'],
-		action: string,
-		params: { uid: IUser['_id']; rid: IRoom['_id']; callId: VideoConference['_id'] },
-	): void {
-		void api.broadcast('user.video-conference', { userId, action, params });
-	}
-
 	private notifyVideoConfUpdate(rid: IRoom['_id'], callId: VideoConference['_id']): void {
-		/* deprecated */
 		Notifications.notifyRoom(rid, callId);
-
-		Notifications.notifyRoom(rid, 'videoconf', callId);
 	}
 
 	private async endCall(callId: VideoConference['_id']): Promise<void> {
@@ -453,7 +442,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 		const params = { rid: call.rid, uid: call.createdBy._id, callId: call._id };
 
 		// Notify the caller that the call was ended by the server
-		this.notifyUser(call.createdBy._id, 'end', params);
+		Notifications.notifyUser(call.createdBy._id, 'video-conference.end', params);
 
 		// If the callee hasn't joined the call yet, notify them that it has already ended
 		const subscriptions = await Subscriptions.findByRoomIdAndNotUserId(call.rid, call.createdBy._id, {
@@ -461,12 +450,11 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 		}).toArray();
 
 		for (const subscription of subscriptions) {
-			// Skip notifying users that already joined the call
 			if (call.users.find(({ _id }) => _id === subscription.u._id)) {
 				continue;
 			}
 
-			this.notifyUser(subscription.u._id, 'end', params);
+			Notifications.notifyUser(subscription.u._id, 'video-conference.end', params);
 		}
 	}
 
@@ -497,7 +485,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 		const appId = videoConfProviders.getProviderAppId(call.providerName);
 		const user = createdBy || (appId && (await Users.findOneByAppId(appId))) || (await Users.findOneById('rocket.cat'));
 
-		const message = await sendMessage(user, record, room, false);
+		const message = sendMessage(user, record, room, false);
 		return message._id;
 	}
 
@@ -532,7 +520,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 			lng: language,
 		});
 
-		void api.broadcast('notify.ephemeralMessage', uid, rid, {
+		api.broadcast('notify.ephemeralMessage', uid, rid, {
 			msg,
 		});
 	}
@@ -617,25 +605,22 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 		await this.runNewVideoConferenceEvent(callId);
 
 		const url = await this.generateNewUrl(call);
-		await VideoConferenceModel.setUrlById(callId, url);
+		VideoConferenceModel.setUrlById(callId, url);
 
 		const messageId = await this.createMessage(call, user);
 		call.messages.started = messageId;
-		await VideoConferenceModel.setMessageById(callId, 'started', messageId);
+		VideoConferenceModel.setMessageById(callId, 'started', messageId);
 
 		// After 40 seconds if the status is still "calling", we cancel the call automatically.
 		setTimeout(async () => {
 			try {
-				const call = await VideoConferenceModel.findOneById<IDirectVideoConference>(callId);
+				const call = await VideoConferenceModel.findOneById<Pick<VideoConference, '_id' | 'status'>>(callId, { projection: { status: 1 } });
 
-				if (call) {
-					await this.endDirectCall(call);
-					if (call.status !== VideoConferenceStatus.CALLING) {
-						return;
-					}
-
-					await this.cancel(user._id, callId);
+				if (call?.status !== VideoConferenceStatus.CALLING) {
+					return;
 				}
+
+				await this.cancel(user._id, callId);
 			} catch {
 				// Ignore errors on this timeout
 			}
@@ -648,17 +633,12 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 		};
 	}
 
-	private async notifyUsersOfRoom(
-		rid: IRoom['_id'],
-		uid: IUser['_id'],
-		action: string,
-		params: { uid: IUser['_id']; rid: IRoom['_id']; callId: VideoConference['_id'] },
-	): Promise<void> {
+	private async notifyUsersOfRoom(rid: IRoom['_id'], uid: IUser['_id'], eventName: string, ...args: any[]): Promise<void> {
 		const subscriptions = Subscriptions.findByRoomIdAndNotUserId(rid, uid, {
 			projection: { 'u._id': 1, '_id': 0 },
 		});
 
-		await subscriptions.forEach((subscription) => this.notifyUser(subscription.u._id, action, params));
+		await subscriptions.forEach((subscription) => Notifications.notifyUser(subscription.u._id, eventName, ...args));
 	}
 
 	private async startGroup(
@@ -688,16 +668,16 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 		await this.runNewVideoConferenceEvent(callId);
 
 		const url = await this.generateNewUrl(call);
-		await VideoConferenceModel.setUrlById(callId, url);
+		VideoConferenceModel.setUrlById(callId, url);
 
 		call.url = url;
 
 		const messageId = await this.createMessage(call, useAppUser ? undefined : user);
 		call.messages.started = messageId;
-		await VideoConferenceModel.setMessageById(callId, 'started', messageId);
+		VideoConferenceModel.setMessageById(callId, 'started', messageId);
 
 		if (call.ringing) {
-			await this.notifyUsersOfRoom(rid, user._id, 'ring', { callId, rid, uid: call.createdBy._id });
+			await this.notifyUsersOfRoom(rid, user._id, 'video-conference.ring', { callId, rid, title, uid: call.createdBy, providerName });
 		}
 
 		return {
@@ -741,7 +721,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 		user: AtLeast<IUser, '_id' | 'username' | 'name' | 'avatarETag'> | undefined,
 		options: VideoConferenceJoinOptions,
 	): Promise<string> {
-		void callbacks.runAsync('onJoinVideoConference', call._id, user?._id);
+		await callbacks.runAsync('onJoinVideoConference', call._id, user?._id);
 
 		await this.runOnUserJoinEvent(call._id, user as IVideoConferenceUser);
 
@@ -838,7 +818,7 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 
 		if (!call.url) {
 			call.url = await this.generateNewUrl(call);
-			await VideoConferenceModel.setUrlById(call._id, call.url);
+			VideoConferenceModel.setUrlById(call._id, call.url);
 		}
 
 		const callData = {
@@ -937,9 +917,9 @@ export class VideoConfService extends ServiceClassInternal implements IVideoConf
 	private async updateDirectCall(call: IDirectVideoConference, newUserId: IUser['_id']): Promise<void> {
 		// If it's an user that hasn't joined yet
 		if (call.ringing && !call.users.find(({ _id }) => _id === newUserId)) {
-			this.notifyUser(call.createdBy._id, 'join', { rid: call.rid, uid: newUserId, callId: call._id });
+			Notifications.notifyUser(call.createdBy._id, 'video-conference.join', { rid: call.rid, uid: newUserId, callId: call._id });
 			if (newUserId !== call.createdBy._id) {
-				this.notifyUser(newUserId, 'join', { rid: call.rid, uid: newUserId, callId: call._id });
+				Notifications.notifyUser(newUserId, 'video-conference.join', { rid: call.rid, uid: newUserId, callId: call._id });
 				// If the callee joined the direct call, then we stopped ringing
 				await VideoConferenceModel.setRingingById(call._id, false);
 			}

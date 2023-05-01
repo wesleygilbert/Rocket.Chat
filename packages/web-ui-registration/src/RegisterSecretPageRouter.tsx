@@ -2,12 +2,12 @@ import { useSetting } from '@rocket.chat/ui-contexts';
 import type { ReactElement } from 'react';
 
 import type { DispatchLoginRouter } from './hooks/useLoginRouter';
-import RegisterForm from './RegisterForm';
+import LoginRegisterForm from './RegisterForm';
 import RegisterFormDisabled from './RegisterFormDisabled';
-import RegisterTemplate from './RegisterTemplate';
 import SecretRegisterForm from './SecretRegisterForm';
 import SecretRegisterInvalidForm from './SecretRegisterInvalidForm';
 import FormSkeleton from './template/FormSkeleton';
+import HorizontalTemplate from './template/HorizontalTemplate';
 
 export const RegisterSecretPageRouter = ({
 	setLoginRoute,
@@ -16,8 +16,7 @@ export const RegisterSecretPageRouter = ({
 	setLoginRoute: DispatchLoginRouter;
 	origin: 'register' | 'secret-register';
 }): ReactElement => {
-	const registrationMode = useSetting<string>('Accounts_RegistrationForm');
-
+	const registrationMode = useSetting('Accounts_RegistrationForm');
 	const isPublicRegistration = registrationMode === 'Public';
 	const isRegistrationAllowedForSecret = registrationMode === 'Secret URL';
 	const isRegistrationDisabled = registrationMode === 'Disabled' || (origin === 'register' && isRegistrationAllowedForSecret);
@@ -28,17 +27,17 @@ export const RegisterSecretPageRouter = ({
 
 	if (isPublicRegistration) {
 		return (
-			<RegisterTemplate>
-				<RegisterForm setLoginRoute={setLoginRoute} />
-			</RegisterTemplate>
+			<HorizontalTemplate>
+				<LoginRegisterForm setLoginRoute={setLoginRoute} />
+			</HorizontalTemplate>
 		);
 	}
 
 	if (isRegistrationDisabled) {
 		return (
-			<RegisterTemplate>
+			<HorizontalTemplate>
 				<RegisterFormDisabled setLoginRoute={setLoginRoute} />
-			</RegisterTemplate>
+			</HorizontalTemplate>
 		);
 	}
 
@@ -47,9 +46,9 @@ export const RegisterSecretPageRouter = ({
 	}
 
 	return (
-		<RegisterTemplate>
+		<HorizontalTemplate>
 			<FormSkeleton />
-		</RegisterTemplate>
+		</HorizontalTemplate>
 	);
 };
 

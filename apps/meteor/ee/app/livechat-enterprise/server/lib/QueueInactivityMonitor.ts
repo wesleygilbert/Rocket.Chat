@@ -4,15 +4,15 @@ import { MongoInternals } from 'meteor/mongo';
 import { Meteor } from 'meteor/meteor';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import type { IUser, IOmnichannelRoom } from '@rocket.chat/core-typings';
-import { LivechatRooms, LivechatInquiry as LivechatInquiryRaw, Users } from '@rocket.chat/models';
 
 import { settings } from '../../../../../app/settings/server';
 import { Logger } from '../../../../../app/logger/server';
-import { Livechat } from '../../../../../app/livechat/server/lib/LivechatTyped';
+import { LivechatRooms, Users, LivechatInquiry } from '../../../../../app/models/server';
+import { Livechat } from '../../../../../app/livechat/server/lib/Livechat';
 
 const SCHEDULER_NAME = 'omnichannel_queue_inactivity_monitor';
 
-class OmnichannelQueueInactivityMonitorClass {
+export class OmnichannelQueueInactivityMonitorClass {
 	scheduler: Agenda;
 
 	running: boolean;
@@ -40,13 +40,10 @@ class OmnichannelQueueInactivityMonitorClass {
 			defaultConcurrency: 1,
 		});
 		this.createIndex();
+		this.user = Users.findOneById('rocket.cat');
 		const language = settings.get<string>('Language') || 'en';
 		this.message = TAPi18n.__('Closed_automatically_chat_queued_too_long', { lng: language });
-		this.bindedCloseRoom = this.closeRoom.bind(this);
-	}
-
-	private async getRocketCatUser(): Promise<IUser | null> {
-		return Users.findOneById('rocket.cat');
+		this.bindedCloseRoom = Meteor.bindEnvironment(this.closeRoom.bind(this));
 	}
 
 	getName(inquiryId: string): string {
@@ -54,7 +51,7 @@ class OmnichannelQueueInactivityMonitorClass {
 	}
 
 	createIndex(): void {
-		void this._db.collection(SCHEDULER_NAME).createIndex(
+		this._db.collection(SCHEDULER_NAME).createIndex(
 			{
 				'data.inquiryId': 1,
 			},
@@ -62,17 +59,17 @@ class OmnichannelQueueInactivityMonitorClass {
 		);
 	}
 
-	async start(): Promise<void> {
+	start(): void {
 		if (this.running) {
 			return;
 		}
 
-		await this.scheduler.start();
+		Promise.await(this.scheduler.start());
 		this.running = true;
 	}
 
-	async scheduleInquiry(inquiryId: string, time: Date): Promise<void> {
-		await this.stopInquiry(inquiryId);
+	scheduleInquiry(inquiryId: string, time: Date): void {
+		Promise.await(this.stopInquiry(inquiryId));
 		this.logger.debug(`Scheduling automatic close of inquiry ${inquiryId} at ${time}`);
 		const name = this.getName(inquiryId);
 		this.scheduler.define(name, this.bindedCloseRoom);
@@ -80,7 +77,7 @@ class OmnichannelQueueInactivityMonitorClass {
 		const job = this.scheduler.create(name, { inquiryId });
 		job.schedule(time);
 		job.unique({ 'data.inquiryId': inquiryId });
-		await job.save();
+		Promise.await(job.save());
 	}
 
 	async stop(): Promise<void> {
@@ -95,38 +92,34 @@ class OmnichannelQueueInactivityMonitorClass {
 		await this.scheduler.cancel({ name });
 	}
 
-	async closeRoomAction(room: IOmnichannelRoom): Promise<void> {
+	closeRoomAction(room: IOmnichannelRoom): void {
 		const comment = this.message;
-		return Livechat.closeRoom({
+		Livechat.closeRoom({
 			comment,
 			room,
-			user: await this.getRocketCatUser(),
+			user: this.user,
+			visitor: null,
 		});
 	}
 
-	async closeRoom({ attrs: { data } }: any = {}): Promise<void> {
+	closeRoom({ attrs: { data } }: any = {}): void {
 		const { inquiryId } = data;
-		const inquiry = await LivechatInquiryRaw.findOneById(inquiryId);
+		const inquiry = LivechatInquiry.findOneById(inquiryId);
+
 		this.logger.debug(`Processing inquiry item ${inquiryId}`);
 		if (!inquiry || inquiry.status !== 'queued') {
 			this.logger.debug(`Skipping inquiry ${inquiryId}. Invalid or not queued anymore`);
 			return;
 		}
 
-		const room = await LivechatRooms.findOneById(inquiry.rid);
-		if (!room) {
-			this.logger.error(`Error: unable to find room ${inquiry.rid} for inquiry ${inquiryId} to close in queue inactivity monitor`);
-			return;
-		}
-
-		await Promise.all([this.closeRoomAction(room), this.stopInquiry(inquiryId)]);
-
-		this.logger.debug(`Running successful. Closed inquiry ${inquiry._id} because of inactivity`);
+		this.closeRoomAction(LivechatRooms.findOneById(inquiry.rid));
+		Promise.await(this.stopInquiry(inquiryId));
+		this.logger.debug(`Running succesful. Closed inquiry ${inquiry._id} because of inactivity`);
 	}
 }
 
 export const OmnichannelQueueInactivityMonitor = new OmnichannelQueueInactivityMonitorClass();
 
-Meteor.startup(async () => {
-	void OmnichannelQueueInactivityMonitor.start();
+Meteor.startup(() => {
+	OmnichannelQueueInactivityMonitor.start();
 });

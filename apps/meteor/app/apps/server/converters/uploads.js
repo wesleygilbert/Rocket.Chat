@@ -1,19 +1,19 @@
 import { Uploads } from '@rocket.chat/models';
 
-import { transformMappedData } from '../../../../ee/lib/misc/transformMappedData';
+import { transformMappedData } from '../../lib/misc/transformMappedData';
 
 export class AppUploadsConverter {
 	constructor(orch) {
 		this.orch = orch;
 	}
 
-	async convertById(id) {
-		const upload = await Uploads.findOneById(id);
+	convertById(id) {
+		const upload = Promise.await(Uploads.findOneById(id));
 
 		return this.convertToApp(upload);
 	}
 
-	async convertToApp(upload) {
+	convertToApp(upload) {
 		if (!upload) {
 			return undefined;
 		}
@@ -35,26 +35,26 @@ export class AppUploadsConverter {
 			url: 'url',
 			updatedAt: '_updatedAt',
 			uploadedAt: 'uploadedAt',
-			room: async (upload) => {
-				const result = await this.orch.getConverters().get('rooms').convertById(upload.rid);
+			room: (upload) => {
+				const result = this.orch.getConverters().get('rooms').convertById(upload.rid);
 				delete upload.rid;
 				return result;
 			},
-			user: async (upload) => {
+			user: (upload) => {
 				if (!upload.userId) {
 					return undefined;
 				}
 
-				const result = await this.orch.getConverters().get('users').convertById(upload.userId);
+				const result = this.orch.getConverters().get('users').convertById(upload.userId);
 				delete upload.userId;
 				return result;
 			},
-			visitor: async (upload) => {
+			visitor: (upload) => {
 				if (!upload.visitorToken) {
 					return undefined;
 				}
 
-				const result = await this.orch.getConverters().get('visitors').convertByToken(upload.visitorToken);
+				const result = this.orch.getConverters().get('visitors').convertByToken(upload.visitorToken);
 				delete upload.visitorToken;
 				return result;
 			},

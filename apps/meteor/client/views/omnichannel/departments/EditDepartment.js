@@ -18,10 +18,10 @@ import React, { useMemo, useState, useRef, useCallback } from 'react';
 
 import { validateEmail } from '../../../../lib/emailValidator';
 import Page from '../../../components/Page';
+import { useRoomsList } from '../../../components/RoomAutoComplete/hooks/useRoomsList';
 import { useRecordList } from '../../../hooks/lists/useRecordList';
 import { useComponentDidUpdate } from '../../../hooks/useComponentDidUpdate';
 import { useForm } from '../../../hooks/useForm';
-import { useRoomsList } from '../../../hooks/useRoomsList';
 import { AsyncStatePhase } from '../../../lib/asyncState';
 import { useFormsSubscription } from '../additionalForms';
 import DepartmentsAgentsTable from './DepartmentsAgentsTable';
@@ -30,7 +30,7 @@ function withDefault(key, defaultValue) {
 	return key || defaultValue;
 }
 
-function EditDepartment({ data, id, title, allowedToForwardData }) {
+function EditDepartment({ data, id, title, reload, allowedToForwardData }) {
 	const t = useTranslation();
 	const departmentsRoute = useRoute('omnichannel-departments');
 
@@ -200,8 +200,8 @@ function EditDepartment({ data, id, title, allowedToForwardData }) {
 			visitorInactivityTimeoutInSeconds,
 			abandonedRoomsCloseCustomMessage,
 			waitingQueueMessage,
-			departmentsAllowedToForward: departmentsAllowedToForward?.map((dep) => dep.value),
-			fallbackForwardDepartment,
+			departmentsAllowedToForward: departmentsAllowedToForward?.map((dep) => dep.value).join(),
+			fallbackForwardDepartment: fallbackForwardDepartment.value,
 		};
 
 		const agentListPayload = {
@@ -224,6 +224,7 @@ function EditDepartment({ data, id, title, allowedToForwardData }) {
 				await saveDepartmentInfo(id, payload, agentList);
 			}
 			dispatchToastMessage({ type: 'success', message: t('Saved') });
+			reload();
 			departmentsRoute.push({});
 		} catch (error) {
 			dispatchToastMessage({ type: 'error', message: error });
@@ -421,7 +422,6 @@ function EditDepartment({ data, id, title, allowedToForwardData }) {
 									placeholder={t('Fallback_forward_department')}
 									label={t('Fallback_forward_department')}
 									onlyMyDepartments
-									showArchived
 								/>
 							</Field>
 						)}

@@ -9,18 +9,12 @@ import CloseChatModal from './CloseChatModal';
 
 const CloseChatModalData = ({
 	departmentId,
-	visitorEmail,
 	onCancel,
 	onConfirm,
 }: {
 	departmentId: ILivechatDepartment['_id'];
 	onCancel: () => void;
-	visitorEmail?: string;
-	onConfirm: (
-		comment?: string,
-		tags?: string[],
-		preferences?: { omnichannelTranscriptPDF: boolean; omnichannelTranscriptEmail: boolean },
-	) => Promise<void>;
+	onConfirm: (comment?: string, tags?: string[]) => Promise<void>;
 }): ReactElement => {
 	const { value: data, phase: state } = useEndpointData('/v1/livechat/department/:_id', { keys: { _id: departmentId } });
 
@@ -37,7 +31,6 @@ const CloseChatModalData = ({
 		<CloseChatModal
 			onCancel={onCancel}
 			onConfirm={onConfirm}
-			visitorEmail={visitorEmail}
 			department={
 				(
 					data as {

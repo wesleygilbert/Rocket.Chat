@@ -1,13 +1,11 @@
 import { Meteor } from 'meteor/meteor';
-import { Random } from '@rocket.chat/random';
+import { Random } from 'meteor/random';
 import objectPath from 'object-path';
-import { Messages } from '@rocket.chat/models';
 
 import { slashCommands } from '../../../utils/server';
-import { canAccessRoomIdAsync } from '../../../authorization/server/functions/canAccessRoom';
+import { Messages } from '../../../models/server';
+import { canAccessRoomId } from '../../../authorization/server';
 import { API } from '../api';
-import { getLoggedInUser } from '../helpers/getLoggedInUser';
-import { getPaginationItems } from '../helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'commands.get',
@@ -141,10 +139,9 @@ API.v1.addRoute(
 	'commands.list',
 	{ authRequired: true },
 	{
-		async get() {
-			const params = this.queryParams as Record<string, any>;
-			const { offset, count } = await getPaginationItems(params);
-			const { sort, query } = await this.parseJsonQuery();
+		get() {
+			const { offset, count } = this.getPaginationItems();
+			const { sort, query } = this.parseJsonQuery();
 
 			let commands = Object.values(slashCommands.commands);
 
@@ -173,7 +170,7 @@ API.v1.addRoute(
 	'commands.run',
 	{ authRequired: true },
 	{
-		async post() {
+		post() {
 			const body = this.bodyParams;
 
 			if (typeof body.command !== 'string') {
@@ -197,13 +194,13 @@ API.v1.addRoute(
 				return API.v1.failure('The command provided does not exist (or is disabled).');
 			}
 
-			if (!(await canAccessRoomIdAsync(body.roomId, this.userId))) {
+			if (!canAccessRoomId(body.roomId, this.userId)) {
 				return API.v1.unauthorized();
 			}
 
 			const params = body.params ? body.params : '';
 			if (typeof body.tmid === 'string') {
-				const thread = await Messages.findOneById(body.tmid);
+				const thread = Messages.findOneById(body.tmid);
 				if (!thread || thread.rid !== body.roomId) {
 					return API.v1.failure('Invalid thread.');
 				}
@@ -218,7 +215,7 @@ API.v1.addRoute(
 
 			const { triggerId } = body;
 
-			const result = await slashCommands.run({ command: cmd, params, message, triggerId, userId: this.userId });
+			const result = slashCommands.run(cmd, params, message, triggerId);
 
 			return API.v1.success({ result });
 		},
@@ -232,7 +229,7 @@ API.v1.addRoute(
 		// Expects these query params: command: 'giphy', params: 'mine', roomId: 'value'
 		async get() {
 			const query = this.queryParams;
-			const user = await getLoggedInUser(this.request);
+			const user = this.getLoggedInUser();
 
 			if (typeof query.command !== 'string') {
 				return API.v1.failure('You must provide a command to get the previews from.');
@@ -251,13 +248,13 @@ API.v1.addRoute(
 				return API.v1.failure('The command provided does not exist (or is disabled).');
 			}
 
-			if (!(await canAccessRoomIdAsync(query.roomId, user?._id))) {
+			if (!canAccessRoomId(query.roomId, user._id)) {
 				return API.v1.unauthorized();
 			}
 
 			const params = query.params ? query.params : '';
 
-			const preview = await Meteor.callAsync('getSlashCommandPreviews', {
+			const preview = Meteor.call('getSlashCommandPreviews', {
 				cmd,
 				params,
 				msg: { rid: query.roomId },
@@ -267,7 +264,7 @@ API.v1.addRoute(
 		},
 
 		// Expects a body format of: { command: 'giphy', params: 'mine', roomId: 'value', tmid: 'value', triggerId: 'value', previewItem: { id: 'sadf8' type: 'image', value: 'https://dev.null/gif' } }
-		async post() {
+		post() {
 			const body = this.bodyParams;
 
 			if (typeof body.command !== 'string') {
@@ -303,13 +300,13 @@ API.v1.addRoute(
 				return API.v1.failure('The command provided does not exist (or is disabled).');
 			}
 
-			if (!(await canAccessRoomIdAsync(body.roomId, this.userId))) {
+			if (!canAccessRoomId(body.roomId, this.userId)) {
 				return API.v1.unauthorized();
 			}
 
 			const { params = '' } = body;
 			if (body.tmid) {
-				const thread = await Messages.findOneById(body.tmid);
+				const thread = Messages.findOneById(body.tmid);
 				if (!thread || thread.rid !== body.roomId) {
 					return API.v1.failure('Invalid thread.');
 				}
@@ -320,7 +317,7 @@ API.v1.addRoute(
 				...(body.tmid && { tmid: body.tmid }),
 			};
 
-			await Meteor.callAsync(
+			Meteor.call(
 				'executeSlashCommandPreview',
 				{
 					cmd,

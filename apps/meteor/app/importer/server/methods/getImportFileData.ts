@@ -3,16 +3,15 @@ import fs from 'fs';
 
 import { Meteor } from 'meteor/meteor';
 import type { IImportFileData } from '@rocket.chat/core-typings';
-import { Imports } from '@rocket.chat/models';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
 import { RocketChatImportFileInstance } from '../startup/store';
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { hasPermission } from '../../../authorization/server';
+import { Imports } from '../../../models/server';
 import { ProgressStep } from '../../lib/ImporterProgressStep';
 import { Importers } from '..';
 
 export const executeGetImportFileData = async (): Promise<IImportFileData | { waiting: true }> => {
-	const operation = await Imports.findLastImport();
+	const operation = Imports.findLastImport();
 	if (!operation) {
 		throw new Meteor.Error('error-operation-not-found', 'Import Operation Not Found', 'getImportFileData');
 	}
@@ -25,7 +24,6 @@ export const executeGetImportFileData = async (): Promise<IImportFileData | { wa
 	}
 
 	importer.instance = new importer.importer(importer, operation); // eslint-disable-line new-cap
-	await importer.instance.build();
 
 	const waitingSteps = [
 		ProgressStep.DOWNLOADING_FILE,
@@ -50,26 +48,25 @@ export const executeGetImportFileData = async (): Promise<IImportFileData | { wa
 
 	const fileName = importer.instance.importRecord.file;
 	const fullFilePath = fs.existsSync(fileName) ? fileName : path.join(RocketChatImportFileInstance.absolutePath, fileName);
-	await importer.instance.prepareUsingLocalFile(fullFilePath);
+	const promise = importer.instance.prepareUsingLocalFile(fullFilePath);
+
+	if (promise && promise instanceof Promise) {
+		//  promise;
+		await promise;
+	}
+
 	return importer.instance.buildSelection();
 };
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		getImportFileData(): IImportFileData | { waiting: true };
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async getImportFileData() {
+Meteor.methods({
+	getImportFileData() {
 		const userId = Meteor.userId();
 
 		if (!userId) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', 'getImportFileData');
 		}
 
-		if (!(await hasPermissionAsync(userId, 'run-import'))) {
+		if (!hasPermission(userId, 'run-import')) {
 			throw new Meteor.Error('error-action-not-allowed', 'Importing is not allowed', 'getImportFileData');
 		}
 

@@ -1,4 +1,4 @@
-import type { FindOptions, FindCursor, UpdateResult, DeleteResult, Filter, Document } from 'mongodb';
+import type { FindOptions, FindCursor, UpdateResult, DeleteResult, Filter } from 'mongodb';
 import type { ITeam, TEAM_TYPE } from '@rocket.chat/core-typings';
 
 import type { FindPaginated, IBaseModel } from './IBaseModel';
@@ -8,9 +8,9 @@ export interface ITeamModel extends IBaseModel<ITeam> {
 
 	findByNames(names: Array<string>, options: FindOptions<ITeam>): FindCursor<ITeam>;
 
-	findByNames<P extends Document>(names: Array<string>, options: FindOptions<P extends ITeam ? ITeam : P>): FindCursor<P>;
+	findByNames<P>(names: Array<string>, options: FindOptions<P extends ITeam ? ITeam : P>): FindCursor<P>;
 
-	findByNames<P extends Document>(
+	findByNames<P>(
 		names: Array<string>,
 		options?: undefined | FindOptions<ITeam> | FindOptions<P extends ITeam ? ITeam : P>,
 	): FindCursor<P> | FindCursor<ITeam>;
@@ -19,13 +19,9 @@ export interface ITeamModel extends IBaseModel<ITeam> {
 
 	findByIds(ids: Array<string>, options: FindOptions<ITeam>, query?: Filter<ITeam>): FindCursor<ITeam>;
 
-	findByIds<P extends Document>(
-		ids: Array<string>,
-		options: FindOptions<P extends ITeam ? ITeam : P>,
-		query?: Filter<ITeam>,
-	): FindCursor<P>;
+	findByIds<P>(ids: Array<string>, options: FindOptions<P extends ITeam ? ITeam : P>, query?: Filter<ITeam>): FindCursor<P>;
 
-	findByIds<P extends Document>(
+	findByIds<P>(
 		ids: Array<string>,
 		options?: undefined | FindOptions<ITeam> | FindOptions<P extends ITeam ? ITeam : P>,
 		query?: Filter<ITeam>,
@@ -37,13 +33,9 @@ export interface ITeamModel extends IBaseModel<ITeam> {
 
 	findByIdsAndType(ids: Array<string>, type: TEAM_TYPE, options: FindOptions<ITeam>): FindCursor<ITeam>;
 
-	findByIdsAndType<P extends Document>(
-		ids: Array<string>,
-		type: TEAM_TYPE,
-		options: FindOptions<P extends ITeam ? ITeam : P>,
-	): FindCursor<P>;
+	findByIdsAndType<P>(ids: Array<string>, type: TEAM_TYPE, options: FindOptions<P extends ITeam ? ITeam : P>): FindCursor<P>;
 
-	findByIdsAndType<P extends Document>(
+	findByIdsAndType<P>(
 		ids: Array<string>,
 		type: TEAM_TYPE,
 		options?: undefined | FindOptions<ITeam> | FindOptions<P extends ITeam ? ITeam : P>,
@@ -53,9 +45,9 @@ export interface ITeamModel extends IBaseModel<ITeam> {
 
 	findByType(type: number, options: FindOptions<ITeam>): FindCursor<ITeam>;
 
-	findByType<P extends Document>(type: number, options: FindOptions<P extends ITeam ? ITeam : P>): FindCursor<P>;
+	findByType<P>(type: number, options: FindOptions<P extends ITeam ? ITeam : P>): FindCursor<P>;
 
-	findByType<P extends Document>(
+	findByType<P>(
 		type: number,
 		options?: undefined | FindOptions<ITeam> | FindOptions<P extends ITeam ? ITeam : P>,
 	): FindCursor<ITeam> | FindCursor<P>;
@@ -64,13 +56,9 @@ export interface ITeamModel extends IBaseModel<ITeam> {
 
 	findByNameAndTeamIds(name: string | RegExp, teamIds: Array<string>, options: FindOptions<ITeam>): FindCursor<ITeam>;
 
-	findByNameAndTeamIds<P extends Document>(
-		name: string | RegExp,
-		teamIds: Array<string>,
-		options: FindOptions<P extends ITeam ? ITeam : P>,
-	): FindCursor<P>;
+	findByNameAndTeamIds<P>(name: string | RegExp, teamIds: Array<string>, options: FindOptions<P extends ITeam ? ITeam : P>): FindCursor<P>;
 
-	findByNameAndTeamIds<P extends Document>(
+	findByNameAndTeamIds<P>(
 		name: string | RegExp,
 		teamIds: Array<string>,
 		options?: undefined | FindOptions<ITeam> | FindOptions<P extends ITeam ? ITeam : P>,
@@ -80,9 +68,9 @@ export interface ITeamModel extends IBaseModel<ITeam> {
 
 	findOneByName(name: string | RegExp, options: FindOptions<ITeam>): Promise<ITeam | null>;
 
-	findOneByName<P extends Document>(name: string | RegExp, options: FindOptions<P>): Promise<P | null>;
+	findOneByName<P>(name: string | RegExp, options: FindOptions<P>): Promise<P | null>;
 
-	findOneByName<P extends Document>(
+	findOneByName<P>(
 		name: string | RegExp,
 		options?: undefined | FindOptions<ITeam> | FindOptions<P extends ITeam ? ITeam : P>,
 	): Promise<P | null> | Promise<ITeam | null>;
@@ -91,9 +79,9 @@ export interface ITeamModel extends IBaseModel<ITeam> {
 
 	findOneByMainRoomId(roomId: string, options: FindOptions<ITeam>): Promise<ITeam | null>;
 
-	findOneByMainRoomId<P extends Document>(roomId: string, options: FindOptions<P>): Promise<P | null>;
+	findOneByMainRoomId<P>(roomId: string, options: FindOptions<P>): Promise<P | null>;
 
-	findOneByMainRoomId<P extends Document>(
+	findOneByMainRoomId<P>(
 		roomId: string,
 		options?: undefined | FindOptions<ITeam> | FindOptions<P extends ITeam ? ITeam : P>,
 	): Promise<P | null> | Promise<ITeam | null>;

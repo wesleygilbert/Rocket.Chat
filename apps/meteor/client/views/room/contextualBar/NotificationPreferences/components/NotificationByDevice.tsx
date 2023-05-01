@@ -8,7 +8,7 @@ type NotificationByDeviceProps = {
 	children: ReactNode;
 };
 
-const NotificationByDevice = ({ device, icon, children }: NotificationByDeviceProps): ReactElement => (
+export const NotificationByDevice = ({ device, icon, children }: NotificationByDeviceProps): ReactElement => (
 	<Accordion.Item
 		title={
 			<Box display='flex' alignItems='center'>

@@ -1,25 +1,22 @@
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import _ from 'underscore';
-import Gravatar from 'gravatar';
+import s from 'underscore.string';
+import { Gravatar } from 'meteor/jparker:gravatar';
 import { isUserFederated } from '@rocket.chat/core-typings';
-import { Users } from '@rocket.chat/models';
 
-import * as Mailer from '../../../mailer/server/api';
-import { getRoles } from '../../../authorization/server';
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import * as Mailer from '../../../mailer';
+import { getRoles, hasPermission } from '../../../authorization';
 import { settings } from '../../../settings/server';
 import { passwordPolicy } from '../lib/passwordPolicy';
 import { validateEmailDomain } from '../lib';
 import { getNewUserRoles } from '../../../../server/services/user/lib/getNewUserRoles';
 import { saveUserIdentity } from './saveUserIdentity';
-import { checkEmailAvailability, setUserAvatar, setEmail } from '.';
-import { setStatusText } from './setStatusText';
-import { checkUsernameAvailability } from './checkUsernameAvailability';
+import { checkEmailAvailability, checkUsernameAvailability, setUserAvatar, setEmail, setStatusText } from '.';
+import { Users } from '../../../models/server';
 import { callbacks } from '../../../../lib/callbacks';
-import { AppEvents, Apps } from '../../../../ee/server/apps/orchestrator';
+import { AppEvents, Apps } from '../../../apps/server/orchestrator';
 import { safeGetMeteorUser } from '../../../utils/server/functions/safeGetMeteorUser';
-import { trim } from '../../../../lib/utils/stringUtils';
 
 const MAX_BIO_LENGTH = 260;
 const MAX_NICKNAME_LENGTH = 120;
@@ -36,7 +33,7 @@ Meteor.startup(() => {
 	});
 });
 
-async function _sendUserEmail(subject, html, userData) {
+function _sendUserEmail(subject, html, userData) {
 	const email = {
 		to: userData.email,
 		from: settings.get('From_Email'),
@@ -53,7 +50,7 @@ async function _sendUserEmail(subject, html, userData) {
 	}
 
 	try {
-		await Mailer.send(email);
+		Mailer.send(email);
 	} catch (error) {
 		throw new Meteor.Error('error-email-send-failed', `Error trying to send email: ${error.message}`, {
 			function: 'RocketChat.saveUser',
@@ -62,17 +59,17 @@ async function _sendUserEmail(subject, html, userData) {
 	}
 }
 
-async function validateUserData(userId, userData) {
-	const existingRoles = _.pluck(await getRoles(), '_id');
+function validateUserData(userId, userData) {
+	const existingRoles = _.pluck(getRoles(), '_id');
 
-	if (userData._id && userId !== userData._id && !(await hasPermissionAsync(userId, 'edit-other-user-info'))) {
+	if (userData._id && userId !== userData._id && !hasPermission(userId, 'edit-other-user-info')) {
 		throw new Meteor.Error('error-action-not-allowed', 'Editing user is not allowed', {
 			method: 'insertOrUpdateUser',
 			action: 'Editing_user',
 		});
 	}
 
-	if (!userData._id && !(await hasPermissionAsync(userId, 'create-user'))) {
+	if (!userData._id && !hasPermission(userId, 'create-user')) {
 		throw new Meteor.Error('error-action-not-allowed', 'Adding user is not allowed', {
 			method: 'insertOrUpdateUser',
 			action: 'Adding_user',
@@ -86,21 +83,21 @@ async function validateUserData(userId, userData) {
 		});
 	}
 
-	if (userData.roles && userData.roles.includes('admin') && !(await hasPermissionAsync(userId, 'assign-admin-role'))) {
+	if (userData.roles && _.indexOf(userData.roles, 'admin') >= 0 && !hasPermission(userId, 'assign-admin-role')) {
 		throw new Meteor.Error('error-action-not-allowed', 'Assigning admin is not allowed', {
 			method: 'insertOrUpdateUser',
 			action: 'Assign_admin',
 		});
 	}
 
-	if (settings.get('Accounts_RequireNameForSignUp') && !userData._id && !trim(userData.name)) {
+	if (settings.get('Accounts_RequireNameForSignUp') && !userData._id && !s.trim(userData.name)) {
 		throw new Meteor.Error('error-the-field-is-required', 'The field Name is required', {
 			method: 'insertOrUpdateUser',
 			field: 'Name',
 		});
 	}
 
-	if (!userData._id && !trim(userData.username)) {
+	if (!userData._id && !s.trim(userData.username)) {
 		throw new Meteor.Error('error-the-field-is-required', 'The field Username is required', {
 			method: 'insertOrUpdateUser',
 			field: 'Username',
@@ -108,7 +105,7 @@ async function validateUserData(userId, userData) {
 	}
 
 	if (userData.roles) {
-		await callbacks.run('validateUserRoles', userData);
+		callbacks.run('validateUserRoles', userData);
 	}
 
 	let nameValidation;
@@ -135,14 +132,14 @@ async function validateUserData(userId, userData) {
 	}
 
 	if (!userData._id) {
-		if (!(await checkUsernameAvailability(userData.username))) {
+		if (!checkUsernameAvailability(userData.username)) {
 			throw new Meteor.Error('error-field-unavailable', `${_.escape(userData.username)} is already in use :(`, {
 				method: 'insertOrUpdateUser',
 				field: userData.username,
 			});
 		}
 
-		if (userData.email && !(await checkEmailAvailability(userData.email))) {
+		if (userData.email && !checkEmailAvailability(userData.email)) {
 			throw new Meteor.Error('error-field-unavailable', `${_.escape(userData.email)} is already in use :(`, {
 				method: 'insertOrUpdateUser',
 				field: userData.email,
@@ -155,20 +152,20 @@ async function validateUserData(userId, userData) {
  * Validate permissions to edit user fields
  *
  * @param {string} userId
- * @param {{ _id: string, roles?: string[], username?: string, name?: string, statusText?: string, email?: string, password?: string}} userData
+ * @param {{ _id: string, roles: string[], username: string, name: string, statusText: string, email: string, password: string}} userData
  */
-export async function validateUserEditing(userId, userData) {
+export function validateUserEditing(userId, userData) {
 	const editingMyself = userData._id && userId === userData._id;
 
-	const canEditOtherUserInfo = await hasPermissionAsync(userId, 'edit-other-user-info');
-	const canEditOtherUserPassword = await hasPermissionAsync(userId, 'edit-other-user-password');
-	const user = await Users.findOneById(userData._id);
+	const canEditOtherUserInfo = hasPermission(userId, 'edit-other-user-info');
+	const canEditOtherUserPassword = hasPermission(userId, 'edit-other-user-password');
+	const user = Users.findOneById(userData._id);
 
 	const isEditingUserRoles = (previousRoles, newRoles) =>
 		typeof newRoles !== 'undefined' && !_.isEqual(_.sortBy(previousRoles), _.sortBy(newRoles));
 	const isEditingField = (previousValue, newValue) => typeof newValue !== 'undefined' && newValue !== previousValue;
 
-	if (isEditingUserRoles(user.roles, userData.roles) && !(await hasPermissionAsync(userId, 'assign-roles'))) {
+	if (isEditingUserRoles(user.roles, userData.roles) && !hasPermission(userId, 'assign-roles')) {
 		throw new Meteor.Error('error-action-not-allowed', 'Assign roles is not allowed', {
 			method: 'insertOrUpdateUser',
 			action: 'Assign_role',
@@ -265,10 +262,10 @@ const handleNickname = (updateUser, nickname) => {
 	}
 };
 
-const saveNewUser = async function (userData, sendPassword) {
-	await validateEmailDomain(userData.email);
+const saveNewUser = function (userData, sendPassword) {
+	validateEmailDomain(userData.email);
 
-	const roles = (!!userData.roles && userData.roles.length > 0 && userData.roles) || getNewUserRoles();
+	const roles = userData.roles || getNewUserRoles();
 	const isGuest = roles && roles.length === 1 && roles.includes('guest');
 
 	// insert user
@@ -282,7 +279,7 @@ const saveNewUser = async function (userData, sendPassword) {
 		createUser.email = userData.email;
 	}
 
-	const _id = await Accounts.createUserAsync(createUser);
+	const _id = Accounts.createUser(createUser);
 
 	const updateUser = {
 		$set: {
@@ -303,27 +300,27 @@ const saveNewUser = async function (userData, sendPassword) {
 	handleBio(updateUser, userData.bio);
 	handleNickname(updateUser, userData.nickname);
 
-	await Users.updateOne({ _id }, updateUser);
+	Meteor.users.update({ _id }, updateUser);
 
 	if (userData.sendWelcomeEmail) {
-		await _sendUserEmail(settings.get('Accounts_UserAddedEmail_Subject'), html, userData);
+		_sendUserEmail(settings.get('Accounts_UserAddedEmail_Subject'), html, userData);
 	}
 
 	if (sendPassword) {
-		await _sendUserEmail(settings.get('Password_Changed_Email_Subject'), passwordChangedHtml, userData);
+		_sendUserEmail(settings.get('Password_Changed_Email_Subject'), passwordChangedHtml, userData);
 	}
 
 	userData._id = _id;
 
 	if (settings.get('Accounts_SetDefaultAvatar') === true && userData.email) {
-		const gravatarUrl = Gravatar.url(userData.email, {
+		const gravatarUrl = Gravatar.imageUrl(userData.email, {
 			default: '404',
-			size: '200',
-			protocol: 'https',
+			size: 200,
+			secure: true,
 		});
 
 		try {
-			await setUserAvatar(userData, gravatarUrl, '', 'url');
+			setUserAvatar(userData, gravatarUrl, '', 'url');
 		} catch (e) {
 			// Ignore this error for now, as it not being successful isn't bad
 		}
@@ -332,12 +329,12 @@ const saveNewUser = async function (userData, sendPassword) {
 	return _id;
 };
 
-export const saveUser = async function (userId, userData) {
-	const oldUserData = await Users.findOneById(userData._id);
+export const saveUser = function (userId, userData) {
+	const oldUserData = Users.findOneById(userData._id);
 	if (oldUserData && isUserFederated(oldUserData)) {
 		throw new Meteor.Error('Edit_Federated_User_Not_Allowed', 'Not possible to edit a federated user');
 	}
-	await validateUserData(userId, userData);
+	validateUserData(userId, userData);
 	let sendPassword = false;
 
 	if (userData.hasOwnProperty('setRandomPassword')) {
@@ -354,16 +351,16 @@ export const saveUser = async function (userId, userData) {
 		return saveNewUser(userData, sendPassword);
 	}
 
-	await validateUserEditing(userId, userData);
+	validateUserEditing(userId, userData);
 
 	// update user
 	if (userData.hasOwnProperty('username') || userData.hasOwnProperty('name')) {
 		if (
-			!(await saveUserIdentity({
+			!saveUserIdentity({
 				_id: userData._id,
 				username: userData.username,
 				name: userData.name,
-			}))
+			})
 		) {
 			throw new Meteor.Error('error-could-not-save-identity', 'Could not save user identity', {
 				method: 'saveUser',
@@ -372,21 +369,21 @@ export const saveUser = async function (userId, userData) {
 	}
 
 	if (typeof userData.statusText === 'string') {
-		await setStatusText(userData._id, userData.statusText);
+		setStatusText(userData._id, userData.statusText);
 	}
 
 	if (userData.email) {
 		const shouldSendVerificationEmailToUser = userData.verified !== true;
-		await setEmail(userData._id, userData.email, shouldSendVerificationEmailToUser);
+		setEmail(userData._id, userData.email, shouldSendVerificationEmailToUser);
 	}
 
 	if (
 		userData.password &&
 		userData.password.trim() &&
-		(await hasPermissionAsync(userId, 'edit-other-user-password')) &&
+		hasPermission(userId, 'edit-other-user-password') &&
 		passwordPolicy.validate(userData.password)
 	) {
-		await Accounts.setPasswordAsync(userData._id, userData.password.trim());
+		Accounts.setPassword(userData._id, userData.password.trim());
 	} else {
 		sendPassword = false;
 	}
@@ -417,21 +414,22 @@ export const saveUser = async function (userId, userData) {
 		updateUser.$set['emails.0.verified'] = userData.verified;
 	}
 
-	await Users.updateOne({ _id: userData._id }, updateUser);
+	Meteor.users.update({ _id: userData._id }, updateUser);
 
-	await callbacks.run('afterSaveUser', userData);
+	callbacks.run('afterSaveUser', userData);
 
 	// App IPostUserUpdated event hook
-	const userUpdated = await Users.findOneById(userId);
-
-	await Apps.triggerEvent(AppEvents.IPostUserUpdated, {
-		user: userUpdated,
-		previousUser: oldUserData,
-		performedBy: await safeGetMeteorUser(),
-	});
+	const userUpdated = Users.findOneById(userId);
+	Promise.await(
+		Apps.triggerEvent(AppEvents.IPostUserUpdated, {
+			user: userUpdated,
+			previousUser: oldUserData,
+			performedBy: safeGetMeteorUser(),
+		}),
+	);
 
 	if (sendPassword) {
-		await _sendUserEmail(settings.get('Password_Changed_Email_Subject'), passwordChangedHtml, userData);
+		_sendUserEmail(settings.get('Password_Changed_Email_Subject'), passwordChangedHtml, userData);
 	}
 
 	return true;

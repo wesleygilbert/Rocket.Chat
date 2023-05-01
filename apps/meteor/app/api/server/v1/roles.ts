@@ -1,18 +1,26 @@
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
-import { isRoleAddUserToRoleProps, isRoleDeleteProps, isRoleRemoveUserFromRoleProps } from '@rocket.chat/rest-typings';
+import {
+	isRoleAddUserToRoleProps,
+	isRoleCreateProps,
+	isRoleDeleteProps,
+	isRoleRemoveUserFromRoleProps,
+	isRoleUpdateProps,
+} from '@rocket.chat/rest-typings';
 import type { IRole } from '@rocket.chat/core-typings';
-import { Roles, Users } from '@rocket.chat/models';
+import { Roles } from '@rocket.chat/models';
 import { api } from '@rocket.chat/core-services';
 
+import { Users } from '../../../models/server';
 import { API } from '../api';
-import { hasRoleAsync, hasAnyRoleAsync } from '../../../authorization/server/functions/hasRole';
+import { hasRole } from '../../../authorization/server';
 import { getUsersInRolePaginated } from '../../../authorization/server/functions/getUsersInRole';
 import { settings } from '../../../settings/server/index';
 import { apiDeprecationLogger } from '../../../lib/server/lib/deprecationWarningLogger';
+import { hasAnyRoleAsync } from '../../../authorization/server/functions/hasRole';
 import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
-import { getUserFromParams } from '../helpers/getUserFromParams';
-import { getPaginationItems } from '../helpers/getPaginationItems';
+import { updateRole } from '../../../../server/lib/roles/updateRole';
+import { insertRole } from '../../../../server/lib/roles/insertRole';
 
 API.v1.addRoute(
 	'roles.list',
@@ -51,6 +59,48 @@ API.v1.addRoute(
 );
 
 API.v1.addRoute(
+	'roles.create',
+	{ authRequired: true },
+	{
+		async post() {
+			if (!isRoleCreateProps(this.bodyParams)) {
+				throw new Meteor.Error('error-invalid-role-properties', 'The role properties are invalid.');
+			}
+
+			const userId = Meteor.userId();
+
+			if (!userId || !(await hasPermissionAsync(userId, 'access-permissions'))) {
+				throw new Meteor.Error('error-action-not-allowed', 'Accessing permissions is not allowed');
+			}
+
+			const { name, scope, description, mandatory2fa } = this.bodyParams;
+
+			if (await Roles.findOneByIdOrName(name)) {
+				throw new Meteor.Error('error-duplicate-role-names-not-allowed', 'Role name already exists');
+			}
+
+			const roleData = {
+				description: description || '',
+				...(mandatory2fa !== undefined && { mandatory2fa }),
+				name,
+				scope: scope || 'Users',
+				protected: false,
+			};
+
+			const options = {
+				broadcastUpdate: settings.get<boolean>('UI_DisplayRoles'),
+			};
+
+			const role = insertRole(roleData, options);
+
+			return API.v1.success({
+				role,
+			});
+		},
+	},
+);
+
+API.v1.addRoute(
 	'roles.addUserToRole',
 	{ authRequired: true },
 	{
@@ -59,7 +109,7 @@ API.v1.addRoute(
 				throw new Meteor.Error('error-invalid-role-properties', isRoleAddUserToRoleProps.errors?.map((error) => error.message).join('\n'));
 			}
 
-			const user = await getUserFromParams(this.bodyParams);
+			const user = this.getUserFromParams();
 			const { roleId, roleName, roomId } = this.bodyParams;
 
 			if (!roleId) {
@@ -75,11 +125,11 @@ API.v1.addRoute(
 				return API.v1.failure('error-role-not-found', 'Role not found');
 			}
 
-			if (await hasRoleAsync(user._id, role._id, roomId)) {
+			if (hasRole(user._id, role._id, roomId)) {
 				throw new Meteor.Error('error-user-already-in-role', 'User already in role');
 			}
 
-			await Meteor.callAsync('authorization:addUserToRole', role._id, user.username, roomId);
+			await Meteor.call('authorization:addUserToRole', role._id, user.username, roomId);
 
 			return API.v1.success({
 				role,
@@ -94,7 +144,7 @@ API.v1.addRoute(
 	{
 		async get() {
 			const { roomId, role } = this.queryParams;
-			const { offset, count = 50 } = await getPaginationItems(this.queryParams);
+			const { offset, count = 50 } = this.getPaginationItems();
 
 			const projection = {
 				name: 1,
@@ -136,6 +186,42 @@ API.v1.addRoute(
 			const [users, total] = await Promise.all([cursor.toArray(), totalCount]);
 
 			return API.v1.success({ users, total });
+		},
+	},
+);
+
+API.v1.addRoute(
+	'roles.update',
+	{ authRequired: true },
+	{
+		async post() {
+			if (!isRoleUpdateProps(this.bodyParams)) {
+				throw new Meteor.Error('error-invalid-role-properties', 'The role properties are invalid.');
+			}
+
+			if (!(await hasPermissionAsync(this.userId, 'access-permissions'))) {
+				throw new Meteor.Error('error-action-not-allowed', 'Accessing permissions is not allowed');
+			}
+
+			const { roleId, name, scope, description, mandatory2fa } = this.bodyParams;
+
+			const roleData = {
+				description: description || '',
+				...(mandatory2fa !== undefined && { mandatory2fa }),
+				name,
+				scope: scope || 'Users',
+				protected: false,
+			};
+
+			const options = {
+				broadcastUpdate: settings.get<boolean>('UI_DisplayRoles'),
+			};
+
+			const role = updateRole(roleId, roleData, options);
+
+			return API.v1.success({
+				role,
+			});
 		},
 	},
 );
@@ -201,7 +287,7 @@ API.v1.addRoute(
 				apiDeprecationLogger.warn(`Unassigning roles by name is deprecated and will be removed on the next major release of Rocket.Chat`);
 			}
 
-			const user = await Users.findOneByUsername(username);
+			const user = Users.findOneByUsername(username);
 
 			if (!user) {
 				throw new Meteor.Error('error-invalid-user', 'There is no user with this username');
@@ -227,7 +313,7 @@ API.v1.addRoute(
 			await Roles.removeUserRoles(user._id, [role._id], scope);
 
 			if (settings.get('UI_DisplayRoles')) {
-				void api.broadcast('user.roleUpdate', {
+				api.broadcast('user.roleUpdate', {
 					type: 'removed',
 					_id: role._id,
 					u: {

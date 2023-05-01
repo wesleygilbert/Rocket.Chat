@@ -19,7 +19,7 @@ const CannedResponseEdit: FC<{
 	departmentData?: {
 		department: Serialized<ILivechatDepartment>;
 	};
-}> = ({ data, reload, totalDataReload, isNew = false }) => {
+}> = ({ data, reload, totalDataReload, isNew = false, departmentData = {} }) => {
 	const t = useTranslation();
 	const dispatchToastMessage = useToastMessageDispatch();
 	const Route = useRoute('omnichannel-canned-responses');
@@ -44,7 +44,9 @@ const CannedResponseEdit: FC<{
 				? data.cannedResponse.tags.map((tag) => ({ label: tag, value: tag }))
 				: [],
 		scope: data ? data.cannedResponse.scope : 'user',
-		departmentId: data?.cannedResponse?.departmentId ? data.cannedResponse.departmentId : '',
+		departmentId: data?.cannedResponse?.departmentId
+			? { value: data.cannedResponse.departmentId, label: departmentData?.department?.name }
+			: '',
 	});
 
 	const { values, handlers, hasUnsavedChanges } = form;
@@ -98,7 +100,7 @@ const CannedResponseEdit: FC<{
 				text: string;
 				scope: string;
 				tags: any;
-				departmentId: string;
+				departmentId: { value: string; label: string };
 			};
 			const mappedTags = tags.map((tag: string | { value: string; label: string }) => (typeof tag === 'object' ? tag?.value : tag));
 			await saveCannedResponse({
@@ -107,7 +109,7 @@ const CannedResponseEdit: FC<{
 				text,
 				scope,
 				...(mappedTags.length > 0 && { tags: mappedTags }),
-				...(departmentId && { departmentId }),
+				...(departmentId && { departmentId: departmentId.value }),
 			});
 			dispatchToastMessage({
 				type: 'success',

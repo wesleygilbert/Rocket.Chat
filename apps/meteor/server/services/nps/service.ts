@@ -21,9 +21,9 @@ export class NPSService extends ServiceClassInternal implements INPSService {
 
 		const any = await Nps.findOne({}, { projection: { _id: 1 } });
 		if (!any) {
-			await Banner.create(getBannerForAdmins(nps.startAt));
+			Banner.create(getBannerForAdmins(nps.startAt));
 
-			await notifyAdmins(nps.startAt);
+			notifyAdmins(nps.startAt);
 		}
 
 		const { npsId, startAt, expireAt, createdBy } = nps;
@@ -121,8 +121,7 @@ export class NPSService extends ServiceClassInternal implements INPSService {
 				total,
 				votes: votesWithoutIds,
 			};
-
-			await sendNpsResults(nps._id, payload);
+			sendNpsResults(nps._id, payload);
 
 			await NpsVote.updateVotesToSent(voteIds);
 		}

@@ -1,5 +1,4 @@
-import { FederationRoomEvents, Rooms } from '@rocket.chat/models';
-
+import { FederationRoomEvents, Rooms } from '../../../models/server';
 import { clientLogger } from '../lib/logger';
 import { hasExternalDomain } from '../functions/helpers';
 import { getFederationDomain } from '../lib/getFederationDomain';
@@ -32,6 +31,6 @@ async function afterUnsetReaction(message, { user, reaction }) {
 
 export const definition = {
 	hook: 'afterUnsetReaction',
-	callback: afterUnsetReaction,
+	callback: (message, extras) => Promise.await(afterUnsetReaction(message, extras)),
 	id: 'federation-after-unset-reaction',
 };

@@ -1,10 +1,9 @@
 import { faker } from '@faker-js/faker';
 
-import { Users } from './fixtures/userStates';
-import { HomeChannel } from './page-objects';
 import { test, expect } from './utils/test';
+import { HomeChannel } from './page-objects';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 test.describe.serial('channel-management', () => {
 	let poHomeChannel: HomeChannel;

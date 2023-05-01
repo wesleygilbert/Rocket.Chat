@@ -12,8 +12,8 @@ export type LegacyBannerPayload = {
 	icon?: ComponentProps<typeof Icon>['name'];
 	modifiers?: ('large' | 'danger')[];
 	timer?: number;
-	action?: () => Promise<void> | void;
-	onClose?: () => Promise<void> | void;
+	action?: () => void;
+	onClose?: () => void;
 };
 
 type BannerPayload = LegacyBannerPayload | UiKitBannerPayload;

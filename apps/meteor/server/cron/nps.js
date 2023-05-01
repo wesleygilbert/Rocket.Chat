@@ -2,14 +2,14 @@ import { NPS } from '@rocket.chat/core-services';
 
 import { settings } from '../../app/settings/server';
 
-async function runNPS() {
+function runNPS() {
 	// if NPS is disabled close any pending scheduled survey
 	const enabled = settings.get('NPS_survey_enabled');
 	if (!enabled) {
-		await NPS.closeOpenSurveys();
+		Promise.await(NPS.closeOpenSurveys());
 		return;
 	}
-	await NPS.sendResults();
+	Promise.await(NPS.sendResults());
 }
 
 export function npsCron(SyncedCron) {

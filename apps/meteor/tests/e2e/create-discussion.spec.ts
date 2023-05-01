@@ -1,10 +1,9 @@
 import { faker } from '@faker-js/faker';
 
-import { Users } from './fixtures/userStates';
-import { HomeDiscussion } from './page-objects';
 import { test, expect } from './utils/test';
+import { HomeDiscussion } from './page-objects';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 test.describe.serial('create-discussion', () => {
 	let poHomeDiscussion: HomeDiscussion;
@@ -21,7 +20,7 @@ test.describe.serial('create-discussion', () => {
 
 		await poHomeDiscussion.sidenav.openNewByLabel('Discussion');
 		await poHomeDiscussion.inputChannelName.type('general');
-		await page.locator('role=listbox >> role=option[name=general]').click();
+		await page.keyboard.press('Enter');
 		await poHomeDiscussion.inputName.type(discussionName);
 		await poHomeDiscussion.inputMessage.type(discussionMessage);
 		await poHomeDiscussion.btnCreate.click();

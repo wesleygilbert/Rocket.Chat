@@ -15,7 +15,7 @@ export const registerAccessTokenService = function (serviceName, handleAccessTok
 
 // Listen to calls to `login` with an oauth option set. This is where
 // users actually get logged in to meteor via oauth.
-Accounts.registerLoginHandler(async function (options) {
+Accounts.registerLoginHandler(function (options) {
 	if (!options.accessToken) {
 		return undefined; // don't handle
 	}
@@ -35,7 +35,7 @@ Accounts.registerLoginHandler(async function (options) {
 	}
 
 	// Make sure we're configured
-	if (!(await ServiceConfiguration.configurations.findOneAsync({ service: options.serviceName }))) {
+	if (!ServiceConfiguration.configurations.findOne({ service: options.serviceName })) {
 		throw new ServiceConfiguration.ConfigError();
 	}
 
@@ -49,7 +49,7 @@ Accounts.registerLoginHandler(async function (options) {
 		};
 	}
 
-	const oauthResult = await service.handleAccessTokenRequest(options);
+	const oauthResult = service.handleAccessTokenRequest(options);
 
 	return Accounts.updateOrCreateUserFromExternalService(service.serviceName, oauthResult.serviceData, oauthResult.options);
 });

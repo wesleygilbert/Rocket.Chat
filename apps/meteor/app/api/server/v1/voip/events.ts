@@ -4,14 +4,14 @@ import { VoipRoom } from '@rocket.chat/models';
 import { LivechatVoip } from '@rocket.chat/core-services';
 
 import { API } from '../../api';
-import { canAccessRoomAsync } from '../../../../authorization/server';
+import { canAccessRoom } from '../../../../authorization/server';
 
 API.v1.addRoute(
 	'voip/events',
 	{ authRequired: true, permissionsRequired: ['view-l-room'] },
 	{
 		async post() {
-			check(this.bodyParams, {
+			check(this.requestParams(), {
 				event: Match.Where((v: string) => {
 					return Object.values<string>(VoipClientEvents).includes(v);
 				}),
@@ -19,13 +19,13 @@ API.v1.addRoute(
 				comment: Match.Maybe(String),
 			});
 
-			const { rid, event, comment } = this.bodyParams;
+			const { rid, event, comment } = this.requestParams();
 
 			const room = await VoipRoom.findOneVoipRoomById(rid);
 			if (!room) {
 				return API.v1.notFound();
 			}
-			if (!(await canAccessRoomAsync(room, this.user))) {
+			if (!canAccessRoom(room, this.user)) {
 				return API.v1.unauthorized();
 			}
 

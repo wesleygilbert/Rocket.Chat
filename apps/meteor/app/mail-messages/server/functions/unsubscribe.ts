@@ -1,10 +1,9 @@
-import { Users } from '@rocket.chat/models';
-
+import { Users } from '../../../models/server';
 import { SystemLogger } from '../../../../server/lib/logger/system';
 
-export const unsubscribe = async function (_id: string, createdAt: string): Promise<boolean> {
+export const unsubscribe = function (_id: string, createdAt: string): boolean {
 	if (_id && createdAt) {
-		const affectedRows = (await Users.rocketMailUnsubscribe(_id, createdAt)) === 1;
+		const affectedRows = Users.rocketMailUnsubscribe(_id, createdAt) === 1;
 
 		SystemLogger.debug('[Mailer:Unsubscribe]', _id, createdAt, new Date(parseInt(createdAt)), affectedRows);
 

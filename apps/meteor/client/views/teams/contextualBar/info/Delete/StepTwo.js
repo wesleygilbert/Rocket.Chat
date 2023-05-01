@@ -4,7 +4,7 @@ import React from 'react';
 import GenericModal from '../../../../../components/GenericModal';
 import RoomLinkList from '../../RoomLinkList';
 
-const StepTwo = ({ deletedRooms, keptRooms, onConfirm, onReturn, onCancel }) => {
+export const StepTwo = ({ deletedRooms, keptRooms, onConfirm, onReturn, onCancel }) => {
 	const t = useTranslation();
 
 	return (

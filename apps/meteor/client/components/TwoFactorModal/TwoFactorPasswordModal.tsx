@@ -1,7 +1,7 @@
 import { Box, PasswordInput } from '@rocket.chat/fuselage';
 import { useAutoFocus } from '@rocket.chat/fuselage-hooks';
 import { useTranslation } from '@rocket.chat/ui-contexts';
-import type { ReactElement, ChangeEvent, Ref, SyntheticEvent } from 'react';
+import type { ReactElement, ChangeEvent, Ref } from 'react';
 import React, { useState } from 'react';
 
 import GenericModal from '../GenericModal';
@@ -18,8 +18,7 @@ const TwoFactorPasswordModal = ({ onConfirm, onClose }: TwoFactorPasswordModalPr
 	const [code, setCode] = useState<string>('');
 	const ref = useAutoFocus();
 
-	const onConfirmTotpCode = (e: SyntheticEvent): void => {
-		e.preventDefault();
+	const onConfirmTotpCode = (): void => {
 		onConfirm(code, Method.PASSWORD);
 	};
 
@@ -29,7 +28,7 @@ const TwoFactorPasswordModal = ({ onConfirm, onClose }: TwoFactorPasswordModalPr
 
 	return (
 		<GenericModal
-			wrapperFunction={(props) => <Box is='form' onSubmit={onConfirmTotpCode} {...props} />}
+			onConfirm={onConfirmTotpCode}
 			onCancel={onClose}
 			confirmText={t('Verify')}
 			title={t('Please_enter_your_password')}

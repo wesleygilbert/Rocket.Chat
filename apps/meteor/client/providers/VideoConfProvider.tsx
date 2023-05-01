@@ -1,4 +1,5 @@
 import type { IRoom } from '@rocket.chat/core-typings';
+import { useSetModal } from '@rocket.chat/ui-contexts';
 import type { ReactElement, ReactNode } from 'react';
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Unsubscribe } from 'use-subscription';
@@ -7,19 +8,39 @@ import type { VideoConfPopupPayload } from '../contexts/VideoConfContext';
 import { VideoConfContext } from '../contexts/VideoConfContext';
 import type { DirectCallParams, ProviderCapabilities, CallPreferences } from '../lib/VideoConfManager';
 import { VideoConfManager } from '../lib/VideoConfManager';
+import VideoConfBlockModal from '../views/room/contextualBar/VideoConference/VideoConfBlockModal';
 import VideoConfPopups from '../views/room/contextualBar/VideoConference/VideoConfPopups';
-import { useVideoOpenCall } from '../views/room/contextualBar/VideoConference/hooks/useVideoConfOpenCall';
+
+type WindowMaybeDesktop = typeof window & {
+	RocketChatDesktop?: {
+		openInternalVideoChatWindow?: (url: string, options: undefined) => void;
+	};
+};
 
 const VideoConfContextProvider = ({ children }: { children: ReactNode }): ReactElement => {
 	const [outgoing, setOutgoing] = useState<VideoConfPopupPayload | undefined>();
-	const handleOpenCall = useVideoOpenCall();
+	const setModal = useSetModal();
 
 	useEffect(
 		() =>
 			VideoConfManager.on('call/join', (props) => {
-				handleOpenCall(props.url);
+				const windowMaybeDesktop = window as WindowMaybeDesktop;
+				if (windowMaybeDesktop.RocketChatDesktop?.openInternalVideoChatWindow) {
+					windowMaybeDesktop.RocketChatDesktop.openInternalVideoChatWindow(props.url, undefined);
+				} else {
+					const open = (): void => {
+						const popup = window.open(props.url);
+
+						if (popup !== null) {
+							return;
+						}
+
+						setModal(<VideoConfBlockModal onClose={(): void => setModal(null)} onConfirm={open} />);
+					};
+					open();
+				}
 			}),
-		[handleOpenCall],
+		[setModal],
 	);
 
 	useEffect(() => {
@@ -40,7 +61,7 @@ const VideoConfContextProvider = ({ children }: { children: ReactNode }): ReactE
 			},
 			rejectIncomingCall: (callId: string): void => VideoConfManager.rejectIncomingCall(callId),
 			abortCall: (): void => VideoConfManager.abortCall(),
-			setPreferences: (prefs: Partial<(typeof VideoConfManager)['preferences']>): void => VideoConfManager.setPreferences(prefs),
+			setPreferences: (prefs: Partial<typeof VideoConfManager['preferences']>): void => VideoConfManager.setPreferences(prefs),
 			queryIncomingCalls: {
 				getCurrentValue: (): DirectCallParams[] => VideoConfManager.getIncomingDirectCalls(),
 				subscribe: (cb: () => void): Unsubscribe => VideoConfManager.on('incoming/changed', cb),

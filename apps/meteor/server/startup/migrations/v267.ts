@@ -1,4 +1,4 @@
-import { Settings } from '@rocket.chat/models';
+import { MongoInternals } from 'meteor/mongo';
 import { ServiceConfiguration } from 'meteor/service-configuration';
 
 import { addMigration } from '../../lib/migrations';
@@ -6,11 +6,13 @@ import { addMigration } from '../../lib/migrations';
 addMigration({
 	version: 267,
 	async up() {
-		await ServiceConfiguration.configurations.removeAsync({
+		ServiceConfiguration.configurations.remove({
 			service: 'blockstack',
 		});
 
-		await Settings.deleteMany({
+		const { mongo } = MongoInternals.defaultRemoteCollectionDriver();
+		const settings = mongo.db.collection('rocketchat_settings');
+		await settings.deleteMany({
 			_id: {
 				$in: [
 					'Blockstack',

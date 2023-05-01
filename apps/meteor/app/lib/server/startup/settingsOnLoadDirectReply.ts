@@ -29,7 +29,7 @@ const startEmailInterceptor = _.debounce(async function () {
 
 	if (protocol === 'IMAP') {
 		client = new DirectReplyIMAPInterceptor();
-		await client.start();
+		client.start();
 	}
 
 	if (protocol === 'POP') {
@@ -40,4 +40,4 @@ const startEmailInterceptor = _.debounce(async function () {
 
 settings.watchByRegex(/^Direct_Reply_.+/, startEmailInterceptor);
 
-void startEmailInterceptor();
+startEmailInterceptor();

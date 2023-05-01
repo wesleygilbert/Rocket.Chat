@@ -38,13 +38,6 @@ export type ServerContextValue = {
 			retransmitToSelf?: boolean | undefined;
 		},
 	) => <TEvent extends unknown[]>(eventName: string, callback: (...event: TEvent) => void) => () => void;
-	getSingleStream: (
-		streamName: string,
-		options?: {
-			retransmit?: boolean | undefined;
-			retransmitToSelf?: boolean | undefined;
-		},
-	) => <TEvent extends unknown[]>(eventName: string, callback: (...event: TEvent) => void) => () => void;
 };
 
 export const ServerContext = createContext<ServerContextValue>({
@@ -57,5 +50,4 @@ export const ServerContext = createContext<ServerContextValue>({
 		throw new Error('not implemented');
 	},
 	getStream: () => () => (): void => undefined,
-	getSingleStream: () => () => (): void => undefined,
 });

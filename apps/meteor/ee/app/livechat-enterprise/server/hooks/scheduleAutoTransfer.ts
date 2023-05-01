@@ -1,16 +1,10 @@
-import type { IMessage, IOmnichannelRoom } from '@rocket.chat/core-typings';
-import { LivechatRooms } from '@rocket.chat/models';
+import type { IMessage, IRoom } from '@rocket.chat/core-typings';
 
 import { AutoTransferChatScheduler } from '../lib/AutoTransferChatScheduler';
 import { callbacks } from '../../../../../lib/callbacks';
 import { settings } from '../../../../../app/settings/server';
+import { LivechatRooms } from '../../../../../app/models/server';
 import { cbLogger } from '../lib/logger';
-import type { CloseRoomParams } from '../../../../../app/livechat/server/lib/LivechatTyped';
-
-type LivechatCloseCallbackParams = {
-	room: IOmnichannelRoom;
-	options: CloseRoomParams['options'];
-};
 
 let autoTransferTimeout = 0;
 
@@ -26,13 +20,8 @@ const handleAfterTakeInquiryCallback = async (inquiry: any = {}): Promise<any> =
 		return inquiry;
 	}
 
-	const room = await LivechatRooms.findOneById(rid, { projection: { _id: 1, autoTransferredAt: 1, autoTransferOngoing: 1 } });
-	if (!room) {
-		cbLogger.debug(`Skipping callback. Room ${rid} not found`);
-		return inquiry;
-	}
-
-	if (room.autoTransferredAt || room.autoTransferOngoing) {
+	const room = LivechatRooms.findOneById(rid, { autoTransferredAt: 1, autoTransferOngoing: 1 });
+	if (!room || room.autoTransferredAt || room.autoTransferOngoing) {
 		cbLogger.debug(`Skipping callback. Room ${room._id} already being transfered or not found`);
 		return inquiry;
 	}
@@ -43,7 +32,7 @@ const handleAfterTakeInquiryCallback = async (inquiry: any = {}): Promise<any> =
 	return inquiry;
 };
 
-const handleAfterSaveMessage = async (message: any = {}, room: any = {}): Promise<IMessage> => {
+const handleAfterSaveMessage = (message: any = {}, room: any = {}): IMessage => {
 	const { _id: rid, t, autoTransferredAt, autoTransferOngoing } = room;
 	const { token } = message;
 
@@ -63,29 +52,27 @@ const handleAfterSaveMessage = async (message: any = {}, room: any = {}): Promis
 		return message;
 	}
 
-	await AutoTransferChatScheduler.unscheduleRoom(rid);
+	Promise.await(AutoTransferChatScheduler.unscheduleRoom(rid));
 	return message;
 };
 
-const handleAfterCloseRoom = async (params: LivechatCloseCallbackParams): Promise<LivechatCloseCallbackParams> => {
-	const { room } = params;
-
+const handleAfterCloseRoom = (room: any = {}): IRoom => {
 	const { _id: rid, autoTransferredAt, autoTransferOngoing } = room;
 
 	if (!autoTransferTimeout || autoTransferTimeout <= 0) {
-		return params;
+		return room;
 	}
 
 	if (autoTransferredAt) {
-		return params;
+		return room;
 	}
 
 	if (!autoTransferOngoing) {
-		return params;
+		return room;
 	}
 
-	await AutoTransferChatScheduler.unscheduleRoom(rid);
-	return params;
+	Promise.await(AutoTransferChatScheduler.unscheduleRoom(rid));
+	return room;
 };
 
 settings.watch('Livechat_auto_transfer_chat_timeout', function (value) {
@@ -99,7 +86,7 @@ settings.watch('Livechat_auto_transfer_chat_timeout', function (value) {
 
 	callbacks.add(
 		'livechat.afterTakeInquiry',
-		handleAfterTakeInquiryCallback,
+		(inquiry) => Promise.await(handleAfterTakeInquiryCallback(inquiry)),
 		callbacks.priority.MEDIUM,
 		'livechat-auto-transfer-job-inquiry',
 	);

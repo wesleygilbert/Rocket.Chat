@@ -10,6 +10,7 @@ import type { ToolboxActionConfig } from '../../lib/Toolbox';
 import RoomHeader from '../RoomHeader';
 import { BackButton } from './BackButton';
 import QuickActions from './QuickActions';
+import { useQuickActions } from './QuickActions/hooks/useQuickActions';
 
 type OmnichannelRoomHeaderProps = {
 	slots: {
@@ -30,6 +31,7 @@ const OmnichannelRoomHeader: FC<OmnichannelRoomHeaderProps> = ({ slots: parentSl
 	const [name] = useCurrentRoute();
 	const { isMobile } = useLayout();
 	const room = useOmnichannelRoom();
+	const { visibleActions, getAction } = useQuickActions(room);
 	const toolbox = useToolboxContext();
 
 	const slots = useMemo(
@@ -41,7 +43,7 @@ const OmnichannelRoomHeader: FC<OmnichannelRoomHeaderProps> = ({ slots: parentSl
 					{<BackButton routeName={name} />}
 				</TemplateHeader.ToolBox>
 			),
-			posContent: <QuickActions room={room} />,
+			...(!isMobile && { insideContent: <QuickActions room={room} /> }),
 		}),
 		[isMobile, name, parentSlot, room],
 	);
@@ -50,9 +52,21 @@ const OmnichannelRoomHeader: FC<OmnichannelRoomHeaderProps> = ({ slots: parentSl
 			value={useMemo(
 				() => ({
 					...toolbox,
-					actions: new Map([...(Array.from(toolbox.actions.entries()) as [string, ToolboxActionConfig][])]),
+					actions: new Map([
+						...(isMobile
+							? (visibleActions.map((action) => [
+									action.id,
+									{
+										...action,
+										action: (): unknown => getAction(action.id),
+										order: (action.order || 0) - 10,
+									},
+							  ]) as [string, ToolboxActionConfig][])
+							: []),
+						...(Array.from(toolbox.actions.entries()) as [string, ToolboxActionConfig][]),
+					]),
 				}),
-				[toolbox],
+				[toolbox, isMobile, visibleActions, getAction],
 			)}
 		>
 			<RoomHeader slots={slots} room={room} />

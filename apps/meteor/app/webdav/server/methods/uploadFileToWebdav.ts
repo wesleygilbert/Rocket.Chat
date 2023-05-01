@@ -1,7 +1,5 @@
 import { Meteor } from 'meteor/meteor';
 import { MeteorError } from '@rocket.chat/core-services';
-import type { IWebdavAccount } from '@rocket.chat/core-typings';
-import type { ServerMethods, TranslationKey } from '@rocket.chat/ui-contexts';
 
 import { settings } from '../../../settings/server';
 import { Logger } from '../../../logger/server';
@@ -9,18 +7,7 @@ import { uploadFileToWebdav } from '../lib/uploadFileToWebdav';
 
 const logger = new Logger('WebDAV_Upload');
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		uploadFileToWebdav(
-			accountId: IWebdavAccount['_id'],
-			fileData: string | Buffer | ArrayBuffer,
-			name: string,
-		): { success: boolean; message?: TranslationKey };
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	async uploadFileToWebdav(accountId, fileData, name) {
 		if (!Meteor.userId()) {
 			throw new MeteorError('error-invalid-user', 'Invalid User', {
@@ -35,7 +22,7 @@ Meteor.methods<ServerMethods>({
 		}
 
 		try {
-			await uploadFileToWebdav(accountId, fileData instanceof ArrayBuffer ? Buffer.from(fileData) : fileData, name);
+			await uploadFileToWebdav(accountId, fileData, name);
 			return { success: true };
 		} catch (error: any) {
 			if (typeof error === 'object' && error instanceof Error && error.name === 'error-invalid-account') {

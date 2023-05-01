@@ -1,6 +1,4 @@
 import { isPOSTLivechatPageVisitedParams } from '@rocket.chat/rest-typings';
-import { Messages } from '@rocket.chat/models';
-import type { IOmnichannelSystemMessage } from '@rocket.chat/core-typings';
 
 import { API } from '../../../../api/server';
 import { Livechat } from '../../lib/Livechat';
@@ -11,18 +9,14 @@ API.v1.addRoute(
 	{
 		async post() {
 			const { token, rid, pageInfo } = this.bodyParams;
-			const msgId = await Livechat.savePageHistory(token, rid, pageInfo);
-			if (!msgId) {
-				return API.v1.success();
+			const obj = Livechat.savePageHistory(token, rid, pageInfo);
+			if (obj) {
+				// @ts-expect-error -- typings on savePageHistory are wrong
+				const { msg, navigation } = obj;
+				return API.v1.success({ page: { msg, navigation } });
 			}
 
-			const message = await Messages.findOneById<IOmnichannelSystemMessage>(msgId);
-			if (!message) {
-				return API.v1.success();
-			}
-
-			const { msg, navigation } = message;
-			return API.v1.success({ page: { msg, navigation } });
+			return API.v1.success();
 		},
 	},
 );

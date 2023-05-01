@@ -96,6 +96,10 @@ function NewImportPage() {
 										fileName: file.name,
 										importerKey,
 									});
+									dispatchToastMessage({
+										type: 'success',
+										message: t('File_uploaded_successfully'),
+									});
 								} catch (error) {
 									handleError(error, t('Failed_To_upload_Import_File'));
 								} finally {

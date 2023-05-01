@@ -1,3 +1,5 @@
 import './jumpToMessage';
 import './providers';
-import './server';
+import { OEmbed } from './server';
+
+export { OEmbed };

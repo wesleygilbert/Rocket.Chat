@@ -4,7 +4,7 @@ import { Accounts } from 'meteor/accounts-base';
 import { handleIdentityToken } from '../lib/handleIdentityToken';
 import { settings } from '../../settings/server';
 
-Accounts.registerLoginHandler('apple', async (loginRequest) => {
+Accounts.registerLoginHandler('apple', (loginRequest) => {
 	if (!loginRequest.identityToken) {
 		return;
 	}
@@ -16,7 +16,7 @@ Accounts.registerLoginHandler('apple', async (loginRequest) => {
 	const { identityToken, fullName, email } = loginRequest;
 
 	try {
-		const serviceData = await handleIdentityToken(identityToken);
+		const serviceData = handleIdentityToken(identityToken);
 
 		if (!serviceData.email && email) {
 			serviceData.email = email;

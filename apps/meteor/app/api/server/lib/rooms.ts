@@ -1,7 +1,8 @@
-import type { IRoom, ISubscription, RoomAdminFieldsType } from '@rocket.chat/core-typings';
-import { Rooms, Subscriptions } from '@rocket.chat/models';
+import type { IRoom, ISubscription } from '@rocket.chat/core-typings';
+import { Rooms } from '@rocket.chat/models';
 
 import { hasPermissionAsync, hasAtLeastOnePermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { Subscriptions } from '../../../models/server';
 import { adminFields } from '../../../../lib/rooms/adminFields';
 
 export async function findAdminRooms({
@@ -13,7 +14,7 @@ export async function findAdminRooms({
 	uid: string;
 	filter: string;
 	types: string[];
-	pagination: { offset: number; count: number; sort: Record<string, 1 | -1> };
+	pagination: { offset: number; count: number; sort: [string, number][] };
 }): Promise<{
 	rooms: IRoom[];
 	count: number;
@@ -31,22 +32,23 @@ export async function findAdminRooms({
 	const showTypes = Array.isArray(types) ? types.filter((type) => !typesToRemove.includes(type)) : [];
 	const options = {
 		projection: adminFields,
+		sort: sort || { default: -1, name: 1 },
 		skip: offset,
 		limit: count,
 	};
 
 	let result;
 	if (name && showTypes.length) {
-		result = Rooms.findByNameOrFnameContainingAndTypes(name, showTypes, discussion, includeTeams, showOnlyTeams, options);
+		result = Rooms.findByNameContainingAndTypes(name, showTypes, discussion, includeTeams, showOnlyTeams, options);
 	} else if (showTypes.length) {
 		result = Rooms.findByTypes(showTypes, discussion, includeTeams, showOnlyTeams, options);
 	} else {
-		result = Rooms.findByNameOrFnameContaining(name, discussion, includeTeams, showOnlyTeams, options);
+		result = Rooms.findByNameContaining(name, discussion, includeTeams, showOnlyTeams, options);
 	}
 
 	const { cursor, totalCount } = result;
 
-	const [rooms, total] = await Promise.all([cursor.sort(sort || { default: -1, name: 1 }).toArray(), totalCount]);
+	const [rooms, total] = await Promise.all([cursor.toArray(), totalCount]);
 
 	return {
 		rooms,
@@ -56,7 +58,7 @@ export async function findAdminRooms({
 	};
 }
 
-export async function findAdminRoom({ uid, rid }: { uid: string; rid: string }): Promise<Pick<IRoom, RoomAdminFieldsType> | null> {
+export async function findAdminRoom({ uid, rid }: { uid: string; rid: string }): Promise<unknown> {
 	if (!(await hasPermissionAsync(uid, 'view-room-administration'))) {
 		throw new Error('error-not-authorized');
 	}
@@ -81,9 +83,9 @@ export async function findChannelAndPrivateAutocomplete({ uid, selector }: { uid
 		},
 	};
 
-	const userRoomsIds = (await Subscriptions.findByUserId(uid, { projection: { rid: 1 } }).toArray()).map(
-		(item: Pick<ISubscription, 'rid'>) => item.rid,
-	);
+	const userRoomsIds = Subscriptions.cachedFindByUserId(uid, { fields: { rid: 1 } })
+		.fetch()
+		.map((item: Pick<ISubscription, 'rid'>) => item.rid);
 
 	const rooms = await Rooms.findRoomsWithoutDiscussionsByRoomIds(selector.name, userRoomsIds, options).toArray();
 
@@ -126,14 +128,14 @@ export async function findChannelAndPrivateAutocompleteWithPagination({
 }: {
 	uid: string;
 	selector: { name: string };
-	pagination: { offset: number; count: number; sort: Record<string, 1 | -1> };
+	pagination: { offset: number; count: number; sort: [string, number][] };
 }): Promise<{
 	items: IRoom[];
 	total: number;
 }> {
-	const userRoomsIds = (await Subscriptions.findByUserId(uid, { projection: { rid: 1 } }).toArray()).map(
-		(item: Pick<ISubscription, 'rid'>) => item.rid,
-	);
+	const userRoomsIds = Subscriptions.cachedFindByUserId(uid, { fields: { rid: 1 } })
+		.fetch()
+		.map((item: Pick<ISubscription, 'rid'>) => item.rid);
 
 	const options = {
 		projection: {
@@ -176,7 +178,7 @@ export async function findRoomsAvailableForTeams({ uid, name }: { uid: string; n
 	};
 
 	const userRooms = (
-		(await Subscriptions.findByUserIdAndRoles(uid, ['owner'], { projection: { rid: 1 } }).toArray()) as Pick<ISubscription, 'rid'>[]
+		Subscriptions.findByUserIdAndRoles(uid, ['owner'], { fields: { rid: 1 } }).fetch() as Pick<ISubscription, 'rid'>[]
 	).map((item) => item.rid);
 
 	const rooms = await Rooms.findChannelAndGroupListWithoutTeamsByNameStartingByOwner(uid, name, userRooms, options).toArray();

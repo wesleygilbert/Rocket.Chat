@@ -40,7 +40,7 @@ export const {
 	{
 		icon: 'cloud-plus',
 		href: 'cloud',
-		i18nLabel: 'Registration',
+		i18nLabel: 'Connectivity_Services',
 		permissionGranted: (): boolean => hasPermission('manage-cloud'),
 	},
 	{
@@ -60,6 +60,12 @@ export const {
 		href: 'federation-dashboard',
 		i18nLabel: 'Federation Dashboard',
 		permissionGranted: (): boolean => hasPermission('view-federation-data'),
+	},
+	{
+		icon: 'cube',
+		href: 'admin-marketplace',
+		i18nLabel: 'Apps',
+		permissionGranted: (): boolean => hasPermission('manage-apps'),
 	},
 	{
 		icon: 'mail',
@@ -100,8 +106,8 @@ export const {
 	},
 	{
 		icon: 'user',
-		href: 'user-status',
-		i18nLabel: 'User_Status',
+		href: 'custom-user-status',
+		i18nLabel: 'Custom_User_Status',
 		permissionGranted: (): boolean => hasAtLeastOnePermission(['manage-user-status']),
 	},
 	{

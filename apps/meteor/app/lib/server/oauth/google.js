@@ -1,47 +1,35 @@
 import { Match, check } from 'meteor/check';
 import _ from 'underscore';
+import { HTTP } from 'meteor/http';
 import { Google } from 'meteor/google-oauth';
-import { serverFetch as fetch } from '@rocket.chat/server-fetch';
 
 import { registerAccessTokenService } from './oauth';
 
-async function getIdentity(accessToken) {
+function getIdentity(accessToken) {
 	try {
-		const request = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
+		return HTTP.get('https://www.googleapis.com/oauth2/v1/userinfo', {
 			params: { access_token: accessToken },
-		});
-
-		if (!request.ok) {
-			throw new Error(await request.text());
-		}
-
-		return request.json();
+		}).data;
 	} catch (err) {
 		throw _.extend(new Error(`Failed to fetch identity from Google. ${err.message}`), {
-			response: err.message,
+			response: err.response,
 		});
 	}
 }
 
-async function getScopes(accessToken) {
+function getScopes(accessToken) {
 	try {
-		const request = await fetch('https://www.googleapis.com/oauth2/v1/tokeninfo', {
+		return HTTP.get('https://www.googleapis.com/oauth2/v1/tokeninfo', {
 			params: { access_token: accessToken },
-		});
-
-		if (!request.ok) {
-			throw new Error(await request.text());
-		}
-
-		return (await request.json()).scope.split(' ');
+		}).data.scope.split(' ');
 	} catch (err) {
 		throw _.extend(new Error(`Failed to fetch tokeninfo from Google. ${err.message}`), {
-			response: err.message,
+			response: err.response,
 		});
 	}
 }
 
-registerAccessTokenService('google', async function (options) {
+registerAccessTokenService('google', function (options) {
 	check(
 		options,
 		Match.ObjectIncluding({
@@ -53,13 +41,13 @@ registerAccessTokenService('google', async function (options) {
 		}),
 	);
 
-	const identity = await getIdentity(options.accessToken);
+	const identity = getIdentity(options.accessToken);
 
 	const serviceData = {
 		accessToken: options.accessToken,
 		idToken: options.idToken,
 		expiresAt: +new Date() + 1000 * parseInt(options.expiresIn, 10),
-		scope: options.scopes || (await getScopes(options.accessToken)),
+		scope: options.scopes || getScopes(options.accessToken),
 	};
 
 	const fields = _.pick(identity, Google.whitelistedFields);

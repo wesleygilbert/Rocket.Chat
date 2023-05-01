@@ -21,7 +21,7 @@ type dataType = {
 type AgentEditProps = {
 	data: dataType;
 	userDepartments: { departments: Pick<ILivechatDepartmentAgents, 'departmentId'>[] };
-	availableDepartments: { departments: Pick<ILivechatDepartment, '_id' | 'name' | 'archived'>[] };
+	availableDepartments: { departments: Pick<ILivechatDepartment, '_id' | 'name'>[] };
 	uid: string;
 	reset: () => void;
 };
@@ -37,16 +37,11 @@ const AgentEdit: FC<AgentEditProps> = ({ data, userDepartments, availableDepartm
 
 	const email = getUserEmailAddress(user);
 
-	const options: [string, string][] = useMemo(() => {
-		const archivedDepartment = (name: string, archived?: boolean) => (archived ? `${name} [${t('Archived')}]` : name);
-
-		return availableDepartments?.departments
-			? availableDepartments.departments.map(({ _id, name, archived }) =>
-					name ? [_id, archivedDepartment(name, archived)] : [_id, archivedDepartment(_id, archived)],
-			  )
-			: [];
-	}, [availableDepartments.departments, t]);
-
+	const options: [string, string][] = useMemo(
+		() =>
+			availableDepartments?.departments ? availableDepartments.departments.map(({ _id, name }) => (name ? [_id, name] : [_id, _id])) : [],
+		[availableDepartments],
+	);
 	const initialDepartmentValue = useMemo(
 		() => (userDepartments.departments ? userDepartments.departments.map(({ departmentId }) => departmentId) : []),
 		[userDepartments],

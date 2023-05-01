@@ -1,54 +1,49 @@
 import { AppsEngineException } from '@rocket.chat/apps-engine/definition/exceptions';
 import { Meteor } from 'meteor/meteor';
-import type { IUser } from '@rocket.chat/core-typings';
-import { Subscriptions, Users, Rooms } from '@rocket.chat/models';
-import { Message, Team } from '@rocket.chat/core-services';
+import type { IUser, IRoom } from '@rocket.chat/core-typings';
+import { Team } from '@rocket.chat/core-services';
 
-import { AppEvents, Apps } from '../../../../ee/server/apps';
+import { AppEvents, Apps } from '../../../apps/server';
 import { callbacks } from '../../../../lib/callbacks';
+import { Messages, Rooms, Subscriptions, Users } from '../../../models/server';
 import { roomCoordinator } from '../../../../server/lib/rooms/roomCoordinator';
 import { RoomMemberActions } from '../../../../definition/IRoomTypeConfig';
 
-export const addUserToRoom = async function (
+export const addUserToRoom = function (
 	rid: string,
 	user: Pick<IUser, '_id' | 'username'> | string,
 	inviter?: Pick<IUser, '_id' | 'username'>,
 	silenced?: boolean,
-): Promise<boolean | undefined> {
+): boolean | unknown {
 	const now = new Date();
-	const room = await Rooms.findOneById(rid);
+	const room: IRoom = Rooms.findOneById(rid);
 
-	if (!room) {
-		throw new Meteor.Error('error-invalid-room', 'Invalid room', {
-			method: 'addUserToRoom',
-		});
-	}
-
-	const userToBeAdded = typeof user !== 'string' ? user : await Users.findOneByUsername(user.replace('@', ''));
 	const roomDirectives = roomCoordinator.getRoomDirectives(room.t);
 	if (
-		!(await roomDirectives.allowMemberAction(room, RoomMemberActions.JOIN, userToBeAdded._id)) &&
-		!(await roomDirectives.allowMemberAction(room, RoomMemberActions.INVITE, userToBeAdded._id))
+		!roomDirectives?.allowMemberAction(room, RoomMemberActions.JOIN) &&
+		!roomDirectives?.allowMemberAction(room, RoomMemberActions.INVITE)
 	) {
 		return;
 	}
 
 	try {
-		await callbacks.run('federation.beforeAddUserToARoom', { user, inviter }, room);
+		callbacks.run('federation.beforeAddUserAToRoom', { user, inviter }, room);
 	} catch (error) {
 		throw new Meteor.Error((error as any)?.message);
 	}
 
+	const userToBeAdded = typeof user !== 'string' ? user : Users.findOneByUsername(user.replace('@', ''));
+
 	// Check if user is already in room
-	const subscription = await Subscriptions.findOneByRoomIdAndUserId(rid, userToBeAdded._id);
-	if (subscription || !userToBeAdded) {
+	const subscription = Subscriptions.findOneByRoomIdAndUserId(rid, userToBeAdded._id);
+	if (subscription) {
 		return;
 	}
 
 	try {
-		await Apps.triggerEvent(AppEvents.IPreRoomUserJoined, room, userToBeAdded, inviter);
-	} catch (error: any) {
-		if (error.name === AppsEngineException.name) {
+		Promise.await(Apps.triggerEvent(AppEvents.IPreRoomUserJoined, room, userToBeAdded, inviter));
+	} catch (error) {
+		if (error instanceof AppsEngineException) {
 			throw new Meteor.Error('error-app-prevented', error.message);
 		}
 
@@ -57,20 +52,23 @@ export const addUserToRoom = async function (
 
 	if (room.t === 'c' || room.t === 'p' || room.t === 'l') {
 		// Add a new event, with an optional inviter
-		await callbacks.run('beforeAddedToRoom', { user: userToBeAdded, inviter }, room);
+		callbacks.run('beforeAddedToRoom', { user: userToBeAdded, inviter }, room);
 
 		// Keep the current event
-		await callbacks.run('beforeJoinRoom', userToBeAdded, room);
+		callbacks.run('beforeJoinRoom', userToBeAdded, room);
 	}
-	await Apps.triggerEvent(AppEvents.IPreRoomUserJoined, room, userToBeAdded, inviter).catch((error) => {
-		if (error.name === AppsEngineException.name) {
-			throw new Meteor.Error('error-app-prevented', error.message);
-		}
 
-		throw error;
-	});
+	Promise.await(
+		Apps.triggerEvent(AppEvents.IPreRoomUserJoined, room, userToBeAdded, inviter).catch((error) => {
+			if (error instanceof AppsEngineException) {
+				throw new Meteor.Error('error-app-prevented', error.message);
+			}
 
-	await Subscriptions.createWithRoomAndUser(room, userToBeAdded as IUser, {
+			throw error;
+		}),
+	);
+
+	Subscriptions.createWithRoomAndUser(room, userToBeAdded, {
 		ts: now,
 		open: true,
 		alert: true,
@@ -78,10 +76,6 @@ export const addUserToRoom = async function (
 		userMentions: 1,
 		groupMentions: 0,
 	});
-
-	if (!userToBeAdded.username) {
-		throw new Meteor.Error('error-invalid-user', 'Cannot add an user to a room without a username');
-	}
 
 	if (!silenced) {
 		if (inviter) {
@@ -93,34 +87,34 @@ export const addUserToRoom = async function (
 				},
 			};
 			if (room.teamMain) {
-				await Message.saveSystemMessage('added-user-to-team', rid, userToBeAdded.username, userToBeAdded, extraData);
+				Messages.createUserAddedToTeamWithRoomIdAndUser(rid, userToBeAdded, extraData);
 			} else {
-				await Message.saveSystemMessage('au', rid, userToBeAdded.username, userToBeAdded, extraData);
+				Messages.createUserAddedWithRoomIdAndUser(rid, userToBeAdded, extraData);
 			}
 		} else if (room.prid) {
-			await Message.saveSystemMessage('ut', rid, userToBeAdded.username, userToBeAdded, { ts: now });
+			Messages.createUserJoinWithRoomIdAndUserDiscussion(rid, userToBeAdded, { ts: now });
 		} else if (room.teamMain) {
-			await Message.saveSystemMessage('ujt', rid, userToBeAdded.username, userToBeAdded, { ts: now });
+			Messages.createUserJoinTeamWithRoomIdAndUser(rid, userToBeAdded, { ts: now });
 		} else {
-			await Message.saveSystemMessage('uj', rid, userToBeAdded.username, userToBeAdded, { ts: now });
+			Messages.createUserJoinWithRoomIdAndUser(rid, userToBeAdded, { ts: now });
 		}
 	}
 
 	if (room.t === 'c' || room.t === 'p') {
-		process.nextTick(async function () {
+		Meteor.defer(function () {
 			// Add a new event, with an optional inviter
-			await callbacks.run('afterAddedToRoom', { user: userToBeAdded, inviter }, room);
+			callbacks.run('afterAddedToRoom', { user: userToBeAdded, inviter }, room);
 
 			// Keep the current event
-			await callbacks.run('afterJoinRoom', userToBeAdded, room);
+			callbacks.run('afterJoinRoom', userToBeAdded, room);
 
-			void Apps.triggerEvent(AppEvents.IPostRoomUserJoined, room, userToBeAdded, inviter);
+			Apps.triggerEvent(AppEvents.IPostRoomUserJoined, room, userToBeAdded, inviter);
 		});
 	}
 
 	if (room.teamMain && room.teamId) {
 		// if user is joining to main team channel, create a membership
-		await Team.addMember(inviter || userToBeAdded, userToBeAdded._id, room.teamId);
+		Promise.await(Team.addMember(inviter || userToBeAdded, userToBeAdded._id, room.teamId));
 	}
 
 	return true;

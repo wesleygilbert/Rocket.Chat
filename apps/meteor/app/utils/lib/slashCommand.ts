@@ -7,9 +7,8 @@ import type {
 	SlashCommandPreviewItem,
 	SlashCommandPreviews,
 } from '@rocket.chat/core-typings';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
-interface ISlashCommandAddParams<T extends string> {
+export interface ISlashCommandAddParams<T extends string> {
 	command: string;
 	callback?: SlashCommand<T>['callback'];
 	options?: SlashCommandOptions;
@@ -34,9 +33,6 @@ export const slashCommands = {
 		appId,
 		description = '',
 	}: ISlashCommandAddParams<T>): void {
-		if (this.commands[command]) {
-			return;
-		}
 		this.commands[command] = {
 			command,
 			callback,
@@ -51,45 +47,29 @@ export const slashCommands = {
 			appId,
 		} as SlashCommand;
 	},
-	async run({
-		command,
-		message,
-		params,
-		triggerId,
-		userId,
-	}: {
-		command: string;
-		params: string;
-		message: RequiredField<Partial<IMessage>, 'rid'>;
-		userId: string;
-		triggerId?: string | undefined;
-	}): Promise<unknown> {
+	run(command: string, params: string, message: RequiredField<Partial<IMessage>, 'rid'>, triggerId?: string | undefined): void {
 		const cmd = this.commands[command];
 		if (typeof cmd?.callback !== 'function') {
 			return;
 		}
 
-		if (!message?.rid) {
+		if (!message || !message.rid) {
 			throw new Meteor.Error('invalid-command-usage', 'Executing a command requires at least a message with a room id.');
 		}
 
-		return cmd.callback({ command, params, message, triggerId, userId });
+		return cmd.callback(command, params, message, triggerId);
 	},
-	async getPreviews(
-		command: string,
-		params: string,
-		message: RequiredField<Partial<IMessage>, 'rid'>,
-	): Promise<SlashCommandPreviews | undefined> {
+	getPreviews(command: string, params: string, message: IMessage): SlashCommandPreviews | undefined {
 		const cmd = this.commands[command];
 		if (typeof cmd?.previewer !== 'function') {
 			return;
 		}
 
-		if (!message?.rid) {
+		if (!message || !message.rid) {
 			throw new Meteor.Error('invalid-command-usage', 'Executing a command requires at least a message with a room id.');
 		}
 
-		const previewInfo = await cmd.previewer(command, params, message);
+		const previewInfo = cmd.previewer(command, params, message);
 
 		if (!previewInfo?.items?.length) {
 			return;
@@ -102,19 +82,13 @@ export const slashCommands = {
 
 		return previewInfo;
 	},
-	async executePreview(
-		command: string,
-		params: string,
-		message: Pick<IMessage, 'rid'> & Partial<Omit<IMessage, 'rid'>>,
-		preview: SlashCommandPreviewItem,
-		triggerId?: string,
-	) {
+	executePreview(command: string, params: string, message: IMessage, preview: SlashCommandPreviewItem, triggerId: string): void {
 		const cmd = this.commands[command];
 		if (typeof cmd?.previewCallback !== 'function') {
 			return;
 		}
 
-		if (!message?.rid) {
+		if (!message || !message.rid) {
 			throw new Meteor.Error('invalid-command-usage', 'Executing a command requires at least a message with a room id.');
 		}
 
@@ -127,33 +101,19 @@ export const slashCommands = {
 	},
 };
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		slashCommand(params: { cmd: string; params: string; msg: IMessage; triggerId: string }): unknown;
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async slashCommand(command) {
-		const userId = Meteor.userId();
-		if (!userId) {
+Meteor.methods({
+	slashCommand(command) {
+		if (!Meteor.userId()) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
 				method: 'slashCommand',
 			});
 		}
 
-		if (!command?.cmd || !slashCommands.commands[command.cmd]) {
+		if (!command || !command.cmd || !slashCommands.commands[command.cmd]) {
 			throw new Meteor.Error('error-invalid-command', 'Invalid Command Provided', {
 				method: 'executeSlashCommandPreview',
 			});
 		}
-		return slashCommands.run({
-			command: command.cmd,
-			params: command.params,
-			message: command.msg,
-			triggerId: command.triggerId,
-			userId,
-		});
+		return slashCommands.run(command.cmd, command.params, command.msg, command.triggerId);
 	},
 });

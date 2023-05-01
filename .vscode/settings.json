@@ -14,18 +14,5 @@
 		}
 	],
 	"typescript.tsdk": "./node_modules/typescript/lib",
-	"cSpell.words": [
-		"autotranslate",
-		"fname",
-		"Gazzodown",
-		"katex",
-		"listbox",
-		"livechat",
-		"oauthapps",
-		"omnichannel",
-		"photoswipe",
-		"searchbox",
-		"tmid",
-		"tshow"
-	]
+	"cSpell.words": ["katex", "livechat", "omnichannel", "photoswipe", "tmid"]
 }

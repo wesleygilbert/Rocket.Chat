@@ -5,10 +5,10 @@ import { settings } from '../../../app/settings/server';
 
 addMigration({
 	version: 282,
-	async up() {
+	up() {
 		const omnichannelCallProvider = settings.get('Omnichannel_call_provider');
 		if (omnichannelCallProvider !== 'none') {
-			await Settings.updateOne(
+			Settings.updateOne(
 				{ _id: 'Omnichannel_call_provider' },
 				{
 					$set: { value: 'default-provider' },

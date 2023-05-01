@@ -1,11 +1,12 @@
 import { Meteor } from 'meteor/meteor';
-import { Random } from '@rocket.chat/random';
-import { Invites, Subscriptions, Rooms } from '@rocket.chat/models';
+import { Random } from 'meteor/random';
+import { Invites } from '@rocket.chat/models';
 import { api } from '@rocket.chat/core-services';
 
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { hasPermission } from '../../../authorization/server';
+import { Subscriptions, Rooms } from '../../../models/server';
 import { settings } from '../../../settings/server';
-import { getURL } from '../../../utils/server/getURL';
+import { getURL } from '../../../utils/lib/getURL';
 import { roomCoordinator } from '../../../../server/lib/rooms/roomCoordinator';
 import { RoomMemberActions } from '../../../../definition/IRoomTypeConfig';
 
@@ -14,15 +15,11 @@ function getInviteUrl(invite) {
 
 	const useDirectLink = settings.get('Accounts_Registration_InviteUrlType') === 'direct';
 
-	return getURL(
-		`invite/${_id}`,
-		{
-			full: useDirectLink,
-			cloud: !useDirectLink,
-			cloud_route: 'invite',
-		},
-		settings.get('DeepLink_Url'),
-	);
+	return getURL(`invite/${_id}`, {
+		full: useDirectLink,
+		cloud: !useDirectLink,
+		cloud_route: 'invite',
+	});
 }
 
 const possibleDays = [0, 1, 7, 15, 30];
@@ -40,12 +37,12 @@ export const findOrCreateInvite = async (userId, invite) => {
 		});
 	}
 
-	if (!(await hasPermissionAsync(userId, 'create-invite-links', invite.rid))) {
+	if (!hasPermission(userId, 'create-invite-links', invite.rid)) {
 		throw new Meteor.Error('not_authorized');
 	}
 
-	const subscription = await Subscriptions.findOneByRoomIdAndUserId(invite.rid, userId, {
-		projection: { _id: 1 },
+	const subscription = Subscriptions.findOneByRoomIdAndUserId(invite.rid, userId, {
+		fields: { _id: 1 },
 	});
 	if (!subscription) {
 		throw new Meteor.Error('error-invalid-room', 'The rid field is invalid', {
@@ -54,15 +51,8 @@ export const findOrCreateInvite = async (userId, invite) => {
 		});
 	}
 
-	const room = await Rooms.findOneById(invite.rid);
-	if (!room) {
-		throw new Meteor.Error('error-invalid-room', 'The rid field is invalid', {
-			method: 'findOrCreateInvite',
-			field: 'rid',
-		});
-	}
-
-	if (!(await roomCoordinator.getRoomDirectives(room.t).allowMemberAction(room, RoomMemberActions.INVITE, userId))) {
+	const room = Rooms.findOneById(invite.rid);
+	if (!roomCoordinator.getRoomDirectives(room.t)?.allowMemberAction(room, RoomMemberActions.INVITE)) {
 		throw new Meteor.Error('error-room-type-not-allowed', 'Cannot create invite links for this room type', {
 			method: 'findOrCreateInvite',
 		});
@@ -110,7 +100,7 @@ export const findOrCreateInvite = async (userId, invite) => {
 
 	await Invites.insertOne(createInvite);
 
-	void api.broadcast('notify.updateInvites', userId, { invite: createInvite });
+	api.broadcast('notify.updateInvites', userId, { invite: createInvite });
 
 	createInvite.url = getInviteUrl(createInvite);
 	return createInvite;

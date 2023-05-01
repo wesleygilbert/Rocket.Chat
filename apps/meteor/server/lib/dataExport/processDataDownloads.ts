@@ -4,14 +4,16 @@ import { access, mkdir, rm, writeFile } from 'fs/promises';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import moment from 'moment';
 import { v4 as uuidv4 } from 'uuid';
-import { Avatars, ExportOperations, UserDataFiles, Subscriptions } from '@rocket.chat/models';
-import type { IExportOperation, IUser, RoomType } from '@rocket.chat/core-typings';
+import { Avatars, ExportOperations, UserDataFiles } from '@rocket.chat/models';
+import type { IExportOperation, ISubscription, IUser, RoomType } from '@rocket.chat/core-typings';
+import type { FindCursor } from 'mongodb';
 
 import { settings } from '../../../app/settings/server';
+import { Subscriptions } from '../../../app/models/server';
 import { FileUpload } from '../../../app/file-upload/server';
 import { getPath } from './getPath';
 import { joinPath } from '../fileUtils';
-import { getURL } from '../../../app/utils/server/getURL';
+import { getURL } from '../../../app/utils/lib/getURL';
 import { getRoomData } from './getRoomData';
 import { sendEmail } from './sendEmail';
 import { makeZipFile } from './makeZipFile';
@@ -19,7 +21,7 @@ import { copyFileUpload } from './copyFileUpload';
 import { uploadZipFile } from './uploadZipFile';
 import { exportRoomMessagesToFile } from './exportRoomMessagesToFile';
 
-const loadUserSubscriptions = async (_exportOperation: IExportOperation, fileType: 'json' | 'html', userId: IUser['_id']) => {
+const loadUserSubscriptions = (_exportOperation: IExportOperation, fileType: 'json' | 'html', userId: IUser['_id']) => {
 	const roomList: (
 		| {
 				roomId: string;
@@ -33,13 +35,13 @@ const loadUserSubscriptions = async (_exportOperation: IExportOperation, fileTyp
 		| Record<string, never>
 	)[] = [];
 
-	const cursor = Subscriptions.findByUserId(userId);
-	for await (const subscription of cursor) {
-		const roomData = await getRoomData(subscription.rid, userId);
+	const cursor: FindCursor<ISubscription> = Subscriptions.findByUserId(userId);
+	cursor.forEach((subscription) => {
+		const roomData = getRoomData(subscription.rid, userId);
 		roomData.targetFile = `${(fileType === 'json' && roomData.roomName) || subscription.rid}.${fileType}`;
 
 		roomList.push(roomData);
-	}
+	});
 
 	return roomList;
 };
@@ -107,7 +109,7 @@ const generateUserAvatarFile = async (exportOperation: IExportOperation, userDat
 	}
 
 	const filePath = joinPath(exportOperation.exportPath, 'avatar');
-	if (await FileUpload.copy?.(file, filePath)) {
+	if (FileUpload.copy(file, filePath)) {
 		exportOperation.generatedAvatar = true;
 	}
 };
@@ -146,7 +148,7 @@ const continueExportOperation = async function (exportOperation: IExportOperatio
 	const exportType = exportOperation.fullExport ? 'json' : 'html';
 
 	if (!exportOperation.roomList) {
-		exportOperation.roomList = await loadUserSubscriptions(exportOperation, exportType, exportOperation.userId);
+		exportOperation.roomList = loadUserSubscriptions(exportOperation, exportType, exportOperation.userId);
 
 		if (exportOperation.fullExport) {
 			exportOperation.status = 'exporting-rooms';
@@ -271,6 +273,6 @@ export async function processDataDownloads(): Promise<void> {
 			download_link: getURL(getPath(file._id), { cdn: false, full: true }),
 		});
 
-		await sendEmail(operation.userData, subject, body);
+		sendEmail(operation.userData, subject, body);
 	}
 }

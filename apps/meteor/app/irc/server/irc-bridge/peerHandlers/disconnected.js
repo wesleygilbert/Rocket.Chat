@@ -1,11 +1,13 @@
-import { Users } from '@rocket.chat/models';
+import { Meteor } from 'meteor/meteor';
 
-export default async function handleQUIT(args) {
-	const user = await Users.findOne({
+import { Users } from '../../../../models/server';
+
+export default function handleQUIT(args) {
+	const user = Users.findOne({
 		'profile.irc.nick': args.nick,
 	});
 
-	await Users.updateOne(
+	Meteor.users.update(
 		{ _id: user._id },
 		{
 			$set: {

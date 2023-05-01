@@ -24,6 +24,7 @@ export type UsersSetPreferencesParamsPOST = {
 		highlights?: string[];
 		alsoSendThreadToChannel?: 'never' | 'always' | 'default';
 		desktopNotificationRequireInteraction?: boolean;
+		messageViewMode?: number;
 		hideUsernames?: boolean;
 		hideRoles?: boolean;
 		displayAvatars?: boolean;
@@ -38,11 +39,9 @@ export type UsersSetPreferencesParamsPOST = {
 		sidebarGroupByType?: boolean;
 		muteFocusedConversations?: boolean;
 		dontAskAgainList?: Array<{ action: string; label: string }>;
-		themeAppearence?: 'auto' | 'light' | 'dark';
 		receiveLoginDetectionEmail?: boolean;
+		useLegacyMessageTemplate?: boolean;
 		idleTimeLimit?: number;
-		omnichannelTranscriptEmail?: boolean;
-		omnichannelTranscriptPDF?: boolean;
 	};
 };
 
@@ -128,6 +127,10 @@ const UsersSetPreferencesParamsPostSchema = {
 					type: 'boolean',
 					nullable: true,
 				},
+				messageViewMode: {
+					type: 'number',
+					nullable: true,
+				},
 				hideUsernames: {
 					type: 'boolean',
 					nullable: true,
@@ -191,8 +194,8 @@ const UsersSetPreferencesParamsPostSchema = {
 					},
 					nullable: true,
 				},
-				themeAppearence: {
-					type: 'string',
+				useLegacyMessageTemplate: {
+					type: 'boolean',
 					nullable: true,
 				},
 				receiveLoginDetectionEmail: {
@@ -201,14 +204,6 @@ const UsersSetPreferencesParamsPostSchema = {
 				},
 				idleTimeLimit: {
 					type: 'number',
-					nullable: true,
-				},
-				omnichannelTranscriptEmail: {
-					type: 'boolean',
-					nullable: true,
-				},
-				omnichannelTranscriptPDF: {
-					type: 'boolean',
 					nullable: true,
 				},
 			},

@@ -21,3 +21,6 @@ export const removeUserFromRolesAsync = async (userId: IUser['_id'], roleIds: IR
 	await Roles.removeUserRoles(userId, roleIds, scope);
 	return true;
 };
+
+export const removeUserFromRoles = (...args: Parameters<typeof removeUserFromRolesAsync>): boolean =>
+	Promise.await(removeUserFromRolesAsync(...args));

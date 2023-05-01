@@ -1,12 +1,12 @@
-import type { ILivechatAgent, ILivechatVisitor, IVoipRoomClosingInfo, IUser, IVoipRoom } from '@rocket.chat/core-typings';
+import type { ILivechatAgent, ILivechatVisitor, IRoomClosingInfo, IUser, IVoipRoom } from '@rocket.chat/core-typings';
 
 import type { IOmniRoomClosingMessage } from '../../../../../server/services/omnichannel-voip/internalTypes';
 import { OmnichannelVoipService } from '../../../../../server/services/omnichannel-voip/service';
 import { overwriteClassOnLicense } from '../../../license/server';
 import { calculateOnHoldTimeForRoom } from '../lib/calculateOnHoldTimeForRoom';
 
-await overwriteClassOnLicense('voip-enterprise', OmnichannelVoipService, {
-	async getRoomClosingData(
+overwriteClassOnLicense('voip-enterprise', OmnichannelVoipService, {
+	getRoomClosingData(
 		_originalFn: (
 			closer: ILivechatVisitor | ILivechatAgent,
 			room: IVoipRoom,
@@ -14,12 +14,12 @@ await overwriteClassOnLicense('voip-enterprise', OmnichannelVoipService, {
 			sysMessageId?: 'voip-call-wrapup' | 'voip-call-ended-unexpectedly',
 			options?: { comment?: string | null; tags?: string[] | null },
 		) => Promise<boolean>,
-		closeInfo: IVoipRoomClosingInfo,
+		closeInfo: IRoomClosingInfo,
 		closeSystemMsgData: IOmniRoomClosingMessage,
 		room: IVoipRoom,
 		sysMessageId: 'voip-call-wrapup' | 'voip-call-ended-unexpectedly',
 		options?: { comment?: string; tags?: string[] },
-	): Promise<{ closeInfo: IVoipRoomClosingInfo; closeSystemMsgData: IOmniRoomClosingMessage }> {
+	): { closeInfo: IRoomClosingInfo; closeSystemMsgData: IOmniRoomClosingMessage } {
 		const { comment, tags } = options || {};
 		if (comment) {
 			closeSystemMsgData.msg = comment;
@@ -33,7 +33,7 @@ await overwriteClassOnLicense('voip-enterprise', OmnichannelVoipService, {
 		}
 
 		const now = new Date();
-		const callTotalHoldTime = await calculateOnHoldTimeForRoom(room, now);
+		const callTotalHoldTime = Promise.await(calculateOnHoldTimeForRoom(room, now));
 		closeInfo.callTotalHoldTime = callTotalHoldTime;
 
 		return { closeInfo, closeSystemMsgData };

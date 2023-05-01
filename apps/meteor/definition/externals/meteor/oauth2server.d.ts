@@ -3,7 +3,7 @@ declare module 'meteor/rocketchat:oauth2-server' {
 	import type { HandleFunction } from 'connect';
 	import type { Request, Response } from 'express';
 
-	class OAuth2Server {
+	export class OAuth2Server {
 		constructor(opts: {
 			accessTokensCollectionName: string;
 			refreshTokensCollectionName: string;

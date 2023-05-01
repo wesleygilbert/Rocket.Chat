@@ -69,7 +69,7 @@ export class AppListenerBridge {
 	}
 
 	async messageEvent(inte, message, ...payload) {
-		const msg = await this.orch.getConverters().get('messages').convertMessage(message);
+		const msg = this.orch.getConverters().get('messages').convertMessage(message);
 
 		const params = (() => {
 			switch (inte) {
@@ -80,12 +80,12 @@ export class AppListenerBridge {
 						user: this.orch.getConverters().get('users').convertToApp(userDeleted),
 					};
 				case AppInterface.IPostMessageReacted:
-					const [userReacted, reaction, isReacted] = payload;
+					const [userReacted, reaction, isRemoved] = payload;
 					return {
 						message: msg,
 						user: this.orch.getConverters().get('users').convertToApp(userReacted),
 						reaction,
-						isReacted,
+						isRemoved,
 					};
 				case AppInterface.IPostMessageFollowed:
 					const [userFollowed, isUnfollow] = payload;
@@ -129,7 +129,7 @@ export class AppListenerBridge {
 	}
 
 	async roomEvent(inte, room, ...payload) {
-		const rm = await this.orch.getConverters().get('rooms').convertRoom(room);
+		const rm = this.orch.getConverters().get('rooms').convertRoom(room);
 
 		const params = (() => {
 			switch (inte) {
@@ -169,7 +169,7 @@ export class AppListenerBridge {
 					.getManager()
 					.getListenerManager()
 					.executeListener(inte, {
-						room: await this.orch.getConverters().get('rooms').convertRoom(data.room),
+						room: this.orch.getConverters().get('rooms').convertRoom(data.room),
 						agent: this.orch.getConverters().get('users').convertToApp(data.user),
 					});
 			case AppInterface.IPostLivechatRoomTransferred:
@@ -180,22 +180,19 @@ export class AppListenerBridge {
 					.getListenerManager()
 					.executeListener(inte, {
 						type: data.type,
-						room: await this.orch.getConverters().get('rooms').convertById(data.room),
-						from: await this.orch.getConverters().get(converter).convertById(data.from),
-						to: await this.orch.getConverters().get(converter).convertById(data.to),
+						room: this.orch.getConverters().get('rooms').convertById(data.room),
+						from: this.orch.getConverters().get(converter).convertById(data.from),
+						to: this.orch.getConverters().get(converter).convertById(data.to),
 					});
 			case AppInterface.IPostLivechatGuestSaved:
 				return this.orch
 					.getManager()
 					.getListenerManager()
-					.executeListener(inte, await this.orch.getConverters().get('visitors').convertById(data));
+					.executeListener(inte, this.orch.getConverters().get('visitors').convertById(data));
 			case AppInterface.IPostLivechatRoomSaved:
-				return this.orch
-					.getManager()
-					.getListenerManager()
-					.executeListener(inte, await this.orch.getConverters().get('rooms').convertById(data));
+				return this.orch.getManager().getListenerManager().executeListener(inte, this.orch.getConverters().get('rooms').convertById(data));
 			default:
-				const room = await this.orch.getConverters().get('rooms').convertRoom(data);
+				const room = this.orch.getConverters().get('rooms').convertRoom(data);
 
 				return this.orch.getManager().getListenerManager().executeListener(inte, room);
 		}

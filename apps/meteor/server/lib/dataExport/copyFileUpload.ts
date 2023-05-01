@@ -10,5 +10,5 @@ export const copyFileUpload = async (attachmentData: Pick<FileProp, '_id' | 'nam
 		return;
 	}
 
-	await FileUpload.copy(file, joinPath(assetsPath, `${attachmentData._id}-${attachmentData.name}`));
+	FileUpload.copy(file, joinPath(assetsPath, `${attachmentData._id}-${attachmentData.name}`));
 };

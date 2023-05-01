@@ -1,6 +1,6 @@
 import type { IOAuthApps, Serialized } from '@rocket.chat/core-typings';
 import { Button, ButtonGroup, TextInput, Field, Icon, TextAreaInput, ToggleSwitch, FieldGroup } from '@rocket.chat/fuselage';
-import { useSetModal, useToastMessageDispatch, useRoute, useAbsoluteUrl, useTranslation, useEndpoint } from '@rocket.chat/ui-contexts';
+import { useSetModal, useToastMessageDispatch, useRoute, useMethod, useAbsoluteUrl, useTranslation } from '@rocket.chat/ui-contexts';
 import type { ReactElement, ComponentProps } from 'react';
 import React, { useCallback, useMemo } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
@@ -9,13 +9,13 @@ import { useForm, Controller } from 'react-hook-form';
 import GenericModal from '../../../components/GenericModal';
 import VerticalBar from '../../../components/VerticalBar';
 
-type EditOAuthAddAppPayload = {
+export type EditOAuthAddAppPayload = {
 	name: string;
 	active: boolean;
 	redirectUri: string;
 };
 
-type EditOauthAppProps = {
+export type EditOauthAppProps = {
 	onChange: () => void;
 	data: Serialized<IOAuthApps>;
 } & Omit<ComponentProps<typeof VerticalBar.ScrollableContent>, 'data'>;
@@ -47,12 +47,12 @@ const EditOauthApp = ({ onChange, data, ...props }: EditOauthAppProps): ReactEle
 	const authUrl = useMemo(() => absoluteUrl('oauth/authorize'), [absoluteUrl]);
 	const tokenUrl = useMemo(() => absoluteUrl('oauth/token'), [absoluteUrl]);
 
-	const saveApp = useEndpoint('POST', '/v1/oauth-apps.update');
-	const deleteApp = useEndpoint('POST', '/v1/oauth-apps.delete');
+	const saveApp = useMethod('updateOAuthApp');
+	const deleteApp = useMethod('deleteOAuthApp');
 
 	const onSubmit: SubmitHandler<EditOAuthAddAppPayload> = async (newData: EditOAuthAddAppPayload) => {
 		try {
-			await saveApp({ ...newData, appId: data._id });
+			await saveApp(data._id, newData);
 			dispatchToastMessage({ type: 'success', message: t('Application_updated') });
 			onChange();
 		} catch (error) {
@@ -62,7 +62,7 @@ const EditOauthApp = ({ onChange, data, ...props }: EditOauthAppProps): ReactEle
 
 	const onDeleteConfirm = useCallback(async () => {
 		try {
-			await deleteApp({ appId: data._id });
+			await deleteApp(data._id);
 
 			const handleClose = (): void => {
 				setModal();
@@ -77,7 +77,7 @@ const EditOauthApp = ({ onChange, data, ...props }: EditOauthAppProps): ReactEle
 		} catch (error) {
 			dispatchToastMessage({ type: 'error', message: error });
 		}
-	}, [data._id, close, deleteApp, dispatchToastMessage, setModal, t]);
+	}, [close, data._id, deleteApp, dispatchToastMessage, setModal, t]);
 
 	const openConfirmDelete = (): void =>
 		setModal(() => (

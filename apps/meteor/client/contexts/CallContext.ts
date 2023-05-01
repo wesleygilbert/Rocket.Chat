@@ -8,7 +8,7 @@ import type { VoIPUser } from '../lib/voip/VoIPUser';
 
 export type CallContextValue = CallContextDisabled | CallContextReady | CallContextError | CallContextEnabled;
 
-type CallContextDisabled = {
+export type CallContextDisabled = {
 	enabled: false;
 	ready: false;
 	outBoundCallsAllowed: undefined;
@@ -45,8 +45,7 @@ type CallContextReady = {
 	register: () => void;
 	unregister: () => void;
 };
-
-type CallContextError = {
+export type CallContextError = {
 	enabled: true;
 	ready: false;
 	outBoundCallsAllowed: undefined;
@@ -55,9 +54,10 @@ type CallContextError = {
 	error: Error | unknown;
 };
 
-const isCallContextReady = (context: CallContextValue): context is CallContextReady => (context as CallContextReady).ready;
+export const isCallContextReady = (context: CallContextValue): context is CallContextReady => (context as CallContextReady).ready;
 
-const isCallContextError = (context: CallContextValue): context is CallContextError => (context as CallContextError).error !== undefined;
+export const isCallContextError = (context: CallContextValue): context is CallContextError =>
+	(context as CallContextError).error !== undefined;
 
 export type CallActionsType = {
 	mute: () => unknown;
@@ -94,6 +94,14 @@ export const useIsCallReady = (): boolean => {
 export const useIsCallError = (): boolean => {
 	const context = useContext(CallContext);
 	return Boolean(isCallContextError(context));
+};
+
+export const useCallContext = (): CallContextValue => {
+	const context = useContext(CallContext);
+	if (!isCallContextReady(context)) {
+		throw new Error('useCallContext only if Calls are enabled and ready');
+	}
+	return context;
 };
 
 export const useCallActions = (): CallActionsType => {
@@ -150,6 +158,16 @@ export const useCallOpenRoom = (): CallContextReady['openRoom'] => {
 	return context.openRoom;
 };
 
+export const useCallCloseRoom = (): CallContextReady['closeRoom'] => {
+	const context = useContext(CallContext);
+
+	if (!isCallContextReady(context)) {
+		throw new Error('useCallCloseRoom only if Calls are enabled and ready');
+	}
+
+	return context.closeRoom;
+};
+
 export const useCallClient = (): VoIPUser => {
 	const context = useContext(CallContext);
 
@@ -178,6 +196,16 @@ export const useQueueCounter = (): CallContextReady['queueCounter'] => {
 	}
 
 	return context.queueCounter;
+};
+
+export const useWrapUpModal = (): CallContextReady['openWrapUpModal'] => {
+	const context = useContext(CallContext);
+
+	if (!isCallContextReady(context)) {
+		throw new Error('useWrapUpModal only if Calls are enabled and ready');
+	}
+
+	return context.openWrapUpModal;
 };
 
 export const useOpenedRoomInfo = (): CallContextReady['openedRoomInfo'] => {

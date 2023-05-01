@@ -1,13 +1,12 @@
-import { Random } from '@rocket.chat/random';
+import { Random } from 'meteor/random';
 import type { ILivechatAgent, IVoipRoom } from '@rocket.chat/core-typings';
 import { isVoipRoomProps, isVoipRoomsProps, isVoipRoomCloseProps } from '@rocket.chat/rest-typings';
 import { VoipRoom, LivechatVisitors, Users } from '@rocket.chat/models';
 import { LivechatVoip } from '@rocket.chat/core-services';
 
 import { API } from '../../api';
-import { hasPermissionAsync } from '../../../../authorization/server/functions/hasPermission';
+import { hasPermission } from '../../../../authorization/server';
 import { typedJsonParse } from '../../../../../lib/typedJSONParse';
-import { getPaginationItems } from '../../helpers/getPaginationItems';
 
 type DateParam = { start?: string; end?: string };
 const parseDateParams = (date?: string): DateParam => {
@@ -160,16 +159,15 @@ API.v1.addRoute(
 	{ authRequired: true, validateParams: isVoipRoomsProps },
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
+			const { offset, count } = this.getPaginationItems();
 
-			const { sort, fields } = await this.parseJsonQuery();
-			const { agents, open, tags, queue, visitorId, direction, roomName } = this.queryParams;
-			const { createdAt: createdAtParam, closedAt: closedAtParam } = this.queryParams;
+			const { sort, fields } = this.parseJsonQuery();
+			const { agents, open, tags, queue, visitorId, direction, roomName } = this.requestParams();
+			const { createdAt: createdAtParam, closedAt: closedAtParam } = this.requestParams();
 
 			// Reusing same L room permissions for simplicity
-			const hasAdminAccess = await hasPermissionAsync(this.userId, 'view-livechat-rooms');
-			const hasAgentAccess =
-				(await hasPermissionAsync(this.userId, 'view-l-room')) && agents?.includes(this.userId) && agents?.length === 1;
+			const hasAdminAccess = hasPermission(this.userId, 'view-livechat-rooms');
+			const hasAgentAccess = hasPermission(this.userId, 'view-l-room') && agents?.includes(this.userId) && agents?.length === 1;
 			if (!hasAdminAccess && !hasAgentAccess) {
 				return API.v1.unauthorized();
 			}

@@ -15,12 +15,12 @@ interface IExtraDataForNotification {
 	message: IMessage;
 }
 
-await onLicense('teams-mention', async () => {
+onLicense('teams-mention', () => {
 	// Override spotlight with EE version
-	await overwriteClassOnLicense('teams-mention', Spotlight, SpotlightEnterprise);
-	await overwriteClassOnLicense('teams-mention', MentionQueries, MentionQueriesEnterprise);
+	overwriteClassOnLicense('teams-mention', Spotlight, SpotlightEnterprise);
+	overwriteClassOnLicense('teams-mention', MentionQueries, MentionQueriesEnterprise);
 
-	callbacks.add('beforeGetMentions', async (mentionIds: string[], extra?: IExtraDataForNotification) => {
+	callbacks.add('beforeGetMentions', (mentionIds: string[], extra?: IExtraDataForNotification) => {
 		const { otherMentions } = extra ?? {};
 
 		const teamIds = otherMentions?.filter(({ type }) => type === 'team').map(({ _id }) => _id);
@@ -29,7 +29,7 @@ await onLicense('teams-mention', async () => {
 			return mentionIds;
 		}
 
-		const members: ITeamMember[] = await Team.getMembersByTeamIds(teamIds, { projection: { userId: 1 } });
+		const members: ITeamMember[] = Promise.await(Team.getMembersByTeamIds(teamIds, { projection: { userId: 1 } }));
 		mentionIds.push(
 			...new Set(members.map(({ userId }: { userId: string }) => userId).filter((userId: string) => !mentionIds.includes(userId))),
 		);

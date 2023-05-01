@@ -1,5 +1,5 @@
 declare module 'meteor/ostrio:cookies' {
-	class Cookies {
+	export class Cookies {
 		constructor(opts?: {
 			TTL?: number | false;
 			auto?: boolean;

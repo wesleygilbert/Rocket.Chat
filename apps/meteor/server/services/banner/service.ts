@@ -42,7 +42,7 @@ export class BannerService extends ServiceClassInternal implements IBannerServic
 			throw new Error('error-creating-banner');
 		}
 
-		void api.broadcast('banner.new', banner._id);
+		api.broadcast('banner.new', banner._id);
 
 		return banner;
 	}
@@ -108,7 +108,7 @@ export class BannerService extends ServiceClassInternal implements IBannerServic
 		const result = await Banners.disable(bannerId);
 
 		if (result) {
-			void api.broadcast('banner.disabled', bannerId);
+			api.broadcast('banner.disabled', bannerId);
 			return true;
 		}
 		return false;
@@ -123,9 +123,9 @@ export class BannerService extends ServiceClassInternal implements IBannerServic
 
 		const { _id, ...banner } = result;
 
-		await Banners.updateOne({ _id }, { $set: { ...banner, ...doc, active: true } }); // reenable the banner
+		Banners.updateOne({ _id }, { $set: { ...banner, ...doc, active: true } }); // reenable the banner
 
-		void api.broadcast('banner.enabled', bannerId);
+		api.broadcast('banner.enabled', bannerId);
 		return true;
 	}
 }

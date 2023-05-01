@@ -1,8 +1,7 @@
-import { Users } from './fixtures/userStates';
-import { OmnichannelAgents } from './page-objects';
 import { test, expect } from './utils/test';
+import { OmnichannelAgents } from './page-objects';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 test.describe.serial('omnichannel-agents', () => {
 	let poOmnichannelAgents: OmnichannelAgents;
@@ -15,12 +14,12 @@ test.describe.serial('omnichannel-agents', () => {
 	});
 
 	test('expect add "user1" as agent', async ({ page }) => {
-		await poOmnichannelAgents.inputUsername.type('user1');
-		await page.locator('role=option[name="user1"]').click();
+		await poOmnichannelAgents.inputUsername.type('user1', { delay: 1000 });
+		await page.keyboard.press('Enter');
 		await poOmnichannelAgents.btnAdd.click();
 
 		await poOmnichannelAgents.inputSearch.fill('user1');
-		await expect(poOmnichannelAgents.firstRowInTable).toBeVisible();
+		expect(poOmnichannelAgents.firstRowInTable).toBeVisible();
 	});
 
 	test('expect update "user1" status', async ({ page }) => {
@@ -39,6 +38,6 @@ test.describe.serial('omnichannel-agents', () => {
 		await poOmnichannelAgents.btnModalRemove.click();
 
 		await poOmnichannelAgents.inputSearch.fill('user1');
-		await expect(poOmnichannelAgents.firstRowInTable).toBeHidden();
+		expect(poOmnichannelAgents.firstRowInTable).toBeHidden();
 	});
 });

@@ -1,15 +1,12 @@
 import type { IMessage } from '../IMessage';
 import type { RequiredField } from '../utils';
 
-export type SlashCommandCallbackParams<T> = {
-	command: T;
-	params: string;
-	message: RequiredField<Partial<IMessage>, 'rid'>;
-	userId: string;
-	triggerId?: string;
-};
-
-type SlashCommandCallback<T extends string = string> = (params: SlashCommandCallbackParams<T>) => Promise<unknown> | unknown;
+type SlashCommandCallback<T extends string = string> = (
+	command: T,
+	params: string,
+	message: RequiredField<Partial<IMessage>, 'rid'>,
+	triggerId?: string,
+) => void;
 
 export type SlashCommandPreviewItem = {
 	id: string;
@@ -22,18 +19,14 @@ export type SlashCommandPreviews = {
 	items: SlashCommandPreviewItem[];
 };
 
-type SlashCommandPreviewer = (
-	command: string,
-	params: string,
-	message: RequiredField<Partial<IMessage>, 'rid'>,
-) => Promise<SlashCommandPreviews | undefined>;
+type SlashCommandPreviewer = (command: string, params: string, message: IMessage) => SlashCommandPreviews | undefined;
 
 type SlashCommandPreviewCallback = (
 	command: string,
 	params: string,
-	message: RequiredField<Partial<IMessage>, 'rid'>,
+	message: IMessage,
 	preview: SlashCommandPreviewItem,
-	triggerId?: string,
+	triggerId: string,
 ) => void;
 
 export type SlashCommandOptions = {

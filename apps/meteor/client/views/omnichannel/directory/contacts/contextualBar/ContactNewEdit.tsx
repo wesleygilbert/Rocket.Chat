@@ -1,23 +1,23 @@
-import type { ILivechatVisitor, Serialized } from '@rocket.chat/core-typings';
+import type { ILivechatCustomField, ILivechatVisitor, Serialized } from '@rocket.chat/core-typings';
 import { Field, TextInput, ButtonGroup, Button } from '@rocket.chat/fuselage';
 import { useToastMessageDispatch, useEndpoint, useTranslation } from '@rocket.chat/ui-contexts';
+import { useQuery } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useController, useForm } from 'react-hook-form';
+import { debounce } from 'underscore';
 
 import { hasAtLeastOnePermission } from '../../../../../../app/authorization/client';
 import { validateEmail } from '../../../../../../lib/emailValidator';
-import { withDebouncing } from '../../../../../../lib/utils/highOrderFunctions';
-import { CustomFieldsForm } from '../../../../../components/CustomFieldsFormV2';
+import CustomFieldsForm from '../../../../../components/CustomFieldsForm';
 import VerticalBar from '../../../../../components/VerticalBar';
 import { createToken } from '../../../../../lib/utils/createToken';
 import { useFormsSubscription } from '../../../additionalForms';
-import { FormSkeleton } from '../../components/FormSkeleton';
-import { useCustomFieldsMetadata } from '../../hooks/useCustomFieldsMetadata';
+import { FormSkeleton } from '../../Skeleton';
 
 type ContactNewEditProps = {
 	id: string;
-	data?: { contact: Serialized<ILivechatVisitor> | null };
+	data: { contact: Serialized<ILivechatVisitor> | null };
 	close(): void;
 };
 
@@ -29,6 +29,17 @@ type ContactFormData = {
 	username: string;
 	customFields: Record<any, any>;
 };
+
+type CustomFieldsMetadata = Record<
+	string,
+	{
+		label: string;
+		type: 'select' | 'text';
+		required?: boolean;
+		defaultValue?: unknown;
+		options?: string[];
+	}
+>;
 
 const DEFAULT_VALUES = {
 	token: '',
@@ -56,9 +67,22 @@ const getInitialValues = (data: ContactNewEditProps['data']): ContactFormData =>
 	};
 };
 
-const ContactNewEdit = ({ id, data, close }: ContactNewEditProps): ReactElement => {
+const formatCustomFieldsMetadata = (customFields: Serialized<ILivechatCustomField>[]): CustomFieldsMetadata =>
+	customFields
+		.filter(({ visibility, scope }) => visibility === 'visible' && scope === 'visitor')
+		.reduce((obj, { _id, label, options, defaultValue, required }) => {
+			obj[_id] = {
+				label,
+				type: options ? 'select' : 'text',
+				required,
+				defaultValue,
+				options: options?.split(',').map((item) => item.trim()),
+			};
+			return obj;
+		}, {} as CustomFieldsMetadata);
+
+export const ContactNewEdit = ({ id, data, close }: ContactNewEditProps): ReactElement => {
 	const t = useTranslation();
-	const dispatchToastMessage = useToastMessageDispatch();
 
 	const canViewCustomFields = (): boolean =>
 		hasAtLeastOnePermission(['view-livechat-room-customfields', 'edit-livechat-room-customfields']);
@@ -68,13 +92,15 @@ const ContactNewEdit = ({ id, data, close }: ContactNewEditProps): ReactElement 
 	const ContactManager = useContactManager?.();
 
 	const [userId, setUserId] = useState('no-agent-selected');
+	const dispatchToastMessage = useToastMessageDispatch();
 	const saveContact = useEndpoint('POST', '/v1/omnichannel/contact');
 	const getContactBy = useEndpoint('GET', '/v1/omnichannel/contact.search');
 	const getUserData = useEndpoint('GET', '/v1/users.info');
+	const getCustomFields = useEndpoint('GET', '/v1/livechat/custom-fields');
 
-	const { data: customFieldsMetadata = [], isInitialLoading: isLoadingCustomFields } = useCustomFieldsMetadata({
-		scope: 'visitor',
-		enabled: canViewCustomFields(),
+	const { data: customFieldsMetadata = {}, isLoading: isLoadingCustomFields } = useQuery(['contact-json-custom-fields'], async () => {
+		const rawFields = await getCustomFields();
+		return formatCustomFieldsMetadata(rawFields?.customFields);
 	});
 
 	const initialValue = getInitialValues(data);
@@ -85,6 +111,7 @@ const ContactNewEdit = ({ id, data, close }: ContactNewEditProps): ReactElement 
 		formState: { errors, isValid: isFormValid, isDirty },
 		control,
 		setValue,
+		getValues,
 		handleSubmit,
 		trigger,
 	} = useForm<ContactFormData>({
@@ -93,7 +120,15 @@ const ContactNewEdit = ({ id, data, close }: ContactNewEditProps): ReactElement 
 		defaultValues: initialValue,
 	});
 
-	const isValid = isDirty && isFormValid;
+	const {
+		field: { onChange: handleLivechatData, value: customFields },
+	} = useController({
+		name: 'customFields',
+		control,
+	});
+
+	const [customFieldsErrors, setCustomFieldsErrors] = useState([]);
+	const isValid = isDirty && isFormValid && customFieldsErrors.length === 0;
 
 	useEffect(() => {
 		if (!initialUsername) {
@@ -133,18 +168,18 @@ const ContactNewEdit = ({ id, data, close }: ContactNewEditProps): ReactElement 
 		setUserId(userId);
 
 		if (userId === 'no-agent-selected') {
-			setValue('username', '', { shouldDirty: true });
+			setValue('username', '');
 			return;
 		}
 
 		const { user } = await getUserData({ userId });
-		setValue('username', user.username || '', { shouldDirty: true });
+		setValue('username', user.username || '');
 	};
 
-	const validate = (fieldName: keyof ContactFormData): (() => void) => withDebouncing({ wait: 500 })(() => trigger(fieldName));
+	const validate = (fieldName: keyof ContactFormData): (() => void) => debounce(() => trigger(fieldName), 500);
 
-	const handleSave = async (data: ContactFormData): Promise<void> => {
-		const { name, phone, email, customFields, username, token } = data;
+	const handleSave = async (): Promise<void> => {
+		const { name, phone, email, customFields, username, token } = getValues();
 
 		const payload = {
 			name,
@@ -171,7 +206,7 @@ const ContactNewEdit = ({ id, data, close }: ContactNewEditProps): ReactElement 
 
 	return (
 		<>
-			<VerticalBar.ScrollableContent is='form' onSubmit={handleSubmit(handleSave)}>
+			<VerticalBar.ScrollableContent is='form'>
 				<Field>
 					<Field.Label>{t('Name')}*</Field.Label>
 					<Field.Row>
@@ -201,7 +236,14 @@ const ContactNewEdit = ({ id, data, close }: ContactNewEditProps): ReactElement 
 					</Field.Row>
 					<Field.Error>{errors.phone?.message}</Field.Error>
 				</Field>
-				{canViewCustomFields() && <CustomFieldsForm formName='customFields' formControl={control} metadata={customFieldsMetadata} />}
+				{canViewCustomFields() && customFields && (
+					<CustomFieldsForm
+						jsonCustomFields={customFieldsMetadata}
+						customFieldsData={customFields}
+						setCustomFieldsData={handleLivechatData}
+						setCustomFieldsError={setCustomFieldsErrors}
+					/>
+				)}
 				{ContactManager && <ContactManager value={userId} handler={handleContactManagerChange} />}
 			</VerticalBar.ScrollableContent>
 			<VerticalBar.Footer>

@@ -49,12 +49,11 @@ function EditSound({ close, onChange, data, ...props }: EditSoundProps): ReactEl
 			const soundData = createSoundData(sound, name, { previousName, previousSound, _id, extension: sound.extension });
 			const validation = validate(soundData, sound);
 			if (validation.length === 0) {
-				let soundId: string;
+				let soundId;
 				try {
 					soundId = await insertOrUpdateSound(soundData);
 				} catch (error) {
 					dispatchToastMessage({ type: 'error', message: error });
-					return;
 				}
 
 				soundData._id = soundId;
@@ -67,7 +66,7 @@ function EditSound({ close, onChange, data, ...props }: EditSoundProps): ReactEl
 					reader.readAsBinaryString(sound);
 					reader.onloadend = (): void => {
 						try {
-							uploadCustomSound(reader.result as string, sound.type, { ...soundData, _id: soundId });
+							uploadCustomSound(reader.result, sound.type, soundData);
 							return dispatchToastMessage({ type: 'success', message: t('File_uploaded') });
 						} catch (error) {
 							dispatchToastMessage({ type: 'error', message: error });

@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import React from 'react';
 
 import { useChat } from '../../../views/room/contexts/ChatContext';
+import { useBlockRendered } from '../hooks/useBlockRendered';
 
 type BroadcastMetricsProps = {
 	username: string;
@@ -13,6 +14,7 @@ type BroadcastMetricsProps = {
 
 const BroadcastMetrics = ({ username, message }: BroadcastMetricsProps): ReactElement => {
 	const t = useTranslation();
+	const { className, ref } = useBlockRendered<HTMLDivElement>();
 
 	const chat = useChat();
 
@@ -23,6 +25,7 @@ const BroadcastMetrics = ({ username, message }: BroadcastMetricsProps): ReactEl
 	return (
 		<MessageBlock>
 			<MessageMetrics>
+				<div className={className} ref={ref} />
 				<MessageMetricsReply data-username={username} data-mid={message._id} onClick={handleReplyButtonClick}>
 					{t('Reply')}
 				</MessageMetricsReply>

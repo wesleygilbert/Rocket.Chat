@@ -1,10 +1,10 @@
 import { Meteor } from 'meteor/meteor';
 import type { IMessage, IPushNotificationConfig, IRoom, IUser } from '@rocket.chat/core-typings';
-import { Users } from '@rocket.chat/models';
 
 import { Push } from '../../../push/server';
 import { settings } from '../../../settings/server';
 import { metrics } from '../../../metrics/server';
+import { Users } from '../../../models/server';
 import { RocketChatAssets } from '../../../assets/server';
 import { replaceMentionedUsernamesWithFullNames, parseMessageTextPerUser } from '../../../lib/server/functions/notifications';
 import { callbacks } from '../../../../lib/callbacks';
@@ -42,7 +42,7 @@ function hash(str: string): number {
 	return hash;
 }
 
-class PushNotification {
+export class PushNotification {
 	getNotificationId(roomId: string): number {
 		const serverId = settings.get('uniqueID');
 		return hash(`${serverId}|${roomId}`); // hash
@@ -95,7 +95,7 @@ class PushNotification {
 		return config;
 	}
 
-	async send({ rid, uid, mid, roomName, username, message, payload, badge = 1, category }: PushNotificationData): Promise<void> {
+	send({ rid, uid, mid, roomName, username, message, payload, badge = 1, category }: PushNotificationData): void {
 		const idOnly = settings.get<boolean>('Push_request_content_from_server');
 		const config = this.getNotificationConfig({
 			rid,
@@ -111,7 +111,7 @@ class PushNotification {
 		});
 
 		metrics.notificationsSent.inc({ notification_type: 'mobile' });
-		await Push.send(config);
+		Push.send(config);
 	}
 
 	async getNotificationForMessageId({
@@ -123,16 +123,16 @@ class PushNotification {
 		message: IMessage;
 		room: IRoom;
 	}): Promise<NotificationPayload> {
-		const sender = await Users.findOneById(message.u._id, { projection: { username: 1, name: 1 } });
+		const sender = Users.findOne(message.u._id, { fields: { username: 1, name: 1 } });
 		if (!sender) {
 			throw new Error('Message sender not found');
 		}
 
-		let notificationMessage = await callbacks.run('beforeSendMessageNotifications', message.msg);
+		let notificationMessage = callbacks.run('beforeSendMessageNotifications', message.msg);
 		if (message.mentions && Object.keys(message.mentions).length > 0 && settings.get('UI_Use_Real_Name')) {
 			notificationMessage = replaceMentionedUsernamesWithFullNames(message.msg, message.mentions);
 		}
-		notificationMessage = await parseMessageTextPerUser(notificationMessage, message, receiver);
+		notificationMessage = parseMessageTextPerUser(notificationMessage, message, receiver);
 
 		const pushData = await getPushData({
 			room,

@@ -47,9 +47,6 @@ to: ee/apps/<%= name %>/package.json
 	"main": "./dist/ee/apps/<%= name %>/src/service.js",
 	"files": [
 		"/dist"
-	],
-	"volta": {
-		"node": "14.19.3"
-	}
+	]
 }
 

@@ -1,9 +1,9 @@
 import './models/startup';
-import './settings/index';
 import '../ee/server/models/startup';
 import './services/startup';
 import '../app/settings/server';
-import '../lib/oauthRedirectUriServer';
+import '../lib/oauthRedirectUri';
+import './overrides/http';
 import './lib/logger/startup';
 import './importPackages';
 import '../imports/startup/server';
@@ -64,7 +64,7 @@ import './methods/sendForgotPasswordEmail';
 import './methods/setAvatarFromService';
 import './methods/setUserActiveStatus';
 import './methods/setUserPassword';
-import './methods/toggleFavorite';
+import './methods/toogleFavorite';
 import './methods/unmuteUserInRoom';
 import './methods/userPresence';
 import './methods/userSetUtcOffset';
@@ -79,5 +79,7 @@ import './routes/i18n';
 import './routes/timesync';
 import './routes/userDataDownload';
 import './stream/stdout';
+import './stream/streamBroadcast';
+import './settings/index';
 
 import './features/EmailInbox/index';

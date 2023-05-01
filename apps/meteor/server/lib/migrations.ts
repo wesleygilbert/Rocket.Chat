@@ -1,25 +1,34 @@
-import { Migrations } from '@rocket.chat/models';
-import type { IControl } from '@rocket.chat/core-typings';
+import { Meteor } from 'meteor/meteor';
+import { Mongo } from 'meteor/mongo';
 
 import { Info } from '../../app/utils/server';
 import { Logger } from './logger/Logger';
 import { showErrorBox } from './logger/showBox';
-import { sleep } from '../../lib/utils/sleep';
 
-type IMigration = {
+type IControl = {
+	_id?: string;
+	version: number;
+	locked: boolean;
+	buildAt?: string;
+	lockedAt?: string;
+};
+
+export type IMigration = {
 	name?: string;
 	version: number;
-	up: (migration: IMigration) => Promise<void> | void;
-	down?: (migration: IMigration) => Promise<void> | void;
+	up: (migration: IMigration) => void;
+	down?: (migration: IMigration) => void;
 };
 
 const log = new Logger('Migrations');
 
 const migrations = new Set<IMigration>();
 
+const collection = new Mongo.Collection('migrations');
+
 // sets the control record
-function setControl(control: Pick<IControl, 'version' | 'locked'>): Pick<IControl, 'version' | 'locked'> {
-	void Migrations.updateMany(
+function setControl(control: IControl): IControl {
+	collection.update(
 		{
 			_id: 'control',
 		},
@@ -38,10 +47,10 @@ function setControl(control: Pick<IControl, 'version' | 'locked'>): Pick<IContro
 }
 
 // gets the current control record, optionally creating it if non-existant
-export async function getControl(): Promise<IControl> {
-	const control = (await Migrations.findOne({
+export function getControl(): IControl {
+	const control = collection.findOne({
 		_id: 'control',
-	})) as IControl;
+	}) as IControl;
 
 	return (
 		control ||
@@ -53,7 +62,7 @@ export async function getControl(): Promise<IControl> {
 }
 
 // Returns true if lock was acquired.
-async function lock(): Promise<boolean> {
+function lock(): boolean {
 	const date = new Date();
 	const dateMinusInterval = new Date();
 	dateMinusInterval.setMinutes(dateMinusInterval.getMinutes() - 5);
@@ -64,35 +73,33 @@ async function lock(): Promise<boolean> {
 	// the unlocked control, and locking occurs in the same update's modifier.
 	// All other simultaneous callers will get false back from the update.
 	return (
-		(
-			await Migrations.updateMany(
-				{
-					_id: 'control',
-					$or: [
-						{
-							locked: false,
-						},
-						{
-							lockedAt: {
-								$lt: dateMinusInterval,
-							},
-						},
-						{
-							buildAt: {
-								$ne: build,
-							},
-						},
-					],
-				},
-				{
-					$set: {
-						locked: true,
-						lockedAt: date,
-						buildAt: build,
+		collection.update(
+			{
+				_id: 'control',
+				$or: [
+					{
+						locked: false,
 					},
+					{
+						lockedAt: {
+							$lt: dateMinusInterval,
+						},
+					},
+					{
+						buildAt: {
+							$ne: build,
+						},
+					},
+				],
+			},
+			{
+				$set: {
+					locked: true,
+					lockedAt: date,
+					buildAt: build,
 				},
-			)
-		).matchedCount === 1
+			},
+		) === 1
 	);
 }
 
@@ -141,22 +148,22 @@ function showError(version: number, control: IControl, e: any): void {
 }
 
 // run the actual migration
-async function migrate(direction: 'up' | 'down', migration: IMigration): Promise<void> {
+function migrate(direction: 'up' | 'down', migration: IMigration): void {
 	if (typeof migration[direction] !== 'function') {
 		throw new Error(`Cannot migrate ${direction} on version ${migration.version}`);
 	}
 
 	log.startup(`Running ${direction}() on version ${migration.version}${migration.name ? `(${migration.name})` : ''}`);
 
-	await migration[direction]?.(migration);
+	Promise.await(migration[direction]?.(migration));
 }
 
 const maxAttempts = 30;
 const retryInterval = 10;
 let currentAttempt = 0;
 
-export async function migrateDatabase(targetVersion: 'latest' | number, subcommands?: string[]): Promise<boolean> {
-	const control = await getControl();
+export function migrateDatabase(targetVersion: 'latest' | number, subcommands?: string[]): boolean {
+	const control = getControl();
 	const currentVersion = control.version;
 
 	const orderedMigrations = getOrderedMigrations();
@@ -180,17 +187,17 @@ export async function migrateDatabase(targetVersion: 'latest' | number, subcomma
 	// get latest version
 	// const { version } = orderedMigrations[orderedMigrations.length - 1];
 
-	if (!(await lock())) {
+	if (!lock()) {
 		const msg = `Not migrating, control is locked. Attempt ${currentAttempt}/${maxAttempts}`;
 		if (currentAttempt <= maxAttempts) {
 			log.warn(`${msg}. Trying again in ${retryInterval} seconds.`);
 
-			await sleep(retryInterval * 1000);
+			(Meteor as unknown as any)._sleepForMs(retryInterval * 1000);
 
 			currentAttempt++;
 			return migrateDatabase(targetVersion, subcommands);
 		}
-		const control = await getControl(); // Side effect: upserts control document.
+		const control = getControl(); // Side effect: upserts control document.
 		showErrorBox(
 			'ERROR! SERVER STOPPED',
 			[
@@ -220,7 +227,7 @@ export async function migrateDatabase(targetVersion: 'latest' | number, subcomma
 		}
 
 		try {
-			await migrate('up', migration);
+			migrate('up', migration);
 		} catch (e) {
 			showError(version, control, e);
 			log.error({ err: e });
@@ -250,30 +257,22 @@ export async function migrateDatabase(targetVersion: 'latest' | number, subcomma
 	log.startup(`Migrating from version ${orderedMigrations[startIdx].version} -> ${orderedMigrations[endIdx].version}`);
 
 	try {
-		const migrations = [];
 		if (currentVersion < version) {
 			for (let i = startIdx; i < endIdx; i++) {
-				migrations.push(async () => {
-					await migrate('up', orderedMigrations[i + 1]);
-					setControl({
-						locked: true,
-						version: orderedMigrations[i + 1].version,
-					});
+				migrate('up', orderedMigrations[i + 1]);
+				setControl({
+					locked: true,
+					version: orderedMigrations[i + 1].version,
 				});
 			}
 		} else {
 			for (let i = startIdx; i > endIdx; i--) {
-				migrations.push(async () => {
-					await migrate('down', orderedMigrations[i]);
-					setControl({
-						locked: true,
-						version: orderedMigrations[i - 1].version,
-					});
+				migrate('down', orderedMigrations[i]);
+				setControl({
+					locked: true,
+					version: orderedMigrations[i - 1].version,
 				});
 			}
-		}
-		for await (const migration of migrations) {
-			await migration();
 		}
 	} catch (e) {
 		showError(version, control, e);
@@ -293,8 +292,8 @@ export async function migrateDatabase(targetVersion: 'latest' | number, subcomma
 }
 
 export const onFreshInstall =
-	(await getControl()).version !== 0
-		? async (): Promise<void> => {
+	getControl().version !== 0
+		? (): void => {
 				/* noop */
 		  }
-		: (fn: () => unknown): unknown => fn();
+		: (fn: () => unknown): unknown => Promise.await(fn());

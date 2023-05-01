@@ -1,9 +1,11 @@
-import { Sidebar as FuselageSidebar } from '@rocket.chat/fuselage';
+import { Box } from '@rocket.chat/fuselage';
 import type { FC } from 'react';
 import React from 'react';
 
 const Sidebar: FC = ({ children, ...props }) => (
-	<FuselageSidebar {...props} role='navigation' display='flex' flexDirection='column' h='full' children={children} />
+	<Box display='flex' flexDirection='column' h='full' justifyContent='stretch' {...props} role='navigation'>
+		{children}
+	</Box>
 );
 
 export default Sidebar;

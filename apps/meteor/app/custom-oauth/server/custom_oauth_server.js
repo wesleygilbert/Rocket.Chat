@@ -2,13 +2,13 @@ import { Meteor } from 'meteor/meteor';
 import { Match, check } from 'meteor/check';
 import { Accounts } from 'meteor/accounts-base';
 import { OAuth } from 'meteor/oauth';
+import { HTTP } from 'meteor/http';
 import { ServiceConfiguration } from 'meteor/service-configuration';
 import _ from 'underscore';
-import { Users } from '@rocket.chat/models';
-import { serverFetch as fetch } from '@rocket.chat/server-fetch';
 
 import { normalizers, fromTemplate, renameInvalidProperties } from './transform_helpers';
-import { Logger } from '../../logger/server';
+import { Logger } from '../../logger';
+import { Users } from '../../models/server';
 import { isURL } from '../../../lib/utils/isURL';
 import { registerAccessTokenService } from '../../lib/server/oauth/oauth';
 import { callbacks } from '../../../lib/callbacks';
@@ -100,8 +100,8 @@ export class CustomOAuth {
 		}
 	}
 
-	async getAccessToken(query) {
-		const config = await ServiceConfiguration.configurations.findOneAsync({ service: this.name });
+	getAccessToken(query) {
+		const config = ServiceConfiguration.configurations.findOne({ service: this.name });
 		if (!config) {
 			throw new ServiceConfiguration.ConfigError();
 		}
@@ -123,38 +123,35 @@ export class CustomOAuth {
 
 		// Only send clientID / secret once on header or payload.
 		if (this.tokenSentVia === 'header') {
-			const b64 = Buffer.from(`${config.clientId}:${OAuth.openSecret(config.secret)}`).toString('base64');
-			allOptions.headers.Authorization = `Basic ${b64}`;
+			allOptions.auth = `${config.clientId}:${OAuth.openSecret(config.secret)}`;
 		} else {
 			allOptions.params.client_secret = OAuth.openSecret(config.secret);
 			allOptions.params.client_id = config.clientId;
 		}
 
 		try {
-			const request = await fetch(`${this.tokenPath}`, {
-				method: 'POST',
-				...allOptions,
-			});
-
-			try {
-				response = await request.json();
-			} catch (e) {
-				response = await request.text();
-			}
+			response = HTTP.post(this.tokenPath, allOptions);
 		} catch (err) {
 			const error = new Error(`Failed to complete OAuth handshake with ${this.name} at ${this.tokenPath}. ${err.message}`);
 			throw _.extend(error, { response: err.response });
 		}
 
-		if (response.error) {
-			// if the http response was a json object with an error attribute
-			throw new Error(`Failed to complete OAuth handshake with ${this.name} at ${this.tokenPath}. ${response.error}`);
+		let data;
+		if (response.data) {
+			data = response.data;
 		} else {
-			return response;
+			data = JSON.parse(response.content);
+		}
+
+		if (data.error) {
+			// if the http response was a json object with an error attribute
+			throw new Error(`Failed to complete OAuth handshake with ${this.name} at ${this.tokenPath}. ${data.error}`);
+		} else {
+			return data;
 		}
 	}
 
-	async getIdentity(accessToken) {
+	getIdentity(accessToken) {
 		const params = {};
 		const headers = {
 			'User-Agent': this.userAgent, // http://doc.gitlab.com/ce/api/users.html#Current-user
@@ -168,18 +165,22 @@ export class CustomOAuth {
 		}
 
 		try {
-			const request = await fetch(`${this.identityPath}`, { method: 'GET', headers, params });
-			let response;
+			const response = HTTP.get(this.identityPath, {
+				headers,
+				params,
+			});
 
-			try {
-				response = await request.json();
-			} catch (e) {
-				response = await request.text();
+			let data;
+
+			if (response.data) {
+				data = response.data;
+			} else {
+				data = JSON.parse(response.content);
 			}
 
-			logger.debug({ msg: 'Identity response', response });
+			logger.debug({ msg: 'Identity response', data });
 
-			return this.normalizeIdentity(response);
+			return this.normalizeIdentity(data);
 		} catch (err) {
 			const error = new Error(`Failed to fetch identity from ${this.name} at ${this.identityPath}. ${err.message}`);
 			throw _.extend(error, { response: err.response });
@@ -188,9 +189,9 @@ export class CustomOAuth {
 
 	registerService() {
 		const self = this;
-		OAuth.registerService(this.name, 2, null, async (query) => {
-			const response = await self.getAccessToken(query);
-			const identity = await self.getIdentity(response.access_token, query);
+		OAuth.registerService(this.name, 2, null, (query) => {
+			const response = self.getAccessToken(query);
+			const identity = self.getIdentity(response.access_token, query);
 
 			const serviceData = {
 				_OAuthCustom: true,
@@ -323,7 +324,7 @@ export class CustomOAuth {
 	}
 
 	addHookToProcessUser() {
-		BeforeUpdateOrCreateUserFromExternalService.push(async (serviceName, serviceData /* , options*/) => {
+		BeforeUpdateOrCreateUserFromExternalService.push((serviceName, serviceData /* , options*/) => {
 			if (serviceName !== this.name) {
 				return;
 			}
@@ -332,16 +333,16 @@ export class CustomOAuth {
 				let user = undefined;
 
 				if (this.keyField === 'username') {
-					user = await Users.findOneByUsernameAndServiceNameIgnoringCase(serviceData.username, serviceData._id, serviceName);
+					user = Users.findOneByUsernameAndServiceNameIgnoringCase(serviceData.username, serviceData._id, serviceName);
 				} else if (this.keyField === 'email') {
-					user = await Users.findOneByEmailAddressAndServiceNameIgnoringCase(serviceData.email, serviceData._id, serviceName);
+					user = Users.findOneByEmailAddressAndServiceNameIgnoringCase(serviceData.email, serviceData._id, serviceName);
 				}
 
 				if (!user) {
 					return;
 				}
 
-				await callbacks.run('afterProcessOAuthUser', { serviceName, serviceData, user });
+				callbacks.run('afterProcessOAuthUser', { serviceName, serviceData, user });
 
 				// User already created or merged and has identical name as before
 				if (
@@ -367,7 +368,7 @@ export class CustomOAuth {
 					},
 				};
 
-				await Users.update({ _id: user._id }, update);
+				Users.update({ _id: user._id }, update);
 			}
 		});
 
@@ -396,7 +397,7 @@ export class CustomOAuth {
 		const self = this;
 		const whitelisted = ['id', 'email', 'username', 'name', this.rolesClaim];
 
-		registerAccessTokenService(name, async function (options) {
+		registerAccessTokenService(name, function (options) {
 			check(
 				options,
 				Match.ObjectIncluding({
@@ -405,7 +406,7 @@ export class CustomOAuth {
 				}),
 			);
 
-			const identity = await self.getIdentity(options.accessToken);
+			const identity = self.getIdentity(options.accessToken);
 
 			const serviceData = {
 				accessToken: options.accessToken,
@@ -428,24 +429,20 @@ export class CustomOAuth {
 }
 
 const { updateOrCreateUserFromExternalService } = Accounts;
-const updateOrCreateUserFromExternalServiceAsync = async function (...args /* serviceName, serviceData, options*/) {
-	for await (const hook of BeforeUpdateOrCreateUserFromExternalService) {
-		await hook.apply(this, args);
+Accounts.updateOrCreateUserFromExternalService = function (...args /* serviceName, serviceData, options*/) {
+	for (const hook of BeforeUpdateOrCreateUserFromExternalService) {
+		hook.apply(this, args);
 	}
 
 	const [serviceName, serviceData] = args;
 
 	const user = updateOrCreateUserFromExternalService.apply(this, args);
 
-	await callbacks.run('afterValidateNewOAuthUser', {
+	callbacks.run('afterValidateNewOAuthUser', {
 		identity: serviceData,
 		serviceName,
-		user: await Users.findOneById(user.userId),
+		user: Users.findOneById(user.userId),
 	});
 
 	return user;
-};
-
-Accounts.updateOrCreateUserFromExternalService = function (...args /* serviceName, serviceData, options*/) {
-	return Promise.await(updateOrCreateUserFromExternalServiceAsync.call(this, ...args));
 };

@@ -1,13 +1,14 @@
-import { Roles, Users } from '@rocket.chat/models';
+import { Roles } from '@rocket.chat/models';
 
 import { onLicense } from '../../app/license/server';
 import type { ISAMLUser } from '../../../app/meteor-accounts-saml/server/definition/ISAMLUser';
 import { SAMLUtils } from '../../../app/meteor-accounts-saml/server/lib/Utils';
 import { settings } from '../../../app/settings/server';
 import { addSettings } from '../settings/saml';
+import { Users } from '../../../app/models/server';
 import { ensureArray } from '../../../lib/utils/arrayUtils';
 
-await onLicense('saml-enterprise', () => {
+onLicense('saml-enterprise', () => {
 	SAMLUtils.events.on('mapUser', async ({ profile, userObject }: { profile: Record<string, any>; userObject: ISAMLUser }) => {
 		const roleAttributeName = settings.get('SAML_Custom_Default_role_attribute_name') as string;
 		const roleAttributeSync = settings.get('SAML_Custom_Default_role_attribute_sync');
@@ -44,7 +45,7 @@ await onLicense('saml-enterprise', () => {
 		});
 	});
 
-	SAMLUtils.events.on('updateCustomFields', async (loginResult: Record<string, any>, updatedUser: { userId: string; token: string }) => {
+	SAMLUtils.events.on('updateCustomFields', (loginResult: Record<string, any>, updatedUser: { userId: string; token: string }) => {
 		const userDataCustomFieldMap = settings.get('SAML_Custom_Default_user_data_custom_fieldmap') as string;
 		const customMap: Record<string, any> = JSON.parse(userDataCustomFieldMap);
 
@@ -62,9 +63,9 @@ await onLicense('saml-enterprise', () => {
 			customFieldsList[customAttribute] = value;
 		}
 
-		await Users.updateCustomFieldsById(updatedUser.userId, customFieldsList);
+		Users.updateCustomFieldsById(updatedUser.userId, customFieldsList);
 	});
 });
 
 // For setting creation we add the listener first because the event is emmited during startup
-SAMLUtils.events.on('addSettings', (name: string): void | Promise<void> => onLicense('saml-enterprise', () => addSettings(name)));
+SAMLUtils.events.on('addSettings', (name: string): void => onLicense('saml-enterprise', () => addSettings(name)));

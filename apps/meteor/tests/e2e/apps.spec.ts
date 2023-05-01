@@ -1,8 +1,7 @@
-import { Users } from './fixtures/userStates';
-import { HomeChannel } from './page-objects';
 import { expect, test } from './utils/test';
+import { HomeChannel } from './page-objects';
 
-test.use({ storageState: Users.user1.state });
+test.use({ storageState: 'user1-session.json' });
 
 test.describe.serial('Apps', () => {
 	let poHomeChannel: HomeChannel;

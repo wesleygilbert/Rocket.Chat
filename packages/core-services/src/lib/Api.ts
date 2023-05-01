@@ -27,13 +27,13 @@ export class Api implements IApiService {
 		this.services.delete(instance);
 	}
 
-	registerService(instance: IServiceClass, serviceDependencies?: string[]): void {
+	registerService(instance: IServiceClass): void {
 		this.services.add(instance);
 
 		instance.setApi(this);
 
 		if (this.broker) {
-			this.broker.createService(instance, serviceDependencies);
+			this.broker.createService(instance);
 		}
 	}
 

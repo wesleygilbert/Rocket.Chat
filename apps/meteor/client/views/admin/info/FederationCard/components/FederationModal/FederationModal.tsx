@@ -63,23 +63,19 @@ export const FederationModal: FC<{ onClose: () => void }> = ({ onClose, ...props
 	});
 
 	// Wizard
-	const nextStep = useCallback(
-		(e) => {
-			e.preventDefault();
-			if (currentStep === 1 && hasUnsavedChanges) {
-				setFederationDomain(domain);
-				setFederationDiscoveryMethod(discoveryMethod);
-				commit();
-			}
+	const nextStep = useCallback(() => {
+		if (currentStep === 1 && hasUnsavedChanges) {
+			setFederationDomain(domain);
+			setFederationDiscoveryMethod(discoveryMethod);
+			commit();
+		}
 
-			if (currentStep === 3) {
-				onClose();
-			} else {
-				setCurrentStep(currentStep + 1);
-			}
-		},
-		[currentStep, hasUnsavedChanges, domain, discoveryMethod, commit, onClose, setFederationDomain, setFederationDiscoveryMethod],
-	);
+		if (currentStep === 3) {
+			onClose();
+		} else {
+			setCurrentStep(currentStep + 1);
+		}
+	}, [currentStep, hasUnsavedChanges, domain, discoveryMethod, commit, onClose, setFederationDomain, setFederationDiscoveryMethod]);
 
 	const previousStep = useCallback(() => {
 		if (currentStep === 1) {
@@ -105,7 +101,7 @@ export const FederationModal: FC<{ onClose: () => void }> = ({ onClose, ...props
 	};
 
 	return (
-		<Modal wrapperFunction={(props) => <Box is='form' onSubmit={nextStep} {...props} />} {...props}>
+		<Modal {...props}>
 			{currentStep === 1 && (
 				<>
 					<Modal.Header>
@@ -202,7 +198,7 @@ export const FederationModal: FC<{ onClose: () => void }> = ({ onClose, ...props
 				)}
 				<Modal.FooterControllers>
 					<Button onClick={previousStep}>{currentStep === 1 ? t('Cancel') : t('Back')}</Button>
-					<Button primary type='submit'>
+					<Button primary onClick={nextStep}>
 						{currentStep === 3 ? t('Finish') : t('Next')}
 					</Button>
 				</Modal.FooterControllers>

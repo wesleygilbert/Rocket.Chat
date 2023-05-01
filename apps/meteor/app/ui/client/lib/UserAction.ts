@@ -9,7 +9,7 @@ import { Notifications } from '../../../notifications/client';
 const TIMEOUT = 15000;
 const RENEW = TIMEOUT / 3;
 
-const USER_ACTIVITY = 'user-activity';
+export const USER_ACTIVITY = 'user-activity';
 
 export const USER_ACTIVITIES = {
 	USER_RECORDING: 'user-recording',
@@ -17,6 +17,8 @@ export const USER_ACTIVITIES = {
 	USER_UPLOADING: 'user-uploading',
 	USER_PLAYING: 'user-playing',
 };
+
+export type USER_ACTIVITIES_TYPES = 'user-recording' | 'user-typing' | 'user-uploading' | 'user-playing';
 
 const activityTimeouts = new Map();
 const activityRenews = new Map();
@@ -36,9 +38,9 @@ const shownName = function (user: IUser | null | undefined): string | undefined 
 	return user.username;
 };
 
-const emitActivities = debounce(async (rid: string, extras: IExtras): Promise<void> => {
+const emitActivities = debounce((rid: string, extras: IExtras): void => {
 	const activities = roomActivities.get(extras?.tmid || rid) || new Set();
-	Notifications.notifyRoom(rid, USER_ACTIVITY, shownName(Meteor.user() as unknown as IUser), [...activities], extras);
+	Notifications.notifyRoom(rid, USER_ACTIVITY, shownName(Meteor.user() as IUser), [...activities], extras);
 }, 500);
 
 function handleStreamAction(rid: string, username: string, activityTypes: string[], extras?: IExtras): void {
@@ -119,7 +121,7 @@ export const UserAction = new (class {
 		activities.add(activityType);
 		roomActivities.set(trid, activities);
 
-		void emitActivities(rid, extras);
+		emitActivities(rid, extras);
 
 		if (activityTimeouts.get(key)) {
 			clearTimeout(activityTimeouts.get(key));
@@ -153,7 +155,7 @@ export const UserAction = new (class {
 		const activities = roomActivities.get(trid) || new Set();
 		activities.delete(activityType);
 		roomActivities.set(trid, activities);
-		void emitActivities(rid, extras);
+		emitActivities(rid, extras);
 	}
 
 	cancel(rid: string): void {

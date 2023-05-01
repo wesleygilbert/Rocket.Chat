@@ -1,13 +1,13 @@
 import type Mail from 'nodemailer/lib/mailer';
 import { Match } from 'meteor/check';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
-import { isIMessageInbox } from '@rocket.chat/core-typings';
-import type { IEmailInbox, IUser, IMessage, IOmnichannelRoom, SlashCommandCallbackParams } from '@rocket.chat/core-typings';
-import { Messages, Uploads, LivechatRooms, Rooms, Users } from '@rocket.chat/models';
+import type { IEmailInbox, IUser, IMessage } from '@rocket.chat/core-typings';
+import { Uploads } from '@rocket.chat/models';
 
 import { callbacks } from '../../../lib/callbacks';
 import { FileUpload } from '../../../app/file-upload/server';
 import { slashCommands } from '../../../app/utils/server';
+import { Messages, Rooms, Users, LivechatRooms } from '../../../app/models/server';
 import type { Inbox } from './EmailInbox';
 import { inboxes } from './EmailInbox';
 import { sendMessage } from '../../../app/lib/server/functions/sendMessage';
@@ -16,13 +16,13 @@ import { logger } from './logger';
 
 const livechatQuoteRegExp = /^\[\s\]\(https?:\/\/.+\/live\/.+\?msg=(?<id>.+?)\)\s(?<text>.+)/s;
 
-const getRocketCatUser = async (): Promise<IUser | null> => Users.findOneById('rocket.cat');
+const user: IUser = Users.findOneById('rocket.cat');
 
 const language = settings.get<string>('Language') || 'en';
 const t = (s: string): string => TAPi18n.__(s, { lng: language });
 
 // TODO: change these messages with room notifications
-const sendErrorReplyMessage = async (error: string, options: any) => {
+const sendErrorReplyMessage = (error: string, options: any): void => {
 	if (!options?.rid || !options?.msgId) {
 		return;
 	}
@@ -35,15 +35,10 @@ const sendErrorReplyMessage = async (error: string, options: any) => {
 		ts: new Date(),
 	};
 
-	const user = await getRocketCatUser();
-	if (!user) {
-		return;
-	}
-
-	return sendMessage(user, message, { _id: options.rid });
+	sendMessage(user, message, { _id: options.rid });
 };
 
-const sendSuccessReplyMessage = async (options: any) => {
+const sendSuccessReplyMessage = (options: any): void => {
 	if (!options?.rid || !options?.msgId) {
 		return;
 	}
@@ -55,12 +50,7 @@ const sendSuccessReplyMessage = async (options: any) => {
 		ts: new Date(),
 	};
 
-	const user = await getRocketCatUser();
-	if (!user) {
-		return;
-	}
-
-	return sendMessage(user, message, { _id: options.rid });
+	sendMessage(user, message, { _id: options.rid });
 };
 
 async function sendEmail(inbox: Inbox, mail: Mail.Options, options?: any): Promise<{ messageId: string }> {
@@ -78,35 +68,32 @@ async function sendEmail(inbox: Inbox, mail: Mail.Options, options?: any): Promi
 			logger.info('Message sent: %s', info.messageId);
 			return info;
 		})
-		.catch(async (err) => {
+		.catch((err) => {
 			logger.error({ msg: 'Error sending Email reply', err });
 
 			if (!options?.msgId) {
 				return;
 			}
 
-			await sendErrorReplyMessage(err.message, options);
+			sendErrorReplyMessage(err.message, options);
 		});
 }
 
 slashCommands.add({
 	command: 'sendEmailAttachment',
-	callback: async ({ command, params }: SlashCommandCallbackParams<'sendEmailAttachment'>) => {
+	callback: (command: any, params: string) => {
 		logger.debug('sendEmailAttachment command: ', command, params);
 		if (command !== 'sendEmailAttachment' || !Match.test(params, String)) {
 			return;
 		}
 
-		const message = await Messages.findOneById(params.trim());
-		if (!message?.file) {
+		const message = Messages.findOneById(params.trim());
+
+		if (!message || !message.file) {
 			return;
 		}
 
-		const room = await Rooms.findOneById<IOmnichannelRoom>(message.rid);
-
-		if (!room?.email) {
-			return;
-		}
+		const room = Rooms.findOneById(message.rid);
 
 		const inbox = inboxes.get(room.email.inbox);
 
@@ -118,39 +105,40 @@ slashCommands.add({
 			});
 		}
 
-		const file = await Uploads.findOneById(message.file._id);
+		const file = Promise.await(Uploads.findOneById(message.file._id));
 
 		if (!file) {
 			return;
 		}
 
-		const buffer = await FileUpload.getBuffer(file);
-		if (buffer) {
-			void sendEmail(
-				inbox,
-				{
-					to: room.email?.replyTo,
-					subject: room.email?.subject,
-					text: message?.attachments?.[0].description || '',
-					attachments: [
-						{
-							content: buffer,
-							contentType: file.type,
-							filename: file.name,
-						},
-					],
-					inReplyTo: Array.isArray(room.email?.thread) ? room.email?.thread[0] : room.email?.thread,
-					references: ([] as string[]).concat(room.email?.thread || []),
-				},
-				{
-					msgId: message._id,
-					sender: message.u.username,
-					rid: message.rid,
-				},
-			).then((info) => LivechatRooms.updateEmailThreadByRoomId(room._id, info.messageId));
-		}
+		FileUpload.getBuffer(file, (_err?: Error, buffer?: Buffer) => {
+			!_err &&
+				buffer &&
+				sendEmail(
+					inbox,
+					{
+						to: room.email.replyTo,
+						subject: room.email.subject,
+						text: message.attachments[0].description || '',
+						attachments: [
+							{
+								content: buffer,
+								contentType: file.type,
+								filename: file.name,
+							},
+						],
+						inReplyTo: room.email.thread,
+						references: [room.email.thread],
+					},
+					{
+						msgId: message._id,
+						sender: message.u.username,
+						rid: message.rid,
+					},
+				).then((info) => LivechatRooms.updateEmailThreadByRoomId(room._id, info.messageId));
+		});
 
-		await Messages.updateOne(
+		Messages.update(
 			{ _id: message._id },
 			{
 				$set: {
@@ -187,18 +175,13 @@ slashCommands.add({
 
 callbacks.add(
 	'afterSaveMessage',
-	async function (message: IMessage, room: any) {
+	function (message: IMessage, room: any) {
 		if (!room?.email?.inbox) {
 			return message;
 		}
 
-		const user = await getRocketCatUser();
-		if (!user) {
-			return message;
-		}
-
 		if (message.files?.length && message.u.username !== 'rocket.cat') {
-			await sendMessage(
+			sendMessage(
 				user,
 				{
 					msg: '',
@@ -233,7 +216,7 @@ callbacks.add(
 		const inbox = inboxes.get(room.email.inbox);
 
 		if (!inbox) {
-			await sendErrorReplyMessage(`Email inbox ${room.email.inbox} not found or disabled.`, {
+			sendErrorReplyMessage(`Email inbox ${room.email.inbox} not found or disabled.`, {
 				msgId: message._id,
 				sender: message.u.username,
 				rid: room._id,
@@ -246,12 +229,13 @@ callbacks.add(
 			return message;
 		}
 
-		const replyToMessage = await Messages.findOneById(match.groups.id);
-		if (!replyToMessage || !isIMessageInbox(replyToMessage) || !replyToMessage.email?.messageId) {
+		const replyToMessage = Messages.findOneById(match.groups.id);
+
+		if (!replyToMessage?.email?.messageId) {
 			return message;
 		}
 
-		void sendEmail(
+		sendEmail(
 			inbox,
 			{
 				text: match.groups.text,
@@ -319,7 +303,7 @@ export async function sendTestEmailToInbox(emailInboxRecord: IEmailInbox, user: 
 	}
 
 	logger.info(`Sending testing email to ${address}`);
-	void sendEmail(inbox, {
+	sendEmail(inbox, {
 		to: address,
 		subject: 'Test of inbox configuration',
 		text: 'Test of inbox configuration successful',

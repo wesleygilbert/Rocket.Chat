@@ -1,12 +1,12 @@
-import { Random } from '@rocket.chat/random';
+import { Random } from 'meteor/random';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import { Accounts } from 'meteor/accounts-base';
 import bcrypt from 'bcrypt';
 import type { IUser } from '@rocket.chat/core-typings';
-import { Users } from '@rocket.chat/models';
 
 import { settings } from '../../../settings/server';
-import * as Mailer from '../../../mailer/server/api';
+import * as Mailer from '../../../mailer';
+import { Users } from '../../../models/server';
 import type { ICodeCheck, IProcessInvalidCodeResult } from './ICodeCheck';
 
 export class EmailCheck implements ICodeCheck {
@@ -31,12 +31,12 @@ export class EmailCheck implements ICodeCheck {
 		return this.getUserVerifiedEmails(user).length > 0;
 	}
 
-	private async send2FAEmail(address: string, random: string, user: IUser): Promise<void> {
+	private send2FAEmail(address: string, random: string, user: IUser): void {
 		const language = user.language || settings.get('Language') || 'en';
 
 		const t = (s: string): string => TAPi18n.__(s, { lng: language });
 
-		await Mailer.send({
+		Mailer.send({
 			to: address,
 			from: settings.get('From_Email'),
 			subject: 'Authentication code',
@@ -64,7 +64,7 @@ ${t('If_you_didnt_try_to_login_in_your_account_please_ignore_this_email')}
 		});
 	}
 
-	public async verify(user: IUser, codeFromEmail: string): Promise<boolean> {
+	public verify(user: IUser, codeFromEmail: string): boolean {
 		if (!this.isEnabled(user)) {
 			return false;
 		}
@@ -76,40 +76,42 @@ ${t('If_you_didnt_try_to_login_in_your_account_please_ignore_this_email')}
 		// Remove non digits
 		codeFromEmail = codeFromEmail.replace(/([^\d])/g, '');
 
-		await Users.removeExpiredEmailCodesOfUserId(user._id);
+		Users.removeExpiredEmailCodesOfUserId(user._id);
 
-		for await (const { code, expire } of user.services.emailCode) {
+		const valid = user.services.emailCode.find(({ code, expire }) => {
 			if (expire < new Date()) {
-				continue;
+				return false;
 			}
 
-			if (await bcrypt.compare(codeFromEmail, code)) {
-				await Users.removeEmailCodeByUserIdAndCode(user._id, code);
+			if (bcrypt.compareSync(codeFromEmail, code)) {
+				Users.removeEmailCodeByUserIdAndCode(user._id, code);
 				return true;
 			}
-		}
 
-		return false;
+			return false;
+		});
+
+		return !!valid;
 	}
 
-	public async sendEmailCode(user: IUser): Promise<void> {
+	public sendEmailCode(user: IUser): void {
 		const emails = this.getUserVerifiedEmails(user);
 		const random = Random._randomString(6, '0123456789');
-		const encryptedRandom = await bcrypt.hash(random, Accounts._bcryptRounds());
+		const encryptedRandom = bcrypt.hashSync(random, Accounts._bcryptRounds());
 		const expire = new Date();
 		const expirationInSeconds = parseInt(settings.get('Accounts_TwoFactorAuthentication_By_Email_Code_Expiration') as string, 10);
 
 		expire.setSeconds(expire.getSeconds() + expirationInSeconds);
 
-		await Users.addEmailCodeByUserId(user._id, encryptedRandom, expire);
+		Users.addEmailCodeByUserId(user._id, encryptedRandom, expire);
 
-		for await (const address of emails) {
-			await this.send2FAEmail(address, random, user);
+		for (const address of emails) {
+			this.send2FAEmail(address, random, user);
 		}
 	}
 
-	public async processInvalidCode(user: IUser): Promise<IProcessInvalidCodeResult> {
-		await Users.removeExpiredEmailCodesOfUserId(user._id);
+	public processInvalidCode(user: IUser): IProcessInvalidCodeResult {
+		Users.removeExpiredEmailCodesOfUserId(user._id);
 
 		// Generate new code if the there isn't any code with more than 5 minutes to expire
 		const expireWithDelta = new Date();
@@ -129,7 +131,7 @@ ${t('If_you_didnt_try_to_login_in_your_account_please_ignore_this_email')}
 			};
 		}
 
-		await this.sendEmailCode(user);
+		this.sendEmailCode(user);
 
 		return {
 			codeGenerated: true,

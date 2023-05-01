@@ -1,6 +1,5 @@
-import type { IServerInfo, IStats, Serialized } from '@rocket.chat/core-typings';
+import type { IInstanceStatus, IServerInfo, IStats } from '@rocket.chat/core-typings';
 import { Box, Button, ButtonGroup, Callout, Grid, Icon } from '@rocket.chat/fuselage';
-import type { IInstance } from '@rocket.chat/rest-typings';
 import { useTranslation } from '@rocket.chat/ui-contexts';
 import React, { memo } from 'react';
 
@@ -16,7 +15,7 @@ type InformationPageProps = {
 	canViewStatistics: boolean;
 	info: IServerInfo;
 	statistics: IStats;
-	instances: Serialized<IInstance[]>;
+	instances: Array<IInstanceStatus>;
 	onClickRefreshButton: () => void;
 	onClickDownloadInfo: () => void;
 };

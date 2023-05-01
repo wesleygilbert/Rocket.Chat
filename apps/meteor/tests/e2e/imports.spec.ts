@@ -3,11 +3,10 @@ import * as path from 'path';
 
 import { parse } from 'csv-parse';
 
-import { Users } from './fixtures/userStates';
-import { Admin } from './page-objects';
 import { test, expect } from './utils/test';
+import { Admin } from './page-objects';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 const rowUserName: string[] = [];
 const slackCsvDir = path.resolve(__dirname, 'fixtures', 'files', 'slack_export_users.csv');
@@ -30,20 +29,20 @@ test.describe.serial('imports', () => {
 		await page.goto('/admin/import');
 
 		await poAdmin.btnImportNewFile.click();
-
 		await (await poAdmin.getOptionFileType("Slack's Users CSV")).click();
-
 		await poAdmin.inputFile.setInputFiles(slackCsvDir);
+
 		await poAdmin.btnImport.click();
+		await poAdmin.btnStartImport.waitFor({ state: 'visible' });
 
 		await poAdmin.btnStartImport.click();
 
-		await expect(poAdmin.importStatusTableFirstRowCell).toBeVisible({
-			timeout: 30_000,
-		});
+		await page.locator('[data-qa-id="ImportTable"]').waitFor({ state: 'visible' });
+
+		await expect(poAdmin.importStatusTableFirstRowCell).toBeVisible();
 	});
 
-	test('expect to all users imported are actually listed as users', async ({ page }) => {
+	test('expect all users is added is visible', async ({ page }) => {
 		await page.goto('/admin/users');
 
 		for (const user of rowUserName) {

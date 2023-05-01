@@ -1,12 +1,13 @@
 import type { AtLeast, ValueOf } from '@rocket.chat/core-typings';
-import { LivechatVisitors, LivechatRooms } from '@rocket.chat/models';
+import { LivechatVisitors } from '@rocket.chat/models';
 
+import { LivechatRooms } from '../../../../app/models/server';
 import { RoomSettingsEnum, RoomMemberActions } from '../../../../definition/IRoomTypeConfig';
 import type { IRoomTypeServerDirectives } from '../../../../definition/IRoomTypeConfig';
 import { getLivechatRoomType } from '../../../../lib/rooms/roomTypes/livechat';
 import { roomCoordinator } from '../roomCoordinator';
 
-const LivechatRoomType = getLivechatRoomType(roomCoordinator);
+export const LivechatRoomType = getLivechatRoomType(roomCoordinator);
 
 roomCoordinator.add(LivechatRoomType, {
 	allowRoomSettingChange(_room, setting) {
@@ -18,28 +19,27 @@ roomCoordinator.add(LivechatRoomType, {
 		}
 	},
 
-	async allowMemberAction(_room, action) {
+	allowMemberAction(_room, action) {
 		return ([RoomMemberActions.INVITE, RoomMemberActions.JOIN] as Array<ValueOf<typeof RoomMemberActions>>).includes(action);
 	},
 
-	async roomName(room, _userId?) {
+	roomName(room, _userId?) {
 		return room.name || room.fname || (room as any).label;
 	},
 
-	async canAccessUploadedFile({ rc_token: token, rc_rid: rid }) {
-		return token && rid && !!(await LivechatRooms.findOneOpenByRoomIdAndVisitorToken(rid, token));
+	canAccessUploadedFile({ rc_token: token, rc_rid: rid }) {
+		return token && rid && LivechatRooms.findOneOpenByRoomIdAndVisitorToken(rid, token);
 	},
 
-	async getNotificationDetails(room, _sender, notificationMessage, userId) {
-		const roomName = await this.roomName(room, userId);
-		const title = `[Omnichannel] ${roomName}`;
+	getNotificationDetails(room, _sender, notificationMessage, userId) {
+		const title = `[Omnichannel] ${this.roomName(room, userId)}`;
 		const text = notificationMessage;
 
 		return { title, text };
 	},
 
-	async getMsgSender(senderId) {
-		return LivechatVisitors.findOneById(senderId);
+	getMsgSender(senderId) {
+		return Promise.await(LivechatVisitors.findOneById(senderId));
 	},
 
 	getReadReceiptsExtraData(message) {

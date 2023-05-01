@@ -1,20 +1,22 @@
-import type { ISetting } from '@rocket.chat/core-typings';
-
 import { CachedCollection } from '../../../app/ui-cached-collection/client';
 
-class PublicSettingsCachedCollection extends CachedCollection<ISetting> {
+export class PublicSettingsCachedCollection extends CachedCollection {
 	constructor() {
 		super({
 			name: 'public-settings',
 			eventType: 'onAll',
 			userRelated: false,
+			listenChangesForLoggedUsersOnly: true,
 		});
 	}
+
+	static instance: PublicSettingsCachedCollection;
+
+	static get(): PublicSettingsCachedCollection {
+		if (!PublicSettingsCachedCollection.instance) {
+			PublicSettingsCachedCollection.instance = new PublicSettingsCachedCollection();
+		}
+
+		return PublicSettingsCachedCollection.instance;
+	}
 }
-
-const instance = new PublicSettingsCachedCollection();
-
-export {
-	/** @deprecated */
-	instance as PublicSettingsCachedCollection,
-};

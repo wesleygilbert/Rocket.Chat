@@ -5,7 +5,6 @@ import { useTranslation } from '@rocket.chat/ui-contexts';
 import type { FC, ComponentProps } from 'react';
 import React, { memo } from 'react';
 
-import ToolBoxActionOptions from './ToolBoxActionOptions';
 import { useQuickActions } from './hooks/useQuickActions';
 
 type QuickActionsProps = {
@@ -19,7 +18,7 @@ const QuickActions: FC<QuickActionsProps> = ({ room, className }) => {
 
 	return (
 		<Header.ToolBox aria-label={t('Omnichannel_quick_actions')}>
-			{visibleActions.map(({ id, color, icon, title, action = actionDefault, options }, index) => {
+			{visibleActions.map(({ id, color, icon, title, action = actionDefault }, index) => {
 				const props = {
 					id,
 					icon,
@@ -30,16 +29,10 @@ const QuickActions: FC<QuickActionsProps> = ({ room, className }) => {
 					primary: false,
 					action,
 					key: id,
-					room,
 				};
-
-				if (options) {
-					return <ToolBoxActionOptions options={options} {...props} />;
-				}
 
 				return <Header.ToolBox.Action {...props} />;
 			})}
-			{visibleActions.length > 0 && <Header.ToolBox.Divider />}
 		</Header.ToolBox>
 	);
 };

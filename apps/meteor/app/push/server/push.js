@@ -1,8 +1,8 @@
 import { Meteor } from 'meteor/meteor';
 import { Match, check } from 'meteor/check';
+import { Mongo } from 'meteor/mongo';
+import { HTTP } from 'meteor/http';
 import _ from 'underscore';
-import { AppsTokens } from '@rocket.chat/models';
-import { serverFetch as fetch } from '@rocket.chat/server-fetch';
 
 import { initAPN, sendAPN } from './apn';
 import { sendGCM } from './gcm';
@@ -10,8 +10,9 @@ import { logger } from './logger';
 import { settings } from '../../settings/server';
 
 export const _matchToken = Match.OneOf({ apn: String }, { gcm: String });
+export const appTokensCollection = new Mongo.Collection('_raix_push_app_tokens');
 
-class PushClass {
+export class PushClass {
 	options = {};
 
 	isConfigured = false;
@@ -53,7 +54,7 @@ class PushClass {
 	sendWorker(task, interval) {
 		logger.debug(`Send worker started, using interval: ${interval}`);
 
-		return setInterval(() => {
+		return Meteor.setInterval(() => {
 			try {
 				task();
 			} catch (error) {
@@ -63,11 +64,11 @@ class PushClass {
 	}
 
 	_replaceToken(currentToken, newToken) {
-		void AppsTokens.updateMany({ token: currentToken }, { $set: { token: newToken } });
+		appTokensCollection.rawCollection().updateMany({ token: currentToken }, { $set: { token: newToken } });
 	}
 
 	_removeToken(token) {
-		void AppsTokens.deleteOne({ token });
+		appTokensCollection.rawCollection().deleteOne({ token });
 	}
 
 	_shouldUseGateway() {
@@ -104,65 +105,65 @@ class PushClass {
 		}
 	}
 
-	async sendGatewayPush(gateway, service, token, notification, tries = 0) {
+	sendGatewayPush(gateway, service, token, notification, tries = 0) {
 		notification.uniqueId = this.options.uniqueId;
 
 		const data = {
-			body: {
+			data: {
 				token,
 				options: notification,
 			},
+			headers: {},
 		};
 
 		if (token && this.options.getAuthorization) {
-			data.headers.Authorization = await this.options.getAuthorization();
+			data.headers.Authorization = this.options.getAuthorization();
 		}
 
-		const result = await fetch(`${gateway}/push/${service}/send`, { ...data, method: 'POST' });
-		const response = await result.text();
+		return HTTP.post(`${gateway}/push/${service}/send`, data, (error, response) => {
+			if (response?.statusCode === 406) {
+				logger.info('removing push token', token);
+				appTokensCollection.remove({
+					$or: [
+						{
+							'token.apn': token,
+						},
+						{
+							'token.gcm': token,
+						},
+					],
+				});
+				return;
+			}
 
-		if (result.status === 406) {
-			logger.info('removing push token', token);
-			await AppsTokens.deleteMany({
-				$or: [
-					{
-						'token.apn': token,
-					},
-					{
-						'token.gcm': token,
-					},
-				],
-			});
-			return;
-		}
+			if (response?.statusCode === 422) {
+				logger.info('gateway rejected push notification. not retrying.', response);
+				return;
+			}
 
-		if (result.status === 422) {
-			logger.info('gateway rejected push notification. not retrying.', response);
-			return;
-		}
+			if (response?.statusCode === 401) {
+				logger.warn('Error sending push to gateway (not authorized)', response);
+				return;
+			}
 
-		if (result.status === 401) {
-			logger.warn('Error sending push to gateway (not authorized)', response);
-			return;
-		}
+			if (!error) {
+				return;
+			}
 
-		if (result.ok) {
-			return;
-		}
+			logger.error({ msg: `Error sending push to gateway (${tries} try) ->`, err: error });
 
-		logger.error({ msg: `Error sending push to gateway (${tries} try) ->`, err: response });
+			if (tries <= 4) {
+				// [1, 2, 4, 8, 16] minutes (total 31)
+				const ms = 60000 * Math.pow(2, tries);
 
-		if (tries <= 4) {
-			// [1, 2, 4, 8, 16] minutes (total 31)
-			const ms = 60000 * Math.pow(2, tries);
+				logger.log('Trying sending push to gateway again in', ms, 'milliseconds');
 
-			logger.log('Trying sending push to gateway again in', ms, 'milliseconds');
-
-			return setTimeout(() => this.sendGatewayPush(gateway, service, token, notification, tries + 1), ms);
-		}
+				return Meteor.setTimeout(() => this.sendGatewayPush(gateway, service, token, notification, tries + 1), ms);
+			}
+		});
 	}
 
-	async sendNotificationGateway(app, notification, countApn, countGcm) {
+	sendNotificationGateway(app, notification, countApn, countGcm) {
 		for (const gateway of this.options.gateways) {
 			logger.debug('send to token', app.token);
 
@@ -179,7 +180,7 @@ class PushClass {
 		}
 	}
 
-	async sendNotification(notification = { badge: 0 }) {
+	sendNotification(notification = { badge: 0 }) {
 		logger.debug('Sending notification', notification);
 
 		const countApn = [];
@@ -202,7 +203,7 @@ class PushClass {
 			$or: [{ 'token.apn': { $exists: true } }, { 'token.gcm': { $exists: true } }],
 		};
 
-		await AppsTokens.find(query).forEach((app) => {
+		appTokensCollection.find(query).forEach((app) => {
 			logger.debug('send to token', app.token);
 
 			if (this._shouldUseGateway()) {
@@ -218,16 +219,16 @@ class PushClass {
 			// Add some verbosity about the send result, making sure the developer
 			// understands what just happened.
 			if (!countApn.length && !countGcm.length) {
-				if ((await AppsTokens.col.estimatedDocumentCount()) === 0) {
-					logger.debug('GUIDE: The "AppsTokens" is empty - No clients have registered on the server yet...');
+				if (appTokensCollection.find().count() === 0) {
+					logger.debug('GUIDE: The "appTokensCollection" is empty - No clients have registered on the server yet...');
 				}
 			} else if (!countApn.length) {
-				if ((await AppsTokens.col.countDocuments({ 'token.apn': { $exists: true } })) === 0) {
-					logger.debug('GUIDE: The "AppsTokens" - No APN clients have registered on the server yet...');
+				if (appTokensCollection.find({ 'token.apn': { $exists: true } }).count() === 0) {
+					logger.debug('GUIDE: The "appTokensCollection" - No APN clients have registered on the server yet...');
 				}
 			} else if (!countGcm.length) {
-				if ((await AppsTokens.col.countDocuments({ 'token.gcm': { $exists: true } })) === 0) {
-					logger.debug('GUIDE: The "AppsTokens" - No GCM clients have registered on the server yet...');
+				if (appTokensCollection.find({ 'token.gcm': { $exists: true } }).count() === 0) {
+					logger.debug('GUIDE: The "appTokensCollection" - No GCM clients have registered on the server yet...');
 				}
 			}
 		}
@@ -288,7 +289,7 @@ class PushClass {
 		}
 	}
 
-	async send(options) {
+	send(options) {
 		// If on the client we set the user id - on the server we need an option
 		// set or we default to "<SERVER>" as the creator of the notification
 		// If current user not set see if we can set it to the logged in user
@@ -343,7 +344,7 @@ class PushClass {
 		this._validateDocument(notification);
 
 		try {
-			await this.sendNotification(notification);
+			this.sendNotification(notification);
 		} catch (error) {
 			logger.debug(`Could not send notification id: "${notification._id}", Error: ${error.message}`);
 			logger.debug(error.stack);

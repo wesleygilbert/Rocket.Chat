@@ -29,3 +29,6 @@ export const createOrUpdateProtectedRoleAsync = async (
 		protected: true,
 	});
 };
+
+export const createOrUpdateProtectedRole = (...args: Parameters<typeof createOrUpdateProtectedRoleAsync>): void =>
+	Promise.await(createOrUpdateProtectedRoleAsync(...args));

@@ -73,6 +73,7 @@ it('renders a paragraph', () => {
 	);
 
 	expect(screen.getByText('Hello')).toBeInTheDocument();
+	expect(screen.getByText('Hello').matches('p')).toBeTruthy();
 });
 
 it('renders a heading', () => {
@@ -204,6 +205,7 @@ it('renders a blockquote', () => {
 	expect(screen.getByText('Cogito ergo sum.')).toBeInTheDocument();
 	expect(screen.getByText('Sit amet, consectetur adipiscing elit.')).toBeInTheDocument();
 	expect(screen.getByText('Donec eget ex euismod, euismod nisi euismod, vulputate nisi.')).toBeInTheDocument();
+	expect(screen.getByText('Cogito ergo sum.').matches('blockquote p')).toBeTruthy();
 });
 
 it('renders a code block', async () => {

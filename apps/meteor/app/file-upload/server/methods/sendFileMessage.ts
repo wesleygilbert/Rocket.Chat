@@ -2,11 +2,10 @@ import { Meteor } from 'meteor/meteor';
 import { Match, check } from 'meteor/check';
 import type { MessageAttachment, FileAttachmentProps, IUser, IUpload, AtLeast } from '@rocket.chat/core-typings';
 import { Rooms, Uploads } from '@rocket.chat/models';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
 import { callbacks } from '../../../../lib/callbacks';
 import { FileUpload } from '../lib/FileUpload';
-import { canAccessRoomAsync } from '../../../authorization/server/functions/canAccessRoom';
+import { canAccessRoom } from '../../../authorization/server/functions/canAccessRoom';
 import { SystemLogger } from '../../../../server/lib/logger/system';
 import { omit } from '../../../../lib/utils/omit';
 import { getFileExtension } from '../../../../lib/utils/getFileExtension';
@@ -29,7 +28,7 @@ export const parseFileIntoMessageAttachments = async (
 
 	await Uploads.updateFileComplete(file._id, user._id, omit(file, '_id'));
 
-	const fileUrl = FileUpload.getPath(`${file._id}/${encodeURI(file.name || '')}`);
+	const fileUrl = FileUpload.getPath(`${file._id}/${encodeURI(file.name)}`);
 
 	const attachments: MessageAttachment[] = [];
 
@@ -62,8 +61,8 @@ export const parseFileIntoMessageAttachments = async (
 			const thumbResult = await FileUpload.createImageThumbnail(file);
 			if (thumbResult) {
 				const { data: thumbBuffer, width, height } = thumbResult;
-				const thumbnail = await FileUpload.uploadImageThumbnail(file, thumbBuffer, roomId, user._id);
-				const thumbUrl = FileUpload.getPath(`${thumbnail._id}/${encodeURI(file.name || '')}`);
+				const thumbnail = FileUpload.uploadImageThumbnail(file, thumbBuffer, roomId, user._id);
+				const thumbUrl = FileUpload.getPath(`${thumbnail._id}/${encodeURI(file.name)}`);
 				attachment.image_url = thumbUrl;
 				attachment.image_type = thumbnail.type;
 				attachment.image_dimensions = {
@@ -119,16 +118,9 @@ export const parseFileIntoMessageAttachments = async (
 	return { files, attachments };
 };
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		sendFileMessage: (roomId: string, _store: string, file: Partial<IUpload>, msgData?: Record<string, any>) => boolean;
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	async sendFileMessage(roomId, _store, file, msgData = {}) {
-		const user = (await Meteor.userAsync()) as IUser | undefined;
+		const user = Meteor.user() as IUser | undefined;
 		if (!user) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
 				method: 'sendFileMessage',
@@ -140,7 +132,7 @@ Meteor.methods<ServerMethods>({
 			return false;
 		}
 
-		if (user?.type !== 'app' && !(await canAccessRoomAsync(room, user))) {
+		if (user?.type !== 'app' && !canAccessRoom(room, user)) {
 			return false;
 		}
 
@@ -155,7 +147,7 @@ Meteor.methods<ServerMethods>({
 
 		const { files, attachments } = await parseFileIntoMessageAttachments(file, roomId, user);
 
-		const msg = await Meteor.callAsync('sendMessage', {
+		const msg = Meteor.call('sendMessage', {
 			rid: roomId,
 			ts: new Date(),
 			file: files[0],

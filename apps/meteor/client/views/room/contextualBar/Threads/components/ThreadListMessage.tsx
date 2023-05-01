@@ -4,7 +4,8 @@ import { useTranslation } from '@rocket.chat/ui-contexts';
 import type { ComponentProps, MouseEventHandler, ReactElement, ReactNode } from 'react';
 import React, { memo } from 'react';
 
-import MessageAvatar from '../../../../../components/message/header/MessageAvatar';
+import RawText from '../../../../../components/RawText';
+import UserAvatar from '../../../../../components/avatar/UserAvatar';
 import { followStyle, anchor } from '../../../../../components/message/helpers/followSyle';
 import AllMentionNotification from '../../../../../components/message/notification/AllMentionNotification';
 import MeMentionNotification from '../../../../../components/message/notification/MeMentionNotification';
@@ -13,7 +14,7 @@ import { useTimeAgo } from '../../../../../hooks/useTimeAgo';
 
 type ThreadListMessageProps = {
 	_id: IMessage['_id'];
-	msg: ReactNode;
+	msg: IMessage['msg'];
 	following: boolean;
 	username: IMessage['u']['username'];
 	name?: IMessage['u']['name'];
@@ -25,7 +26,6 @@ type ThreadListMessageProps = {
 	mention: boolean;
 	all: boolean;
 	tlm: Date | undefined;
-	emoji: IMessage['emoji'];
 } & Omit<ComponentProps<typeof Box>, 'is'>;
 
 const ThreadListMessage = ({
@@ -43,7 +43,6 @@ const ThreadListMessage = ({
 	all,
 	tlm,
 	className = [],
-	emoji,
 	...props
 }: ThreadListMessageProps): ReactElement => {
 	const t = useTranslation();
@@ -55,14 +54,16 @@ const ThreadListMessage = ({
 		<Box className={[className, !following && followStyle].flat()}>
 			<Box pbs={16} is={Message} {...props}>
 				<Message.LeftContainer>
-					<MessageAvatar emoji={emoji} username={username} size='x36' />
+					<UserAvatar username={username} className='rcx-message__avatar' size='x36' />
 				</Message.LeftContainer>
 				<Message.Container>
 					<Message.Header>
 						<Message.Name title={username}>{name}</Message.Name>
 						<Message.Timestamp>{formatDate(ts)}</Message.Timestamp>
 					</Message.Header>
-					<Message.Body clamp={2}>{msg}</Message.Body>
+					<Message.Body clamp={2}>
+						<RawText>{msg}</RawText>
+					</Message.Body>
 					<Message.Block>
 						<Message.Metrics>
 							<Message.Metrics.Item>

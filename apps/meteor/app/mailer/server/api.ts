@@ -2,6 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { Email } from 'meteor/email';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import _ from 'underscore';
+import s from 'underscore.string';
 import juice from 'juice';
 import stripHtml from 'string-strip-html';
 import { escapeHTML } from '@rocket.chat/string-helpers';
@@ -10,9 +11,8 @@ import { Settings } from '@rocket.chat/models';
 
 import { settings } from '../../settings/server';
 import { replaceVariables } from './replaceVariables';
-import { Apps } from '../../../ee/server/apps';
+import { Apps } from '../../apps/server';
 import { validateEmail } from '../../../lib/emailValidator';
-import { strLeft, strRightBack } from '../../../lib/utils/stringUtils';
 
 let contentHeader: string | undefined;
 let contentFooter: string | undefined;
@@ -41,8 +41,8 @@ export const replace = (str: string, data: { [key: string]: unknown } = {}): str
 		Site_URL_Slash: settings.get<string>('Site_Url')?.replace(/\/?$/, '/'),
 		...(data.name
 			? {
-					fname: strLeft(String(data.name), ' '),
-					lname: strRightBack(String(data.name), ' '),
+					fname: s.strLeft(String(data.name), ' '),
+					lname: s.strRightBack(String(data.name), ' '),
 			  }
 			: {}),
 		...data,
@@ -136,7 +136,7 @@ settings.watchMultiple(['Email_Header', 'Email_Footer'], () => {
 export const checkAddressFormat = (adresses: string | string[]): boolean =>
 	([] as string[]).concat(adresses).every((address) => validateEmail(address));
 
-export const sendNoWrap = async ({
+export const sendNoWrap = ({
 	to,
 	from,
 	replyTo,
@@ -152,7 +152,7 @@ export const sendNoWrap = async ({
 	html?: string;
 	text?: string;
 	headers?: string;
-}) => {
+}): void => {
 	if (!checkAddressFormat(to)) {
 		throw new Meteor.Error('invalid email');
 	}
@@ -165,16 +165,16 @@ export const sendNoWrap = async ({
 		html = undefined;
 	}
 
-	await Settings.incrementValueById('Triggered_Emails_Count');
+	Settings.incrementValueById('Triggered_Emails_Count');
 
 	const email = { to, from, replyTo, subject, html, text, headers };
 
-	const eventResult = await Apps.triggerEvent('IPreEmailSent', { email });
+	const eventResult = Promise.await(Apps.triggerEvent('IPreEmailSent', { email }));
 
-	setImmediate(() => Email.sendAsync(eventResult || email).catch((e) => console.error(e)));
+	Meteor.defer(() => Email.send(eventResult || email));
 };
 
-export const send = async ({
+export const send = ({
 	to,
 	from,
 	replyTo,
@@ -192,7 +192,7 @@ export const send = async ({
 	text?: string;
 	headers?: string;
 	data?: { [key: string]: unknown };
-}): Promise<void> =>
+}): void =>
 	sendNoWrap({
 		to,
 		from,

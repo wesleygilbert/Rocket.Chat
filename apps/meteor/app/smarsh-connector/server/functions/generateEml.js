@@ -1,10 +1,12 @@
 import { Meteor } from 'meteor/meteor';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
+import _ from 'underscore';
 import moment from 'moment';
-import { Messages, SmarshHistory, Users, Rooms } from '@rocket.chat/models';
+import { SmarshHistory } from '@rocket.chat/models';
 
 import { settings } from '../../../settings/server';
-import { MessageTypes } from '../../../ui-utils/server';
+import { Rooms, Messages, Users } from '../../../models/server';
+import { MessageTypes } from '../../../ui-utils';
 import { smarsh } from '../lib/rocketchat';
 import 'moment-timezone';
 
@@ -27,12 +29,11 @@ function _getLink(attachment) {
 }
 
 smarsh.generateEml = () => {
-	setImmediate(async () => {
+	Meteor.defer(() => {
 		const smarshMissingEmail = settings.get('Smarsh_MissingEmail_Email');
 		const timeZone = settings.get('Smarsh_Timezone');
 
-		// TODO: revisit with more time => This appears to be a super expensive operation, going through all rooms
-		for await (const room of Rooms.find()) {
+		Rooms.find().forEach(async (room) => {
 			const smarshHistory = await SmarshHistory.findOne({ _id: room._id });
 			const query = { rid: room._id };
 
@@ -50,7 +51,7 @@ smarsh.generateEml = () => {
 				room: room.name ? `#${room.name}` : `Direct Message Between: ${room.usernames.join(' & ')}`,
 			};
 
-			await Messages.find(query).forEach(async (message) => {
+			Messages.find(query).forEach((message) => {
 				rows.push(opentr);
 
 				// The timestamp
@@ -60,7 +61,7 @@ smarsh.generateEml = () => {
 
 				// The sender
 				rows.push(open20td);
-				const sender = await Users.findOne({ _id: message.u._id });
+				const sender = Users.findOne({ _id: message.u._id });
 				if (data.users.indexOf(sender._id) === -1) {
 					data.users.push(sender._id);
 				}
@@ -88,7 +89,7 @@ smarsh.generateEml = () => {
 					rows.push(`${message.attachments[0].title} (${_getLink(message.attachments[0])})`);
 				} else if (message.attachments) {
 					const attaches = [];
-					message.attachments.forEach((a) => {
+					_.each(message.attachments, function _loopThroughMessageAttachments(a) {
 						if (a.image_url) {
 							attaches.push(a.image_url);
 						}
@@ -125,6 +126,6 @@ smarsh.generateEml = () => {
 					files: data.files,
 				});
 			}
-		}
+		});
 	});
 };

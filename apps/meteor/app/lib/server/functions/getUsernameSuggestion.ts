@@ -1,14 +1,14 @@
 import limax from 'limax';
 import type { IUser } from '@rocket.chat/core-typings';
-import { Users } from '@rocket.chat/models';
 
+import { Users } from '../../../models/server';
 import { settings } from '../../../settings/server';
 
 function slug(text: string): string {
 	return limax(text, { replacement: '.' }).replace(/[^0-9a-z-_.]/g, '');
 }
 
-async function usernameIsAvailable(username: string): Promise<boolean> {
+function usernameIsAvailable(username: string): boolean {
 	if (username.length === 0) {
 		return false;
 	}
@@ -17,12 +17,12 @@ async function usernameIsAvailable(username: string): Promise<boolean> {
 		return false;
 	}
 
-	return !(await Users.findOneByUsernameIgnoringCase(username, {}));
+	return !Users.findOneByUsernameIgnoringCase(username);
 }
 
 const name = (username: string): string => (settings.get('UTF8_Names_Slugify') ? slug(username) : username);
 
-export async function generateUsernameSuggestion(user: Pick<IUser, 'name' | 'emails' | 'services'>): Promise<string | undefined> {
+export function generateUsernameSuggestion(user: Pick<IUser, 'name' | 'emails' | 'services'>): string | undefined {
 	let usernames = [];
 
 	if (user.name) {
@@ -60,19 +60,18 @@ export async function generateUsernameSuggestion(user: Pick<IUser, 'name' | 'ema
 
 	usernames = usernames.filter((e) => e);
 
-	for await (const item of usernames) {
-		if (await usernameIsAvailable(item)) {
+	for (const item of usernames) {
+		if (usernameIsAvailable(item)) {
 			return item;
 		}
 	}
 
 	usernames.push(settings.get('Accounts_DefaultUsernamePrefixSuggestion'));
 
-	let index = await Users.col.countDocuments({ username: new RegExp(`^${usernames[0]}-[0-9]+`) });
+	let index = Users.find({ username: new RegExp(`^${usernames[0]}-[0-9]+`) }).count();
 	const username = '';
 	while (!username) {
-		// eslint-disable-next-line no-await-in-loop
-		if (await usernameIsAvailable(`${usernames[0]}-${index}`)) {
+		if (usernameIsAvailable(`${usernames[0]}-${index}`)) {
 			return `${usernames[0]}-${index}`;
 		}
 		index++;

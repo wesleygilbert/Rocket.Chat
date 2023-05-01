@@ -16,6 +16,6 @@ export class HomeFlextabChannels {
 	}
 
 	get btnAdd(): Locator {
-		return this.page.locator('role=dialog >> role=group >> role=button[name=Add]');
+		return this.page.locator('#modal-root button:has-text("Add")');
 	}
 }

@@ -1,5 +1,5 @@
 import { isIE11 } from '../../../client/lib/utils/isIE11';
-import { emoji } from './lib';
+import { emoji } from '../lib/rocketchat';
 
 /*
  * emojiParser is a function that will replace emojis
@@ -68,3 +68,5 @@ const emojiParser = (message) => {
 };
 
 export { emojiParser };
+
+export const createEmojiMessageRenderer = () => emojiParser;

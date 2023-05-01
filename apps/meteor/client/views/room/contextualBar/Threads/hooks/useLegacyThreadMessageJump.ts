@@ -1,27 +1,13 @@
-import { useCurrentRoute, useQueryStringParameter, useRoute } from '@rocket.chat/ui-contexts';
+import type { IMessage } from '@rocket.chat/core-typings';
 import { useRef, useEffect } from 'react';
 
-import { waitForElement } from '../../../../../lib/utils/waitForElement';
-import { clearHighlightMessage, setHighlightMessage } from '../../../MessageList/providers/messageHighlightSubscription';
-
-export const useLegacyThreadMessageJump = ({ enabled = true }: { enabled?: boolean }) => {
-	const mid = useQueryStringParameter('msg');
-
-	const [currentRouteName, currentRouteParams, currentRouteQueryStringParams] = useCurrentRoute();
-	if (!currentRouteName) {
-		throw new Error('No route name');
-	}
-	const currentRoute = useRoute(currentRouteName);
-
-	const clearQueryStringParameter = () => {
-		const newQueryStringParams = { ...currentRouteQueryStringParams };
-		delete newQueryStringParams.msg;
-		currentRoute.replace(currentRouteParams, newQueryStringParams);
-	};
-
+export const useLegacyThreadMessageJump = (
+	mid: IMessage['_id'] | undefined,
+	{ enabled = true, onJumpTo }: { enabled?: boolean; onJumpTo?: (mid: IMessage['_id']) => void },
+) => {
 	const parentRef = useRef<HTMLElement>(null);
-	const clearQueryStringParameterRef = useRef(clearQueryStringParameter);
-	clearQueryStringParameterRef.current = clearQueryStringParameter;
+	const onJumpToRef = useRef(onJumpTo);
+	onJumpToRef.current = onJumpTo;
 
 	useEffect(() => {
 		const parent = parentRef.current;
@@ -30,36 +16,25 @@ export const useLegacyThreadMessageJump = ({ enabled = true }: { enabled?: boole
 			return;
 		}
 
-		const abortController = new AbortController();
+		const messageElement = parent.querySelector(`[data-id="${mid}"]`);
+		if (!messageElement) {
+			return;
+		}
 
-		waitForElement<HTMLElement>(`[data-id='${mid}']`, { parent, signal: abortController.signal }).then((messageElement) => {
-			if (abortController.signal.aborted) {
-				return;
-			}
+		messageElement.classList.add('highlight');
 
-			setHighlightMessage(mid);
-			clearQueryStringParameterRef.current?.();
-
-			setTimeout(() => {
-				clearHighlightMessage();
-			}, 1000);
-
-			setTimeout(() => {
-				if (abortController.signal.aborted) {
-					return;
-				}
-
-				messageElement.scrollIntoView({
-					behavior: 'smooth',
-					block: 'nearest',
-				});
-			}, 300);
-		});
-
-		return () => {
-			abortController.abort();
+		const removeClass = () => {
+			messageElement.classList.remove('highlight');
+			messageElement.removeEventListener('animationend', removeClass);
 		};
-	}, [enabled, mid]);
+		messageElement.addEventListener('animationend', removeClass);
+
+		setTimeout(() => {
+			messageElement.scrollIntoView();
+			const onJumpTo = onJumpToRef.current;
+			onJumpTo?.(mid);
+		}, 300);
+	}, [enabled, mid, onJumpTo]);
 
 	return { parentRef };
 };

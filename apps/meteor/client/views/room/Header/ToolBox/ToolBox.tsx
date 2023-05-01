@@ -117,7 +117,7 @@ const ToolBox = ({ className }: ToolBoxProps): ReactElement => {
 				}
 				return <Header.ToolBox.Action {...props} />;
 			})}
-			{(filteredActions.length > 6 || isMobile) && (
+			{filteredActions.length > 6 && (
 				<Menu
 					data-qa-id='ToolBox-Menu'
 					tiny={!isMobile}

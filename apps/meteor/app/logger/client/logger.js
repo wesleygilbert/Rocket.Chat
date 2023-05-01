@@ -1,4 +1,5 @@
 import { Template } from 'meteor/templating';
+import _ from 'underscore';
 
 import { getConfig } from '../../../client/lib/utils/getConfig';
 
@@ -42,7 +43,10 @@ if (Template.log) {
 					return dict[name];
 				}
 			};
-			return original.call(this, Object.fromEntries(Object.entries(dict).map(([key, value]) => [key, fn1(key, value)])));
+			_.each(name, (fn, name) => {
+				fn1(name, fn);
+			});
+			return original.call(template, dict);
 		};
 	};
 
@@ -57,7 +61,7 @@ if (Template.log) {
 				const wrap = function (...args) {
 					const result = fn.apply(this, args);
 					if (Template.log === true) {
-						const completeName = `${prefix}:${template.viewName.replace('Template.', '')}`;
+						const completeName = `${prefix}:${template.viewName.replace('Template.', '')}.${name}`;
 						if (Template.logMatch.test(completeName)) {
 							console.log(`%c${completeName}`, `color: ${color}; font-weight: bold`, {
 								args,

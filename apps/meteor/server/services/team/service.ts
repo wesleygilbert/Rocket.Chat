@@ -1,4 +1,4 @@
-import type { Document, FindOptions, Filter } from 'mongodb';
+import type { FindOptions, Filter } from 'mongodb';
 import { escapeRegExp } from '@rocket.chat/string-helpers';
 import type {
 	IRoom,
@@ -14,7 +14,7 @@ import type {
 import { TEAM_TYPE } from '@rocket.chat/core-typings';
 import { Team, Rooms, Subscriptions, Users, TeamMember } from '@rocket.chat/models';
 import type { InsertionModel } from '@rocket.chat/model-typings';
-import { Room, Authorization, Message, ServiceClassInternal } from '@rocket.chat/core-services';
+import { Room, Authorization, ServiceClassInternal } from '@rocket.chat/core-services';
 import type {
 	IListRoomsFilter,
 	ITeamAutocompleteResult,
@@ -26,10 +26,11 @@ import type {
 	ITeamUpdateData,
 } from '@rocket.chat/core-services';
 
-import { checkUsernameAvailability } from '../../../app/lib/server/functions/checkUsernameAvailability';
+import { checkUsernameAvailability } from '../../../app/lib/server/functions';
 import { addUserToRoom } from '../../../app/lib/server/functions/addUserToRoom';
 import { removeUserFromRoom } from '../../../app/lib/server/functions/removeUserFromRoom';
 import { getSubscribedRoomsForUserWithDetails } from '../../../app/lib/server/functions/getRoomsWithSingleOwner';
+import { Messages } from '../../../app/models/server';
 import { saveRoomName } from '../../../app/channel-settings/server';
 import { saveRoomType } from '../../../app/channel-settings/server/functions/saveRoomType';
 
@@ -37,7 +38,7 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 	protected name = 'team';
 
 	async create(uid: string, { team, room = { name: team.name, extraData: {} }, members, owner }: ITeamCreateParams): Promise<ITeam> {
-		if (!(await checkUsernameAvailability(team.name))) {
+		if (!checkUsernameAvailability(team.name)) {
 			throw new Error('team-name-already-exists');
 		}
 
@@ -105,7 +106,7 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 			let roomId = room.id;
 			if (roomId) {
 				await Rooms.setTeamMainById(roomId, teamId);
-				await Message.saveSystemMessage('user-converted-to-team', roomId, team.name, createdBy);
+				Messages.createUserConvertChannelToTeamWithRoomIdAndUser(roomId, team.name, createdBy);
 			} else {
 				const roomType: IRoom['t'] = team.type === TEAM_TYPE.PRIVATE ? 'p' : 'c';
 
@@ -157,7 +158,7 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 		}
 
 		if (updateRoom && typeof type !== 'undefined') {
-			await saveRoomType(team.roomId, type === TEAM_TYPE.PRIVATE ? 'p' : 'c', user);
+			saveRoomType(team.roomId, type === TEAM_TYPE.PRIVATE ? 'p' : 'c', user);
 		}
 
 		await Team.updateNameAndType(teamId, updateData);
@@ -198,9 +199,9 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 
 	search(userId: string, term: string | RegExp, options: FindOptions<ITeam>): Promise<ITeam[]>;
 
-	search<P extends Document>(userId: string, term: string | RegExp, options: FindOptions<P extends ITeam ? ITeam : P>): Promise<P[]>;
+	search<P>(userId: string, term: string | RegExp, options: FindOptions<P extends ITeam ? ITeam : P>): Promise<P[]>;
 
-	async search<P extends Document>(
+	async search<P>(
 		userId: string,
 		term: string | RegExp,
 		options?: undefined | FindOptions<ITeam> | FindOptions<P extends ITeam ? ITeam : P>,
@@ -295,9 +296,9 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 
 	listByNames(names: Array<string>, options: FindOptions<ITeam>): Promise<ITeam[]>;
 
-	listByNames<P extends Document>(names: Array<string>, options: FindOptions<P extends ITeam ? ITeam : P>): Promise<P[]>;
+	listByNames<P>(names: Array<string>, options: FindOptions<P extends ITeam ? ITeam : P>): Promise<P[]>;
 
-	async listByNames<P extends Document>(
+	async listByNames<P>(
 		names: Array<string>,
 		options?: undefined | FindOptions<ITeam> | FindOptions<P extends ITeam ? ITeam : P>,
 	): Promise<P[] | ITeam[]> {
@@ -358,7 +359,7 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 			}
 
 			if (room.t === 'c') {
-				await Message.saveSystemMessage('user-added-room-to-team', team.roomId, room.name || '', user);
+				Messages.createUserAddRoomToTeamWithRoomIdAndUser(team.roomId, room.name, user);
 			}
 
 			room.teamId = teamId;
@@ -409,7 +410,7 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 		Rooms.unsetTeamById(room._id);
 
 		if (room.t === 'c') {
-			await Message.saveSystemMessage('user-removed-room-from-team', team.roomId, room.name || '', user);
+			Messages.createUserRemoveRoomFromTeamWithRoomIdAndUser(team.roomId, room.name, user);
 		}
 
 		return {
@@ -432,12 +433,9 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 			throw new Error('invalid-room');
 		}
 
-		const user = await Users.findOneById<Pick<IUser, '_id' | 'username' | 'name'>>(uid, { projection: { username: 1, name: 1 } });
-		if (!user) {
-			throw new Error('invalid-user');
-		}
+		const user = await Users.findOneById(uid);
 
-		await Message.saveSystemMessage('user-converted-to-channel', team.roomId, room.name || '', user);
+		Messages.createUserConvertTeamToChannelWithRoomIdAndUser(team.roomId, room.name, user);
 
 		await Rooms.unsetTeamId(teamId);
 	}
@@ -487,14 +485,14 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 
 	listTeamsBySubscriberUserId(uid: string, options: FindOptions<ITeamMember>): Promise<ITeamMember[]>;
 
-	listTeamsBySubscriberUserId<P extends Document>(uid: string, options: FindOptions<P>): Promise<P[]>;
+	listTeamsBySubscriberUserId<P>(uid: string, options: FindOptions<P>): Promise<P[]>;
 
-	listTeamsBySubscriberUserId<P extends Document>(
+	listTeamsBySubscriberUserId<P>(
 		uid: string,
 		options?: undefined | FindOptions<ITeamMember> | FindOptions<P extends ITeamMember ? ITeamMember : P>,
 	): Promise<P[] | ITeamMember[]> {
 		if (options) {
-			return TeamMember.findByUserId(uid, options).toArray();
+			TeamMember.findByUserId(uid, options).toArray();
 		}
 		return TeamMember.findByUserId(uid).toArray();
 	}
@@ -598,7 +596,7 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 
 		const [rooms, total] = await Promise.all([cursor.toArray(), totalCount]);
 
-		const roomData = await getSubscribedRoomsForUserWithDetails(userId, false, teamRoomIds);
+		const roomData = getSubscribedRoomsForUserWithDetails(userId, false, teamRoomIds);
 		const records = [];
 
 		for (const room of rooms) {
@@ -781,7 +779,7 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 					}
 				}
 
-				await TeamMember.removeById(existingMember._id);
+				TeamMember.removeById(existingMember._id);
 			}
 
 			const removedUser = usersToRemove.find((u) => u._id === (existingMember || member).userId);
@@ -964,7 +962,7 @@ export class TeamService extends ServiceClassInternal implements ITeamService {
 			// at this point, users are already part of the team so we won't check for membership
 			for await (const user of users) {
 				// add each user to the default room
-				await addUserToRoom(room._id, user, inviter, false);
+				addUserToRoom(room._id, user, inviter, false);
 			}
 		});
 	}

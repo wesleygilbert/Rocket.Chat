@@ -2,7 +2,6 @@ import type { IRoom } from '@rocket.chat/core-typings';
 import type { Icon } from '@rocket.chat/fuselage';
 import type { TranslationKey } from '@rocket.chat/ui-contexts';
 import { useTranslation } from '@rocket.chat/ui-contexts';
-import type { BlazeTemplates } from 'meteor/templating';
 import type { ReactElement, ComponentProps } from 'react';
 import React from 'react';
 
@@ -12,15 +11,15 @@ import { useTabBarClose } from '../contexts/ToolboxContext';
 import BlazeTemplate from './BlazeTemplate';
 
 type VerticalBarOldActionsProps = {
-	name: keyof BlazeTemplates;
+	name: string;
 	rid: IRoom['_id'];
-	_id: string;
+	_id: IRoom['_id'];
 	icon?: ComponentProps<typeof Icon>['name'];
 	tabBar: ToolboxContextValue['tabBar'];
 	title: TranslationKey;
 };
 
-const VerticalBarOldActions = ({ name, icon, title, ...props }: VerticalBarOldActionsProps): ReactElement => {
+const VerticalBarOldActions = ({ name, rid, icon, tabBar, title, ...props }: VerticalBarOldActionsProps): ReactElement => {
 	const close = useTabBarClose();
 	const t = useTranslation();
 
@@ -32,7 +31,7 @@ const VerticalBarOldActions = ({ name, icon, title, ...props }: VerticalBarOldAc
 				{close && <VerticalBar.Close onClick={close} />}
 			</VerticalBar.Header>
 			<VerticalBar.Content>
-				<BlazeTemplate flexShrink={1} overflow='hidden' name={name} {...(props as any)} />
+				<BlazeTemplate flexShrink={1} overflow='hidden' name={name} tabBar={tabBar} rid={rid} {...props} />
 			</VerticalBar.Content>
 		</>
 	);

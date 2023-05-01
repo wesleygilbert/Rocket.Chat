@@ -5,6 +5,7 @@ import React, { useState, useCallback } from 'react';
 
 import VerticalBar from '../../../components/VerticalBar';
 import { useFileInput } from '../../../hooks/useFileInput';
+import type { soundDataType } from './lib';
 import { validate, createSoundData } from './lib';
 
 type AddCustomSoundProps = {
@@ -31,7 +32,7 @@ const AddCustomSound = ({ goToNew, close, onChange, ...props }: AddCustomSoundPr
 
 	const saveAction = useCallback(
 		async (name, soundFile): Promise<string | undefined> => {
-			const soundData = createSoundData(soundFile, name);
+			const soundData: soundDataType = createSoundData(soundFile, name);
 			const validation = validate(soundData, soundFile) as Array<Parameters<typeof t>[0]>;
 
 			validation.forEach((error) => {
@@ -51,7 +52,7 @@ const AddCustomSound = ({ goToNew, close, onChange, ...props }: AddCustomSoundPr
 				reader.readAsBinaryString(soundFile);
 				reader.onloadend = (): void => {
 					try {
-						uploadCustomSound(reader.result as string, soundFile.type, {
+						uploadCustomSound(reader.result, soundFile.type, {
 							...soundData,
 							_id: soundId,
 							random: Math.round(Math.random() * 1000),

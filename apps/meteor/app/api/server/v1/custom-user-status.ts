@@ -3,15 +3,14 @@ import { Match, check } from 'meteor/check';
 import { CustomUserStatus } from '@rocket.chat/models';
 
 import { API } from '../api';
-import { getPaginationItems } from '../helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'custom-user-status.list',
 	{ authRequired: true },
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { sort, query } = await this.parseJsonQuery();
+			const { offset, count } = this.getPaginationItems();
+			const { sort, query } = this.parseJsonQuery();
 
 			const { cursor, totalCount } = CustomUserStatus.findPaginated(query, {
 				sort: sort || { name: 1 },
@@ -46,7 +45,7 @@ API.v1.addRoute(
 				statusType: this.bodyParams.statusType,
 			};
 
-			await Meteor.callAsync('insertOrUpdateUserStatus', userStatusData);
+			Meteor.call('insertOrUpdateUserStatus', userStatusData);
 
 			const customUserStatus = await CustomUserStatus.findOneByName(userStatusData.name);
 			if (!customUserStatus) {
@@ -64,13 +63,13 @@ API.v1.addRoute(
 	'custom-user-status.delete',
 	{ authRequired: true },
 	{
-		async post() {
+		post() {
 			const { customUserStatusId } = this.bodyParams;
 			if (!customUserStatusId) {
 				return API.v1.failure('The "customUserStatusId" params is required!');
 			}
 
-			await Meteor.callAsync('deleteCustomUserStatus', customUserStatusId);
+			Meteor.call('deleteCustomUserStatus', customUserStatusId);
 
 			return API.v1.success();
 		},
@@ -101,7 +100,7 @@ API.v1.addRoute(
 				return API.v1.failure(`No custom user status found with the id of "${userStatusData._id}".`);
 			}
 
-			await Meteor.callAsync('insertOrUpdateUserStatus', userStatusData);
+			Meteor.call('insertOrUpdateUserStatus', userStatusData);
 
 			const customUserStatus = await CustomUserStatus.findOneById(userStatusData._id);
 

@@ -8,6 +8,10 @@ import type { OEmbedMeta, OEmbedUrlContent, ParsedUrl, OEmbedProvider } from '@r
 import { callbacks } from '../../../lib/callbacks';
 import { SystemLogger } from '../../../server/lib/logger/system';
 
+type OEmbedExecutor = {
+	providers: Providers;
+};
+
 class Providers {
 	private providers: OEmbedProvider[];
 
@@ -31,12 +35,11 @@ class Providers {
 	}
 
 	getProviderForUrl(url: string): OEmbedProvider | undefined {
-		return this.providers?.find(function (provider) {
-			return (
-				provider.urls?.some(function (re) {
-					return re.test(url);
-				}) ?? false
-			);
+		return _.find(this.providers, function (provider) {
+			const candidate = _.find(provider.urls, function (re) {
+				return re.test(url);
+			});
+			return candidate != null;
 		});
 	}
 }
@@ -87,10 +90,9 @@ providers.registerProvider({
 	endPoint: 'https://open.spotify.com/oembed',
 });
 
-providers.registerProvider({
-	urls: [new RegExp('https?://www\\.loom\\.com/\\S+')],
-	endPoint: 'https://www.loom.com/v1/oembed?format=json',
-});
+export const oembed: OEmbedExecutor = {
+	providers,
+};
 
 callbacks.add(
 	'oembed:beforeGetUrlContent',
@@ -148,11 +150,14 @@ const cleanupOembed = (data: {
 callbacks.add(
 	'oembed:afterParseContent',
 	function (data) {
-		if (!data?.url || !data.content?.body || !data.parsedUrl?.query) {
+		if (!data || !data.url || !data.content?.body || !data.parsedUrl?.query) {
 			return cleanupOembed(data);
 		}
 
-		const queryString = typeof data.parsedUrl.query === 'string' ? QueryString.parse(data.parsedUrl.query) : data.parsedUrl.query;
+		let queryString = data.parsedUrl.query;
+		if (_.isString(data.parsedUrl.query)) {
+			queryString = QueryString.parse(data.parsedUrl.query);
+		}
 
 		if (!queryString.url) {
 			return cleanupOembed(data);
@@ -169,8 +174,8 @@ callbacks.add(
 
 		try {
 			const metas = JSON.parse(data.content.body);
-			Object.entries(metas).forEach(([key, value]) => {
-				if (value && typeof value === 'string') {
+			_.each(metas, function (value, key) {
+				if (_.isString(value)) {
 					data.meta[camelCase(`oembed_${key}`)] = value;
 				}
 			});

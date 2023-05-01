@@ -2,26 +2,26 @@
 import { Meteor } from 'meteor/meteor';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import { api } from '@rocket.chat/core-services';
-import { Users } from '@rocket.chat/models';
-import type { SlashCommandCallbackParams } from '@rocket.chat/core-typings';
 
+import { Users, Subscriptions } from '../../models/server';
 import { settings } from '../../settings/server';
 import { slashCommands } from '../../utils/lib/slashCommand';
 
 slashCommands.add({
 	command: 'kick',
-	callback: async ({ params, message, userId }: SlashCommandCallbackParams<'kick'>): Promise<void> => {
+	callback: (_command: 'kick', params, item): void => {
 		const username = params.trim().replace('@', '');
 		if (username === '') {
 			return;
 		}
-		const user = await Users.findOneById(userId);
+		const userId = Meteor.userId() as string;
+		const user = Users.findOneById(userId);
 		const lng = user?.language || settings.get('Language') || 'en';
 
-		const kickedUser = await Users.findOneByUsernameIgnoringCase(username);
+		const kickedUser = Users.findOneByUsernameIgnoringCase(username);
 
 		if (kickedUser == null) {
-			void api.broadcast('notify.ephemeralMessage', userId, message.rid, {
+			api.broadcast('notify.ephemeralMessage', userId, item.rid, {
 				msg: TAPi18n.__('Username_doesnt_exist', {
 					postProcess: 'sprintf',
 					sprintf: [username],
@@ -31,8 +31,21 @@ slashCommands.add({
 			return;
 		}
 
-		const { rid } = message;
-		await Meteor.callAsync('removeUserFromRoom', { rid, username });
+		const subscription = Subscriptions.findOneByRoomIdAndUserId(item.rid, userId, {
+			fields: { _id: 1 },
+		});
+		if (!subscription) {
+			api.broadcast('notify.ephemeralMessage', userId, item.rid, {
+				msg: TAPi18n.__('Username_is_not_in_this_room', {
+					postProcess: 'sprintf',
+					sprintf: [username],
+					lng,
+				}),
+			});
+			return;
+		}
+		const { rid } = item;
+		Meteor.call('removeUserFromRoom', { rid, username });
 	},
 	options: {
 		description: 'Remove_someone_from_room',

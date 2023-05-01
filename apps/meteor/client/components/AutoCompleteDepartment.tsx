@@ -9,13 +9,12 @@ import { AsyncStatePhase } from '../hooks/useAsyncState';
 import { useDepartmentsList } from './Omnichannel/hooks/useDepartmentsList';
 
 type AutoCompleteDepartmentProps = {
-	value?: string;
+	value?: { value: string; label: string } | string;
 	onChange: (value: string) => void;
 	excludeDepartmentId?: string;
 	onlyMyDepartments?: boolean;
 	haveAll?: boolean;
 	haveNone?: boolean;
-	showArchived?: boolean;
 };
 
 const AutoCompleteDepartment = ({
@@ -25,10 +24,9 @@ const AutoCompleteDepartment = ({
 	onChange,
 	haveAll,
 	haveNone,
-	showArchived = false,
 }: AutoCompleteDepartmentProps): ReactElement | null => {
 	const t = useTranslation();
-	const [departmentsFilter, setDepartmentsFilter] = useState<string>('');
+	const [departmentsFilter, setDepartmentsFilter] = useState('');
 
 	const debouncedDepartmentsFilter = useDebouncedValue(departmentsFilter, 500);
 
@@ -40,22 +38,48 @@ const AutoCompleteDepartment = ({
 				haveAll,
 				haveNone,
 				excludeDepartmentId,
-				showArchived,
 			}),
-			[debouncedDepartmentsFilter, onlyMyDepartments, haveAll, haveNone, excludeDepartmentId, showArchived],
+			[debouncedDepartmentsFilter, onlyMyDepartments, haveAll, haveNone, excludeDepartmentId],
 		),
 	);
 
 	const { phase: departmentsPhase, items: departmentsItems, itemCount: departmentsTotal } = useRecordList(departmentsList);
 
+	const sortedByName = useMemo(
+		() =>
+			departmentsItems.sort((a, b) => {
+				if (a.value.value === 'all') {
+					return -1;
+				}
+
+				if (a.name > b.name) {
+					return 1;
+				}
+				if (a.name < b.name) {
+					return -1;
+				}
+
+				return 0;
+			}),
+		[departmentsItems],
+	);
+
+	const department = useMemo(() => {
+		const valueFound = typeof value === 'string' ? value : value?.value || '';
+		return sortedByName.find((dep) => dep.value.value === valueFound)?.value;
+	}, [sortedByName, value]);
+
 	return (
 		<PaginatedSelectFiltered
 			withTitle
-			value={value}
+			value={department}
 			onChange={onChange}
 			filter={departmentsFilter}
-			setFilter={setDepartmentsFilter as (value?: string | number) => void}
-			options={departmentsItems}
+			// Workaround for setFilter weird typing
+			setFilter={setDepartmentsFilter as (value: string | number | undefined) => void}
+			// TODO: Fix typing on fuselage
+			// Workaround for options wrong typing
+			options={sortedByName as any}
 			placeholder={t('Select_an_option')}
 			data-qa='autocomplete-department'
 			endReached={

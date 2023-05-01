@@ -1,54 +1,37 @@
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactElement } from 'react';
 
 import { LoginForm } from './LoginForm';
 import ResetPasswordForm from './ResetPasswordForm';
 import { useLoginRouter } from './hooks/useLoginRouter';
+import HorizontalTemplate from './template/HorizontalTemplate';
 import RegisterSecretPageRouter from './RegisterSecretPageRouter';
-import RegisterTemplate from './RegisterTemplate';
-import type { LoginRoutes } from './hooks/useLoginRouter';
-import GuestForm from './GuestForm';
 
 export const RegistrationPageRouter = ({
 	defaultRoute = 'login',
-	children,
 }: {
-	defaultRoute?: LoginRoutes;
-	children?: ReactNode;
+	defaultRoute?: 'login' | 'register' | 'reset-password' | 'secret-register';
 }): ReactElement | null => {
 	const [route, setLoginRoute] = useLoginRouter(defaultRoute);
 
-	if (route === 'guest') {
-		return (
-			<RegisterTemplate>
-				<GuestForm setLoginRoute={setLoginRoute} />
-			</RegisterTemplate>
-		);
-	}
-
 	if (route === 'login') {
 		return (
-			<RegisterTemplate>
+			<HorizontalTemplate>
 				<LoginForm setLoginRoute={setLoginRoute} />
-			</RegisterTemplate>
+			</HorizontalTemplate>
 		);
 	}
 
 	if (route === 'reset-password') {
 		return (
-			<RegisterTemplate>
+			<HorizontalTemplate>
 				<ResetPasswordForm setLoginRoute={setLoginRoute} />
-			</RegisterTemplate>
+			</HorizontalTemplate>
 		);
 	}
 
 	if (route === 'secret-register' || route === 'register') {
 		return <RegisterSecretPageRouter origin={route} setLoginRoute={setLoginRoute} />;
 	}
-
-	if (route === 'anonymous') {
-		return <>{children}</>;
-	}
-
 	return null;
 };
 

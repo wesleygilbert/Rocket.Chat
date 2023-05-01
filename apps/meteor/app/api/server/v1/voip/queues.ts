@@ -21,12 +21,12 @@ API.v1.addRoute(
 	{
 		async get() {
 			check(
-				this.queryParams,
+				this.requestParams(),
 				Match.ObjectIncluding({
 					extension: String,
 				}),
 			);
-			const membershipDetails: IVoipConnectorResult = await Voip.getQueuedCallsForThisExtension(this.queryParams);
+			const membershipDetails: IVoipConnectorResult = await Voip.getQueuedCallsForThisExtension(this.requestParams());
 			return API.v1.success(membershipDetails.result as IQueueMembershipDetails);
 		},
 	},
@@ -38,12 +38,12 @@ API.v1.addRoute(
 	{
 		async get() {
 			check(
-				this.queryParams,
+				this.requestParams(),
 				Match.ObjectIncluding({
 					extension: String,
 				}),
 			);
-			const membershipDetails: IVoipConnectorResult = await Voip.getQueueMembership(this.queryParams);
+			const membershipDetails: IVoipConnectorResult = await Voip.getQueueMembership(this.requestParams());
 			return API.v1.success(membershipDetails.result as IQueueMembershipSubscription);
 		},
 	},

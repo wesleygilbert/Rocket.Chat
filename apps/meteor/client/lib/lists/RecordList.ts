@@ -1,3 +1,4 @@
+import type { IRocketChatRecord } from '@rocket.chat/core-typings';
 import { Emitter } from '@rocket.chat/emitter';
 
 import { AsyncStatePhase } from '../asyncState';
@@ -7,7 +8,7 @@ export type RecordListBatchChanges<T> = {
 	itemCount?: number;
 };
 
-export class RecordList<T extends { _id: string; _updatedAt?: Date }> extends Emitter {
+export class RecordList<T extends IRocketChatRecord> extends Emitter {
 	#hasChanges = false;
 
 	#index = new Map<T['_id'], T>();
@@ -23,9 +24,7 @@ export class RecordList<T extends { _id: string; _updatedAt?: Date }> extends Em
 	}
 
 	protected compare(a: T, b: T): number {
-		const aUpdatedAt = typeof a._updatedAt === 'string' ? new Date(a._updatedAt) : a._updatedAt;
-		const bUpdatedAt = typeof b._updatedAt === 'string' ? new Date(b._updatedAt) : b._updatedAt;
-		return (bUpdatedAt?.getTime() ?? -1) - (aUpdatedAt?.getTime() ?? -1);
+		return b._updatedAt.getTime() - a._updatedAt.getTime();
 	}
 
 	public get phase(): AsyncStatePhase {

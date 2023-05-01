@@ -1,7 +1,7 @@
-import type { SlashCommandCallbackParams } from '@rocket.chat/core-typings';
+import { Meteor } from 'meteor/meteor';
+import s from 'underscore.string';
 
 import { slashCommands } from '../../utils/lib/slashCommand';
-import { executeSendMessage } from '../../lib/server/methods/sendMessage';
 
 /*
  * Me is a named function that will replace /me commands
@@ -9,11 +9,11 @@ import { executeSendMessage } from '../../lib/server/methods/sendMessage';
  */
 slashCommands.add({
 	command: 'me',
-	callback: async function Me({ params, message, userId }: SlashCommandCallbackParams<'me'>): Promise<void> {
-		if (params.trim()) {
-			const msg = message;
+	callback: function Me(_command: 'me', params, item): void {
+		if (s.trim(params)) {
+			const msg = item;
 			msg.msg = `_${params}_`;
-			await executeSendMessage(userId, msg);
+			Meteor.call('sendMessage', msg);
 		}
 	},
 	options: {

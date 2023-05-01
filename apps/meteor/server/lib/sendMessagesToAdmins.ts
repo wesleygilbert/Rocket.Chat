@@ -15,8 +15,8 @@ type Banner = {
 	link: string;
 };
 
-const getData = async <T>(param: T[] | ((params: { adminUser: IUser }) => Promise<T[] | T>), adminUser: IUser): Promise<T[]> => {
-	const result = typeof param === 'function' ? await param({ adminUser }) : param;
+const getData = <T>(param: T[] | ((params: { adminUser: IUser }) => T[]), adminUser: IUser): T[] => {
+	const result = typeof param === 'function' ? param({ adminUser }) : param;
 
 	if (!Array.isArray(result)) {
 		return [result];
@@ -33,8 +33,8 @@ export async function sendMessagesToAdmins({
 }: {
 	fromId?: string;
 	checkFrom?: boolean;
-	msgs?: Partial<IMessage>[] | ((params: { adminUser: IUser }) => Promise<Partial<IMessage>[] | Partial<IMessage>>);
-	banners?: Banner[] | ((params: { adminUser: IUser }) => Promise<Banner[]>);
+	msgs?: Partial<IMessage>[] | ((params: { adminUser: IUser }) => Partial<IMessage>[]);
+	banners?: Banner[] | ((params: { adminUser: IUser }) => Banner[]);
 }): Promise<void> {
 	const fromUser = checkFrom ? await Users.findOneById(fromId, { projection: { _id: 1 } }) : true;
 
@@ -43,16 +43,14 @@ export async function sendMessagesToAdmins({
 	for await (const adminUser of users) {
 		if (fromUser) {
 			try {
-				const { rid } = await createDirectMessage([adminUser.username], fromId);
+				const { rid } = createDirectMessage([adminUser.username], fromId);
 
-				await Promise.all(
-					(await getData<Partial<IMessage>>(msgs, adminUser)).map((msg) => executeSendMessage(fromId, Object.assign({ rid }, msg))),
-				);
+				getData<Partial<IMessage>>(msgs, adminUser).forEach((msg) => executeSendMessage(fromId, Object.assign({ rid }, msg)));
 			} catch (error) {
 				SystemLogger.error(error);
 			}
 		}
 
-		await Promise.all((await getData<Banner>(banners, adminUser)).map((banner) => Users.addBannerById(adminUser._id, banner)));
+		await Promise.all(getData<Banner>(banners, adminUser).map((banner) => Users.addBannerById(adminUser._id, banner)));
 	}
 }

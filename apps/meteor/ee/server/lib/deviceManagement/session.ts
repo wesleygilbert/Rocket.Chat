@@ -4,7 +4,7 @@ import { UAParser } from 'ua-parser-js';
 import type { ISocketConnection, IUser } from '@rocket.chat/core-typings';
 import { Users } from '@rocket.chat/models';
 
-import * as Mailer from '../../../../app/mailer/server/api';
+import * as Mailer from '../../../../app/mailer';
 import { settings } from '../../../../app/settings/server';
 import { UAParserDesktop, UAParserMobile } from '../../../../app/statistics/server/lib/UAParserCustom';
 import { deviceManagementEvents } from '../../../../server/services/device-management/events';
@@ -85,12 +85,12 @@ export const listenSessionLogin = async (): Promise<void> => {
 
 			try {
 				const userReceiveLoginEmailPreference = settings.get('Device_Management_Allow_Login_Email_preference')
-					? await getUserPreference(userId, 'receiveLoginDetectionEmail', true)
+					? getUserPreference(userId, 'receiveLoginDetectionEmail', true)
 					: true;
 				const shouldSendLoginEmail = settings.get('Device_Management_Enable_Login_Emails') && userReceiveLoginEmailPreference;
 
 				if (shouldSendLoginEmail) {
-					await Mailer.send({
+					Mailer.send({
 						to: `${name} <${email}>`,
 						from: Accounts.emailTemplates.from,
 						subject: settings.get('Device_Management_Email_Subject'),
@@ -98,7 +98,7 @@ export const listenSessionLogin = async (): Promise<void> => {
 						data: mailData,
 					});
 				}
-			} catch ({ message }: any) {
+			} catch ({ message }) {
 				throw new Meteor.Error('error-email-send-failed', `Error trying to send email: ${message}`, {
 					method: 'listenSessionLogin',
 					message,

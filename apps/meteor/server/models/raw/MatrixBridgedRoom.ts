@@ -13,7 +13,6 @@ export class MatrixBridgedRoomRaw extends BaseRaw<IMatrixBridgedRoom> implements
 		return [
 			{ key: { rid: 1 }, unique: true, sparse: true },
 			{ key: { mri: 1 }, unique: true, sparse: true },
-			{ key: { fromServer: 1 }, sparse: true },
 		];
 	}
 
@@ -30,16 +29,10 @@ export class MatrixBridgedRoomRaw extends BaseRaw<IMatrixBridgedRoom> implements
 	}
 
 	async removeByLocalRoomId(localRoomId: string): Promise<void> {
-		await this.deleteOne({ rid: localRoomId });
+		this.deleteOne({ rid: localRoomId });
 	}
 
-	async createOrUpdateByLocalRoomId(localRoomId: string, externalRoomId: string, fromServer: string): Promise<void> {
-		await this.updateOne({ rid: localRoomId }, { $set: { rid: localRoomId, mri: externalRoomId, fromServer } }, { upsert: true });
-	}
-
-	async getExternalServerConnectedExcluding(exclude: string): Promise<string[]> {
-		const externalServers = await this.col.distinct('fromServer');
-
-		return externalServers.filter((serverName) => serverName !== exclude);
+	async createOrUpdateByLocalRoomId(localRoomId: string, externalRoomId: string): Promise<void> {
+		await this.updateOne({ rid: localRoomId }, { $set: { rid: localRoomId, mri: externalRoomId } }, { upsert: true });
 	}
 }

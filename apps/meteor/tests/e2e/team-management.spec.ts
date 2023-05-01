@@ -1,11 +1,10 @@
 import { faker } from '@faker-js/faker';
 
-import { Users } from './fixtures/userStates';
-import { HomeTeam } from './page-objects';
-import { createTargetChannel } from './utils';
 import { test, expect } from './utils/test';
+import { createTargetChannel } from './utils';
+import { HomeTeam } from './page-objects';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 test.describe.serial('teams-management', () => {
 	let poHomeTeam: HomeTeam;
@@ -45,7 +44,7 @@ test.describe.serial('teams-management', () => {
 		await poHomeTeam.content.openLastMessageMenu();
 
 		await page.locator('[data-qa-id="reply-in-thread"]').click();
-		await page.locator('.rcx-vertical-bar').locator('role=textbox[name="Message"]').type('any-reply-message');
+		await page.locator('.rcx-vertical-bar .js-input-message').type('any-reply-message');
 		await page.keyboard.press('Enter');
 
 		await expect(poHomeTeam.tabs.flexTabViewThreadMessage).toHaveText('any-reply-message');
@@ -66,6 +65,5 @@ test.describe.serial('teams-management', () => {
 		await poHomeTeam.tabs.channels.inputChannels.type(targetChannel, { delay: 100 });
 		await page.locator(`.rcx-option__content:has-text("${targetChannel}")`).click();
 		await poHomeTeam.tabs.channels.btnAdd.click();
-		await expect(page.locator('//main//aside >> li')).toContainText(targetChannel);
 	});
 });

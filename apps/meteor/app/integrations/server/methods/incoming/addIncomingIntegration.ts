@@ -1,24 +1,18 @@
 import { Meteor } from 'meteor/meteor';
 import { Match, check } from 'meteor/check';
-import { Random } from '@rocket.chat/random';
+import { Random } from 'meteor/random';
 import { Babel } from 'meteor/babel-compiler';
 import _ from 'underscore';
+import s from 'underscore.string';
 import type { INewIncomingIntegration, IIncomingIntegration } from '@rocket.chat/core-typings';
-import { Integrations, Roles, Subscriptions, Users, Rooms } from '@rocket.chat/models';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
+import { Integrations, Roles } from '@rocket.chat/models';
 
-import { hasPermissionAsync, hasAllPermissionAsync } from '../../../../authorization/server/functions/hasPermission';
+import { hasPermission, hasAllPermission } from '../../../../authorization/server';
+import { Users, Rooms, Subscriptions } from '../../../../models/server';
 
 const validChannelChars = ['@', '#'];
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		addIncomingIntegration(integration: INewIncomingIntegration): Promise<IIncomingIntegration>;
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	async addIncomingIntegration(integration: INewIncomingIntegration): Promise<IIncomingIntegration> {
 		const { userId } = this;
 
@@ -38,17 +32,13 @@ Meteor.methods<ServerMethods>({
 			}),
 		);
 
-		if (
-			!userId ||
-			(!(await hasPermissionAsync(userId, 'manage-incoming-integrations')) &&
-				!(await hasPermissionAsync(userId, 'manage-own-incoming-integrations')))
-		) {
+		if (!userId || (!hasPermission(userId, 'manage-incoming-integrations') && !hasPermission(userId, 'manage-own-incoming-integrations'))) {
 			throw new Meteor.Error('not_authorized', 'Unauthorized', {
 				method: 'addIncomingIntegration',
 			});
 		}
 
-		if (!integration.channel || typeof integration.channel.valueOf() !== 'string') {
+		if (!_.isString(integration.channel)) {
 			throw new Meteor.Error('error-invalid-channel', 'Invalid channel', {
 				method: 'addIncomingIntegration',
 			});
@@ -60,7 +50,7 @@ Meteor.methods<ServerMethods>({
 			});
 		}
 
-		const channels = integration.channel.split(',').map((channel) => channel.trim());
+		const channels = _.map(integration.channel.split(','), (channel) => s.trim(channel));
 
 		for (const channel of channels) {
 			if (!validChannelChars.includes(channel[0])) {
@@ -70,13 +60,13 @@ Meteor.methods<ServerMethods>({
 			}
 		}
 
-		if (!integration.username || typeof integration.username.valueOf() !== 'string' || integration.username.trim() === '') {
+		if (!_.isString(integration.username) || integration.username.trim() === '') {
 			throw new Meteor.Error('error-invalid-username', 'Invalid username', {
 				method: 'addIncomingIntegration',
 			});
 		}
 
-		const user = await Users.findOne({ username: integration.username });
+		const user = Users.findOne({ username: integration.username });
 
 		if (!user) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
@@ -91,7 +81,7 @@ Meteor.methods<ServerMethods>({
 			token: Random.id(48),
 			userId: user._id,
 			_createdAt: new Date(),
-			_createdBy: await Users.findOne({ _id: userId }, { projection: { username: 1 } }),
+			_createdBy: Users.findOne(userId, { fields: { username: 1 } }),
 		};
 
 		if (integration.scriptEnabled === true && integration.script && integration.script.trim() !== '') {
@@ -107,19 +97,19 @@ Meteor.methods<ServerMethods>({
 			}
 		}
 
-		for await (let channel of channels) {
+		for (let channel of channels) {
 			let record;
 			const channelType = channel[0];
 			channel = channel.substr(1);
 
 			switch (channelType) {
 				case '#':
-					record = await Rooms.findOne({
+					record = Rooms.findOne({
 						$or: [{ _id: channel }, { name: channel }],
 					});
 					break;
 				case '@':
-					record = await Users.findOne({
+					record = Users.findOne({
 						$or: [{ _id: channel }, { username: channel }],
 					});
 					break;
@@ -132,8 +122,8 @@ Meteor.methods<ServerMethods>({
 			}
 
 			if (
-				!(await hasAllPermissionAsync(userId, ['manage-incoming-integrations', 'manage-own-incoming-integrations'])) &&
-				!(await Subscriptions.findOneByRoomIdAndUserId(record._id, userId, { projection: { _id: 1 } }))
+				!hasAllPermission(userId, ['manage-incoming-integrations', 'manage-own-incoming-integrations']) &&
+				!Subscriptions.findOneByRoomIdAndUserId(record._id, userId, { fields: { _id: 1 } })
 			) {
 				throw new Meteor.Error('error-invalid-channel', 'Invalid Channel', {
 					method: 'addIncomingIntegration',

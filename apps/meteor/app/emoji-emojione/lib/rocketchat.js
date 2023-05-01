@@ -1,8 +1,12 @@
 import emojione from 'emojione';
+import { Meteor } from 'meteor/meteor';
+import { Tracker } from 'meteor/tracker';
 import mem from 'mem';
 
 import { emojioneRender, emojioneRenderFromShort } from './emojioneRender';
 import { emojisByCategory, emojiCategories, toneList } from './emojiPicker';
+import { emoji } from '../../emoji';
+import { getUserPreference } from '../../utils';
 
 // TODO remove fix below when issue is solved: https://github.com/joypixels/emojione/issues/617
 
@@ -256,25 +260,50 @@ emojione.emojioneList[':asterisk_symbol:'] = {
 	};
 })(emojione);
 
-export function getEmojiConfig() {
-	return {
-		emojione,
-		emojisByCategory,
-		emojiCategories,
-		toneList,
-		render: emojioneRender,
-		renderPicker: emojioneRenderFromShort,
-		sprites: true,
-	};
-}
+emoji.packages.emojione = emojione;
+emoji.packages.emojione.sprites = true;
+emoji.packages.emojione.emojisByCategory = emojisByCategory;
+emoji.packages.emojione.emojiCategories = emojiCategories;
+emoji.packages.emojione.toneList = toneList;
+
+emoji.packages.emojione.render = emojioneRender;
+emoji.packages.emojione.renderPicker = emojioneRenderFromShort;
 
 // http://stackoverflow.com/a/26990347 function isSet() from Gajus
-export async function isSetNotNull(fn) {
+function isSetNotNull(fn) {
 	let value;
 	try {
-		value = await fn();
+		value = fn();
 	} catch (e) {
 		value = null;
 	}
 	return value !== null && value !== undefined;
 }
+
+// RocketChat.emoji.list is the collection of emojis from all emoji packages
+for (const key in emojione.emojioneList) {
+	if (emojione.emojioneList.hasOwnProperty(key)) {
+		const currentEmoji = emojione.emojioneList[key];
+		currentEmoji.emojiPackage = 'emojione';
+		emoji.list[key] = currentEmoji;
+
+		if (currentEmoji.shortnames) {
+			currentEmoji.shortnames.forEach((shortname) => {
+				emoji.list[shortname] = currentEmoji;
+			});
+		}
+	}
+}
+
+// Additional settings -- ascii emojis
+Meteor.startup(function () {
+	Tracker.autorun(function () {
+		if (isSetNotNull(() => emoji.packages.emojione)) {
+			if (isSetNotNull(() => getUserPreference(Meteor.userId(), 'convertAsciiEmoji'))) {
+				emoji.packages.emojione.ascii = getUserPreference(Meteor.userId(), 'convertAsciiEmoji');
+			} else {
+				emoji.packages.emojione.ascii = true;
+			}
+		}
+	});
+});

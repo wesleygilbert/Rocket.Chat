@@ -1,14 +1,16 @@
 import { Agenda } from '@rocket.chat/agenda';
 import { MongoInternals } from 'meteor/mongo';
 import { Meteor } from 'meteor/meteor';
-import { LivechatRooms, Users } from '@rocket.chat/models';
+import { LivechatRooms } from '@rocket.chat/models';
 import type { IUser } from '@rocket.chat/core-typings';
 
+import { Users } from '../../../../../app/models/server';
 import { Livechat } from '../../../../../app/livechat/server';
 import { RoutingManager } from '../../../../../app/livechat/server/lib/RoutingManager';
 import { forwardRoomToAgent } from '../../../../../app/livechat/server/lib/Helper';
 import { settings } from '../../../../../app/settings/server';
 
+const schedulerUser = Users.findOneById('rocket.cat');
 const SCHEDULER_NAME = 'omnichannel_scheduler';
 
 class AutoTransferChatSchedulerClass {
@@ -18,7 +20,7 @@ class AutoTransferChatSchedulerClass {
 
 	user: IUser;
 
-	public async init(): Promise<void> {
+	public init(): void {
 		if (this.running) {
 			return;
 		}
@@ -29,12 +31,8 @@ class AutoTransferChatSchedulerClass {
 			defaultConcurrency: 1,
 		});
 
-		await this.scheduler.start();
+		this.scheduler.start();
 		this.running = true;
-	}
-
-	private async getSchedulerUser(): Promise<IUser | null> {
-		return Users.findOneById('rocket.cat');
 	}
 
 	public async scheduleRoom(roomId: string, timeout: number): Promise<void> {
@@ -79,7 +77,7 @@ class AutoTransferChatSchedulerClass {
 			return Livechat.returnRoomAsInquiry(room._id, departmentId, {
 				scope: 'autoTransferUnansweredChatsToQueue',
 				comment: timeoutDuration,
-				transferredBy: await this.getSchedulerUser(),
+				transferredBy: schedulerUser,
 			});
 		}
 
@@ -87,7 +85,7 @@ class AutoTransferChatSchedulerClass {
 		if (agent) {
 			return forwardRoomToAgent(room, {
 				userId: agent.agentId,
-				transferredBy: await this.getSchedulerUser(),
+				transferredBy: schedulerUser,
 				transferredTo: agent,
 				scope: 'autoTransferUnansweredChatsToAgent',
 				comment: timeoutDuration,
@@ -111,5 +109,5 @@ class AutoTransferChatSchedulerClass {
 export const AutoTransferChatScheduler = new AutoTransferChatSchedulerClass();
 
 Meteor.startup(() => {
-	void AutoTransferChatScheduler.init();
+	AutoTransferChatScheduler.init();
 });

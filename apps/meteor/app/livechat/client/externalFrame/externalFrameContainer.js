@@ -1,12 +1,11 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
+import { Session } from 'meteor/session';
 import { ReactiveVar } from 'meteor/reactive-var';
 
 import { APIClient } from '../../../utils/client';
 import { settings } from '../../../settings/client';
 import { encrypt, getKeyFromString } from './crypto';
-import { asReactiveSource } from '../../../../client/lib/tracker';
-import { RoomManager } from '../../../../client/lib/RoomManager';
 
 import './externalFrameContainer.html';
 
@@ -24,13 +23,7 @@ Template.ExternalFrameContainer.helpers({
 			const frameURL = new URL(frameURLSetting);
 
 			frameURL.searchParams.append('uid', Meteor.userId());
-			frameURL.searchParams.append(
-				'rid',
-				asReactiveSource(
-					(cb) => RoomManager.on('changed', cb),
-					() => RoomManager.opened,
-				),
-			);
+			frameURL.searchParams.append('rid', Session.get('openedRoom'));
 			frameURL.searchParams.append('t', authToken);
 
 			return frameURL.toString();

@@ -3,7 +3,7 @@ import type { ReactElement } from 'react';
 
 import { useCheckRegistrationSecret } from './hooks/useCheckRegistrationSecret';
 import type { DispatchLoginRouter } from './hooks/useLoginRouter';
-import RegisterForm from './RegisterForm';
+import LoginRegisterForm from './RegisterForm';
 import SecretRegisterInvalidForm from './SecretRegisterInvalidForm';
 import FormSkeleton from './template/FormSkeleton';
 import HorizontalTemplate from './template/HorizontalTemplate';
@@ -20,7 +20,7 @@ const SecretRegisterForm = ({ setLoginRoute }: { setLoginRoute: DispatchLoginRou
 	if (isSuccess && valid) {
 		return (
 			<HorizontalTemplate>
-				<RegisterForm setLoginRoute={setLoginRoute} />
+				<LoginRegisterForm setLoginRoute={setLoginRoute} />
 			</HorizontalTemplate>
 		);
 	}

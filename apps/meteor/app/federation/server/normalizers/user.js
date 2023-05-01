@@ -1,6 +1,6 @@
 import _ from 'underscore';
-import { Users } from '@rocket.chat/models';
 
+import { Users } from '../../../models/server';
 import { getNameAndDomain, isFullyQualified } from '../functions/helpers';
 import { getFederationDomain } from '../lib/getFederationDomain';
 
@@ -25,7 +25,7 @@ const denormalizeUser = (originalResource) => {
 
 const denormalizeAllUsers = (resources) => resources.map(denormalizeUser);
 
-const normalizeUser = async (originalResource) => {
+const normalizeUser = (originalResource) => {
 	// Get only what we need, non-sensitive data
 	const resource = _.pick(
 		originalResource,
@@ -63,12 +63,12 @@ const normalizeUser = async (originalResource) => {
 	resource.isRemote = resource.federation.origin !== getFederationDomain();
 
 	// Persist the normalization
-	await Users.updateOne({ _id: resource._id }, { $set: { isRemote: resource.isRemote, federation: resource.federation } });
+	Users.update({ _id: resource._id }, { $set: { isRemote: resource.isRemote, federation: resource.federation } });
 
 	return resource;
 };
 
-const normalizeAllUsers = (resources) => Promise.all(resources.map(normalizeUser));
+const normalizeAllUsers = (resources) => resources.map(normalizeUser);
 
 export default {
 	denormalizeUser,

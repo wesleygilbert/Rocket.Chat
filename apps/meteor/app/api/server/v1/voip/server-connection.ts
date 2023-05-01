@@ -9,7 +9,7 @@ API.v1.addRoute(
 	{
 		async get() {
 			check(
-				this.queryParams,
+				this.requestParams(),
 				Match.ObjectIncluding({
 					host: String,
 					port: String,
@@ -17,7 +17,7 @@ API.v1.addRoute(
 					password: String,
 				}),
 			);
-			const { host, port, username, password } = this.queryParams;
+			const { host, port, username, password } = this.requestParams();
 			return API.v1.success(await Voip.checkManagementConnection(host, port, username, password));
 		},
 	},
@@ -29,7 +29,7 @@ API.v1.addRoute(
 	{
 		async get() {
 			check(
-				this.queryParams,
+				this.requestParams(),
 				Match.ObjectIncluding({
 					websocketUrl: Match.Maybe(String),
 					host: Match.Maybe(String),
@@ -37,7 +37,7 @@ API.v1.addRoute(
 					path: Match.Maybe(String),
 				}),
 			);
-			const { websocketUrl, host, port, path } = this.queryParams;
+			const { websocketUrl, host, port, path } = this.requestParams();
 			if (!websocketUrl && !(host && port && path)) {
 				return API.v1.failure('Incorrect / Insufficient Parameters');
 			}

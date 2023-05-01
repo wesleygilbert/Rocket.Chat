@@ -5,7 +5,6 @@ import type {
 	FindCursor,
 	Db,
 	DeleteResult,
-	Document,
 	Filter,
 	FindOptions,
 	IndexDescription,
@@ -36,9 +35,9 @@ export class TeamMemberRaw extends BaseRaw<ITeamMember> implements ITeamMemberMo
 
 	findByUserId(userId: string, options: FindOptions<ITeamMember>): FindCursor<ITeamMember>;
 
-	findByUserId<P extends Document>(userId: string, options: FindOptions<P>): FindCursor<P>;
+	findByUserId<P>(userId: string, options: FindOptions<P>): FindCursor<P>;
 
-	findByUserId<P extends Document>(
+	findByUserId<P>(
 		userId: string,
 		options?: undefined | FindOptions<ITeamMember> | FindOptions<P extends ITeamMember ? ITeamMember : P>,
 	): FindCursor<P> | FindCursor<ITeamMember> {
@@ -49,9 +48,9 @@ export class TeamMemberRaw extends BaseRaw<ITeamMember> implements ITeamMemberMo
 
 	findOneByUserIdAndTeamId(userId: string, teamId: string, options: FindOptions<ITeamMember>): Promise<ITeamMember | null>;
 
-	findOneByUserIdAndTeamId<P extends Document>(userId: string, teamId: string, options: FindOptions<P>): Promise<P | null>;
+	findOneByUserIdAndTeamId<P>(userId: string, teamId: string, options: FindOptions<P>): Promise<P | null>;
 
-	findOneByUserIdAndTeamId<P extends Document>(
+	findOneByUserIdAndTeamId<P>(
 		userId: string,
 		teamId: string,
 		options?: undefined | FindOptions<ITeamMember> | FindOptions<P extends ITeamMember ? ITeamMember : P>,
@@ -63,9 +62,9 @@ export class TeamMemberRaw extends BaseRaw<ITeamMember> implements ITeamMemberMo
 
 	findByTeamId(teamId: string, options: FindOptions<ITeamMember>): FindCursor<ITeamMember>;
 
-	findByTeamId<P extends Document>(teamId: string, options: FindOptions<P>): FindCursor<P>;
+	findByTeamId<P>(teamId: string, options: FindOptions<P>): FindCursor<P>;
 
-	findByTeamId<P extends Document>(
+	findByTeamId<P>(
 		teamId: string,
 		options?: undefined | FindOptions<ITeamMember> | FindOptions<P extends ITeamMember ? ITeamMember : P>,
 	): FindCursor<P> | FindCursor<ITeamMember> {
@@ -76,9 +75,9 @@ export class TeamMemberRaw extends BaseRaw<ITeamMember> implements ITeamMemberMo
 
 	findByTeamIds(teamIds: Array<string>, options: FindOptions<ITeamMember>): FindCursor<ITeamMember>;
 
-	findByTeamIds<P extends Document>(teamIds: Array<string>, options: FindOptions<P>): FindCursor<P>;
+	findByTeamIds<P>(teamIds: Array<string>, options: FindOptions<P>): FindCursor<P>;
 
-	findByTeamIds<P extends Document>(
+	findByTeamIds<P>(
 		teamIds: Array<string>,
 		options?: undefined | FindOptions<ITeamMember> | FindOptions<P extends ITeamMember ? ITeamMember : P>,
 	): FindCursor<P> | FindCursor<ITeamMember> {
@@ -89,9 +88,9 @@ export class TeamMemberRaw extends BaseRaw<ITeamMember> implements ITeamMemberMo
 
 	findByTeamIdAndRole(teamId: string, role: IRole['_id'], options: FindOptions<ITeamMember>): FindCursor<ITeamMember>;
 
-	findByTeamIdAndRole<P extends Document>(teamId: string, role: IRole['_id'], options: FindOptions<P>): FindCursor<P>;
+	findByTeamIdAndRole<P>(teamId: string, role: IRole['_id'], options: FindOptions<P>): FindCursor<P>;
 
-	findByTeamIdAndRole<P extends Document>(
+	findByTeamIdAndRole<P>(
 		teamId: string,
 		role: IRole['_id'],
 		options?: undefined | FindOptions<ITeamMember> | FindOptions<P extends ITeamMember ? ITeamMember : P>,

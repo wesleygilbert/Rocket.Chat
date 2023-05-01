@@ -24,8 +24,8 @@ export interface IEmailInbox {
 	_createdAt: Date;
 	_createdBy: {
 		_id: string;
-		username?: string;
-	} | null;
+		username: string;
+	};
 	_updatedAt: Date;
 }
 

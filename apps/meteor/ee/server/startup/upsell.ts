@@ -10,7 +10,7 @@ const handleHadTrial = (): void => {
 		}
 
 		if (license.meta?.trial) {
-			void Settings.updateValueById('Cloud_Workspace_Had_Trial', true);
+			Settings.updateValueById('Cloud_Workspace_Had_Trial', true);
 		}
 	});
 };

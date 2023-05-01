@@ -21,7 +21,7 @@ export default class MentionsServer extends MentionsParser {
 	}
 
 	get getUsers() {
-		return typeof this._getUsers === 'function' ? this._getUsers : async () => this._getUsers;
+		return typeof this._getUsers === 'function' ? this._getUsers : () => this._getUsers;
 	}
 
 	set getChannels(m) {
@@ -48,38 +48,36 @@ export default class MentionsServer extends MentionsParser {
 		return typeof this._messageMaxAll === 'function' ? this._messageMaxAll() : this._messageMaxAll;
 	}
 
-	async getUsersByMentions({ msg, rid, u: sender }) {
+	getUsersByMentions({ msg, rid, u: sender }) {
 		let mentions = this.getUserMentions(msg);
 		const mentionsAll = [];
 		const userMentions = [];
 
-		for await (const m of mentions) {
+		mentions.forEach((m) => {
 			const mention = m.trim().substr(1);
 			if (mention !== 'all' && mention !== 'here') {
-				userMentions.push(mention);
-				continue;
+				return userMentions.push(mention);
 			}
-			if (this.messageMaxAll > 0 && (await this.getTotalChannelMembers(rid)) > this.messageMaxAll) {
-				await this.onMaxRoomMembersExceeded({ sender, rid });
-				continue;
+			if (this.messageMaxAll > 0 && this.getTotalChannelMembers(rid) > this.messageMaxAll) {
+				return this.onMaxRoomMembersExceeded({ sender, rid });
 			}
 			mentionsAll.push({
 				_id: mention,
 				username: mention,
 			});
-		}
-		mentions = userMentions.length ? await this.getUsers(userMentions) : [];
+		});
+		mentions = userMentions.length ? this.getUsers(userMentions) : [];
 		return [...mentionsAll, ...mentions];
 	}
 
-	async getChannelbyMentions({ msg }) {
+	getChannelbyMentions({ msg }) {
 		const channels = this.getChannelMentions(msg);
 		return this.getChannels(channels.map((c) => c.trim().substr(1)));
 	}
 
-	async execute(message) {
-		const mentionsAll = await this.getUsersByMentions(message);
-		const channels = await this.getChannelbyMentions(message);
+	execute(message) {
+		const mentionsAll = this.getUsersByMentions(message);
+		const channels = this.getChannelbyMentions(message);
 
 		message.mentions = mentionsAll;
 		message.channels = channels;

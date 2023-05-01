@@ -1,6 +1,6 @@
 import type { IInstanceStatus } from '@rocket.chat/core-typings';
 
-declare const connection:
+export declare const connection:
 	| {
 			_id: string;
 			address: string;

@@ -69,6 +69,7 @@ export async function testFileUploads(filesEndpoint: 'channels.files' | 'groups.
 	});
 
 	it('should succeed when searching by roomId', function (done) {
+		console.log('room._id ->', room._id);
 		request
 			.get(api(filesEndpoint))
 			.set(credentials)

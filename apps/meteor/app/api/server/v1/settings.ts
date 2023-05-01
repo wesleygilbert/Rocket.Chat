@@ -12,12 +12,11 @@ import {
 import { Settings } from '@rocket.chat/models';
 import type { FindOptions } from 'mongodb';
 
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
-import type { ResultFor } from '../definition';
+import { hasPermission } from '../../../authorization/server';
+import type { ResultFor } from '../api';
 import { API } from '../api';
 import { SettingsEvents, settings } from '../../../settings/server';
 import { setValue } from '../../../settings/server/raw';
-import { getPaginationItems } from '../helpers/getPaginationItems';
 
 async function fetchSettings(
 	query: Parameters<typeof Settings.find>[0],
@@ -45,8 +44,8 @@ API.v1.addRoute(
 	{ authRequired: false },
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { sort, fields, query } = await this.parseJsonQuery();
+			const { offset, count } = this.getPaginationItems();
+			const { sort, fields, query } = this.parseJsonQuery();
 
 			const ourQuery = {
 				...query,
@@ -70,8 +69,8 @@ API.v1.addRoute(
 	'settings.oauth',
 	{ authRequired: false },
 	{
-		async get() {
-			const oAuthServicesEnabled = await ServiceConfiguration.configurations.find({}, { fields: { secret: 0 } }).fetchAsync();
+		get() {
+			const oAuthServicesEnabled = ServiceConfiguration.configurations.find({}, { fields: { secret: 0 } }).fetch();
 
 			return API.v1.success({
 				services: oAuthServicesEnabled.map((service) => {
@@ -107,7 +106,7 @@ API.v1.addRoute(
 				throw new Meteor.Error('error-name-param-not-provided', 'The parameter "name" is required');
 			}
 
-			await Meteor.callAsync('addOAuthService', this.bodyParams.name, this.userId);
+			await Meteor.call('addOAuthService', this.bodyParams.name, this.userId);
 
 			return API.v1.success();
 		},
@@ -119,14 +118,14 @@ API.v1.addRoute(
 	{ authRequired: true },
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { sort, fields, query } = await this.parseJsonQuery();
+			const { offset, count } = this.getPaginationItems();
+			const { sort, fields, query } = this.parseJsonQuery();
 
 			let ourQuery: Parameters<typeof Settings.find>[0] = {
 				hidden: { $ne: true },
 			};
 
-			if (!(await hasPermissionAsync(this.userId, 'view-privileged-setting'))) {
+			if (!hasPermission(this.userId, 'view-privileged-setting')) {
 				ourQuery.public = true;
 			}
 
@@ -149,7 +148,7 @@ API.v1.addRoute(
 	{ authRequired: true },
 	{
 		async get() {
-			if (!(await hasPermissionAsync(this.userId, 'view-privileged-setting'))) {
+			if (!hasPermission(this.userId, 'view-privileged-setting')) {
 				return API.v1.unauthorized();
 			}
 			const setting = await Settings.findOneNotHiddenById(this.urlParams._id);
@@ -161,7 +160,7 @@ API.v1.addRoute(
 		post: {
 			twoFactorRequired: true,
 			async action(): Promise<ResultFor<'POST', '/v1/settings/:_id'>> {
-				if (!(await hasPermissionAsync(this.userId, 'edit-privileged-setting'))) {
+				if (!hasPermission(this.userId, 'edit-privileged-setting')) {
 					return API.v1.unauthorized();
 				}
 
@@ -178,15 +177,15 @@ API.v1.addRoute(
 
 				if (isSettingAction(setting) && isSettingsUpdatePropsActions(this.bodyParams) && this.bodyParams.execute) {
 					// execute the configured method
-					await Meteor.callAsync(setting.value);
+					Meteor.call(setting.value);
 					return API.v1.success();
 				}
 
 				if (isSettingColor(setting) && isSettingsUpdatePropsColor(this.bodyParams)) {
-					await Settings.updateOptionsById<ISettingColor>(this.urlParams._id, {
+					Settings.updateOptionsById<ISettingColor>(this.urlParams._id, {
 						editor: this.bodyParams.editor,
 					});
-					await Settings.updateValueNotHiddenById(this.urlParams._id, this.bodyParams.value);
+					Settings.updateValueNotHiddenById(this.urlParams._id, this.bodyParams.value);
 					return API.v1.success();
 				}
 
@@ -213,9 +212,9 @@ API.v1.addRoute(
 	'service.configurations',
 	{ authRequired: false },
 	{
-		async get() {
+		get() {
 			return API.v1.success({
-				configurations: await ServiceConfiguration.configurations.find({}, { fields: { secret: 0 } }).fetchAsync(),
+				configurations: ServiceConfiguration.configurations.find({}, { fields: { secret: 0 } }).fetch(),
 			});
 		},
 	},

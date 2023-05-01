@@ -2,20 +2,17 @@ import type { AtLeast, IRoom } from '@rocket.chat/core-typings';
 import { isRoomFederated, TEAM_TYPE } from '@rocket.chat/core-typings';
 import { Team } from '@rocket.chat/core-services';
 
+import { Federation } from '../../../../app/federation-v2/server/Federation';
 import { settings } from '../../../../app/settings/server';
 import type { IRoomTypeServerDirectives } from '../../../../definition/IRoomTypeConfig';
 import { RoomSettingsEnum, RoomMemberActions } from '../../../../definition/IRoomTypeConfig';
 import { getPublicRoomType } from '../../../../lib/rooms/roomTypes/public';
 import { roomCoordinator } from '../roomCoordinator';
-import { Federation } from '../../../services/federation/Federation';
 
-const PublicRoomType = getPublicRoomType(roomCoordinator);
+export const PublicRoomType = getPublicRoomType(roomCoordinator);
 
 roomCoordinator.add(PublicRoomType, {
 	allowRoomSettingChange(room, setting) {
-		if (isRoomFederated(room)) {
-			return Federation.isRoomSettingAllowed(room, setting);
-		}
 		switch (setting) {
 			case RoomSettingsEnum.BROADCAST:
 				return Boolean(room.broadcast);
@@ -31,9 +28,9 @@ roomCoordinator.add(PublicRoomType, {
 		}
 	},
 
-	async allowMemberAction(_room, action, userId) {
+	allowMemberAction(_room, action) {
 		if (isRoomFederated(_room as IRoom)) {
-			return Federation.actionAllowed(_room, action, userId);
+			return Federation.actionAllowed(_room, action);
 		}
 		switch (action) {
 			case RoomMemberActions.BLOCK:
@@ -43,8 +40,8 @@ roomCoordinator.add(PublicRoomType, {
 		}
 	},
 
-	async roomName(room, _userId?) {
-		if (room.prid || isRoomFederated(room)) {
+	roomName(room, _userId?) {
+		if (room.prid) {
 			return room.fname;
 		}
 		if (settings.get('UI_Allow_room_names_with_special_chars')) {
@@ -61,9 +58,9 @@ roomCoordinator.add(PublicRoomType, {
 		return true;
 	},
 
-	async getDiscussionType(room) {
+	getDiscussionType(room) {
 		if (room?.teamId) {
-			const team = await Team.getOneById(room.teamId, { projection: { type: 1 } });
+			const team = Promise.await(Team.getOneById(room.teamId, { projection: { type: 1 } }));
 			if (team?.type === TEAM_TYPE.PRIVATE) {
 				return 'p';
 			}

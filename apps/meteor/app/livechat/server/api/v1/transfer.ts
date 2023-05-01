@@ -1,8 +1,6 @@
-import { LivechatRooms } from '@rocket.chat/models';
-
+import { LivechatRooms } from '../../../../models/server';
 import { API } from '../../../../api/server';
 import { findLivechatTransferHistory } from '../lib/transfer';
-import { getPaginationItems } from '../../../../api/server/helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'livechat/transfer.history/:rid',
@@ -11,12 +9,13 @@ API.v1.addRoute(
 		async get() {
 			const { rid } = this.urlParams;
 
-			const room = await LivechatRooms.findOneById(rid, { projection: { _id: 1 } });
+			const room = LivechatRooms.findOneById(rid, { _id: 1 });
 			if (!room) {
 				throw new Error('invalid-room');
 			}
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { sort } = await this.parseJsonQuery();
+
+			const { offset, count } = this.getPaginationItems();
+			const { sort } = this.parseJsonQuery();
 
 			const history = await findLivechatTransferHistory({
 				rid,

@@ -50,11 +50,7 @@ const WebdavFilePickerModal = ({ onUpload, onClose, account }: WebdavFilePickerM
 				}
 				return getWebdavFilePreview(accountId, node.filename)
 					.then((res) => {
-						if (!res?.data) {
-							return;
-						}
-
-						const blob = new Blob([res?.data], { type: 'image/png' });
+						const blob = new Blob([res.data], { type: 'image/png' });
 						const imgURL = URL.createObjectURL(blob);
 						nodes[index].preview = imgURL;
 					})

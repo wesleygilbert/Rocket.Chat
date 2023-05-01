@@ -1,5 +1,5 @@
 import { Meteor } from 'meteor/meteor';
-import { Random } from '@rocket.chat/random';
+import { Random } from 'meteor/random';
 
 class PasswordPolicy {
 	constructor({

@@ -5,7 +5,7 @@ import telemetryEvent from '../lib/telemetryEvents';
 type updateCounterDataType = { settingsId: string };
 
 export function updateCounter(data: updateCounterDataType): void {
-	void Settings.incrementValueById(data.settingsId);
+	Settings.incrementValueById(data.settingsId);
 }
 
 telemetryEvent.register('updateCounter', updateCounter);

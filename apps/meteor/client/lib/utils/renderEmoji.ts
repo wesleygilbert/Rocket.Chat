@@ -1,4 +1,4 @@
-import { emoji } from '../../../app/emoji/client/lib';
+import { emoji } from '../../../app/emoji/lib/rocketchat';
 
 const emojiList = emoji.list as Record<string, { emojiPackage: string }>;
 const emojiPackages = emoji.packages as Record<string, { render(emojiName: string): string }>;
@@ -21,7 +21,7 @@ type EmojiParserResult = {
 	'image'?: string;
 };
 
-const createGetEmojiClassNameAndDataTitle =
+export const createGetEmojiClassNameAndDataTitle =
 	(parser: (emojiName: string) => string | undefined) =>
 	(emojiName: string): EmojiParserResult => {
 		const html = parser(emojiName);

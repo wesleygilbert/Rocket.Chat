@@ -98,21 +98,10 @@ const AccountProfileForm = ({ values, handlers, user, settings, onSaveStateChang
 		}
 	}, [dispatchToastMessage, email, previousEmail, sendConfirmationEmail, t]);
 
-	// this is will decide whether form can be saved
-	const passwordError = useMemo(() => {
-		// if changing password in not initiated, no password error
-		const passwordUpdateNotStarted = !password && !confirmationPassword;
-		const passwordMatches = password && confirmationPassword && password === confirmationPassword;
-
-		return passwordUpdateNotStarted || passwordMatches ? undefined : t('Passwords_do_not_match');
-	}, [t, password, confirmationPassword]);
-
-	// this will decide when to password mismatch on UI
-	const showPasswordError = useMemo(
-		() => (!password || !confirmationPassword ? false : !!passwordError),
-		[passwordError, password, confirmationPassword],
+	const passwordError = useMemo(
+		() => (!password || !confirmationPassword || password === confirmationPassword ? undefined : t('Passwords_do_not_match')),
+		[t, password, confirmationPassword],
 	);
-
 	const emailError = useMemo(() => (validateEmail(email) ? undefined : 'error-invalid-email-address'), [email]);
 	const checkUsername = useDebouncedCallback(
 		async (username: string) => {
@@ -175,9 +164,11 @@ const AccountProfileForm = ({ values, handlers, user, settings, onSaveStateChang
 		return undefined;
 	}, [bio, t]);
 
-	const verified = user?.emails?.[0]?.verified ?? false;
+	const {
+		emails: [{ verified = false } = { verified: false }],
+	} = user as any;
 
-	const canSave = !(!!passwordError || !!emailError || !!usernameError || !!nameError || !!statusTextError || !!bioError);
+	const canSave = !![!!passwordError, !!emailError, !!usernameError, !!nameError, !!statusTextError, !!bioError].filter(Boolean);
 
 	useEffect(() => {
 		onSaveStateChange(canSave);
@@ -344,7 +335,7 @@ const AccountProfileForm = ({ values, handlers, user, settings, onSaveStateChang
 											<PasswordInput
 												autoComplete='off'
 												disabled={!allowPasswordChange}
-												error={showPasswordError ? passwordError : undefined}
+												error={passwordError}
 												flexGrow={1}
 												value={password}
 												onChange={handlePassword}
@@ -354,7 +345,7 @@ const AccountProfileForm = ({ values, handlers, user, settings, onSaveStateChang
 										{!allowPasswordChange && <Field.Hint>{t('Password_Change_Disabled')}</Field.Hint>}
 									</Field>
 								),
-								[t, password, handlePassword, passwordError, allowPasswordChange, showPasswordError],
+								[t, password, handlePassword, passwordError, allowPasswordChange],
 							)}
 							{useMemo(
 								() => (
@@ -364,18 +355,18 @@ const AccountProfileForm = ({ values, handlers, user, settings, onSaveStateChang
 											<Field.Row>
 												<PasswordInput
 													autoComplete='off'
-													error={showPasswordError ? passwordError : undefined}
+													error={passwordError}
 													flexGrow={1}
 													value={confirmationPassword}
 													onChange={handleConfirmationPassword}
 													addon={<Icon name='key' size='x20' />}
 												/>
 											</Field.Row>
-											{passwordError && <Field.Error>{showPasswordError ? passwordError : undefined}</Field.Error>}
+											{passwordError && <Field.Error>{passwordError}</Field.Error>}
 										</AnimatedVisibility>
 									</Field>
 								),
-								[t, confirmationPassword, handleConfirmationPassword, password, passwordError, showPasswordError],
+								[t, confirmationPassword, handleConfirmationPassword, password, passwordError],
 							)}
 						</FieldGroup>
 					</Grid.Item>

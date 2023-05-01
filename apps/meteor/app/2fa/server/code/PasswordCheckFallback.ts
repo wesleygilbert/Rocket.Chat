@@ -19,7 +19,7 @@ export class PasswordCheckFallback implements ICodeCheck {
 		return false;
 	}
 
-	public async verify(user: IUser, code: string, force: boolean): Promise<boolean> {
+	public verify(user: IUser, code: string, force: boolean): boolean {
 		if (!this.isEnabled(user, force)) {
 			return false;
 		}
@@ -36,7 +36,7 @@ export class PasswordCheckFallback implements ICodeCheck {
 		return true;
 	}
 
-	public async processInvalidCode(): Promise<IProcessInvalidCodeResult> {
+	public processInvalidCode(): IProcessInvalidCodeResult {
 		return {
 			codeGenerated: false,
 		};

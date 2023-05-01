@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import proxyquire from 'proxyquire';
-
-import { ltrim, rtrim } from '../../../../../lib/utils/stringUtils';
+import s from 'underscore.string';
 
 const { _getURL } = proxyquire.noCallThru().load('../../../../../app/utils/lib/getURL', {
 	'meteor/meteor': {
@@ -12,6 +11,11 @@ const { _getURL } = proxyquire.noCallThru().load('../../../../../app/utils/lib/g
 		},
 		'@global': true,
 	},
+	'../../settings': {
+		settings: {
+			get: () => 'https://go.rocket.chat',
+		},
+	},
 });
 
 const testPaths = (o, _processPath) => {
@@ -20,23 +24,21 @@ const testPaths = (o, _processPath) => {
 		processPath = (path) => _processPath(o._root_url_path_prefix + path);
 	}
 
-	const cloudDeepLinkUrl = 'https://go.rocket.chat';
-
-	expect(_getURL('', o, cloudDeepLinkUrl)).to.be.equal(processPath(''));
-	expect(_getURL('/', o, cloudDeepLinkUrl)).to.be.equal(processPath(''));
-	expect(_getURL('//', o, cloudDeepLinkUrl)).to.be.equal(processPath(''));
-	expect(_getURL('///', o, cloudDeepLinkUrl)).to.be.equal(processPath(''));
-	expect(_getURL('/channel', o, cloudDeepLinkUrl)).to.be.equal(processPath('/channel'));
-	expect(_getURL('/channel/', o, cloudDeepLinkUrl)).to.be.equal(processPath('/channel'));
-	expect(_getURL('/channel//', o, cloudDeepLinkUrl)).to.be.equal(processPath('/channel'));
-	expect(_getURL('/channel/123', o, cloudDeepLinkUrl)).to.be.equal(processPath('/channel/123'));
-	expect(_getURL('/channel/123/', o, cloudDeepLinkUrl)).to.be.equal(processPath('/channel/123'));
-	expect(_getURL('/channel/123?id=456&name=test', o, cloudDeepLinkUrl)).to.be.equal(processPath('/channel/123?id=456&name=test'));
-	expect(_getURL('/channel/123/?id=456&name=test', o, cloudDeepLinkUrl)).to.be.equal(processPath('/channel/123?id=456&name=test'));
+	expect(_getURL('', o)).to.be.equal(processPath(''));
+	expect(_getURL('/', o)).to.be.equal(processPath(''));
+	expect(_getURL('//', o)).to.be.equal(processPath(''));
+	expect(_getURL('///', o)).to.be.equal(processPath(''));
+	expect(_getURL('/channel', o)).to.be.equal(processPath('/channel'));
+	expect(_getURL('/channel/', o)).to.be.equal(processPath('/channel'));
+	expect(_getURL('/channel//', o)).to.be.equal(processPath('/channel'));
+	expect(_getURL('/channel/123', o)).to.be.equal(processPath('/channel/123'));
+	expect(_getURL('/channel/123/', o)).to.be.equal(processPath('/channel/123'));
+	expect(_getURL('/channel/123?id=456&name=test', o)).to.be.equal(processPath('/channel/123?id=456&name=test'));
+	expect(_getURL('/channel/123/?id=456&name=test', o)).to.be.equal(processPath('/channel/123?id=456&name=test'));
 };
 
 const getCloudUrl = (_site_url, path) => {
-	path = ltrim(path, '/');
+	path = s.ltrim(path, '/');
 	const url = `https://go.rocket.chat/?host=${encodeURIComponent(_site_url.replace(/https?:\/\//, ''))}&path=${encodeURIComponent(path)}`;
 	if (_site_url.includes('http://')) {
 		return `${url}&secure=no`;
@@ -45,7 +47,7 @@ const getCloudUrl = (_site_url, path) => {
 };
 
 const testCases = (options) => {
-	const _site_url = rtrim(options._site_url, '/');
+	const _site_url = s.rtrim(options._site_url, '/');
 
 	if (!options.cloud) {
 		if (options._cdn_prefix === '') {

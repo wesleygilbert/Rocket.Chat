@@ -1,5 +1,5 @@
 {
-	"extends": ["@rocket.chat/eslint-config", "plugin:you-dont-need-lodash-underscore/compatible"],
+	"extends": ["@rocket.chat/eslint-config"],
 	"globals": {
 		"__meteor_bootstrap__": false,
 		"__meteor_runtime_config__": false,
@@ -38,22 +38,8 @@
 				"react/jsx-uses-react": "error",
 				"react/jsx-uses-vars": "error",
 				"react/jsx-no-undef": "error",
-				"react/jsx-fragments": ["error", "syntax"],
-				"@typescript-eslint/no-misused-promises": [
-					"error",
-					{
-						"checksVoidReturn": {
-							"arguments": false
-						}
-					}
-				],
-				"@typescript-eslint/no-floating-promises": "error",
-				"no-unreachable-loop": "error"
+				"react/jsx-fragments": ["error", "syntax"]
 			},
-			"parserOptions": {
-				"project": ["./tsconfig.json"]
-			},
-			"excludedFiles": [".scripts/*.ts"],
 			"settings": {
 				"react": {
 					"version": "detect"

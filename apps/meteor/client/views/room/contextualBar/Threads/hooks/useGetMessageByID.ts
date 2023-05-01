@@ -3,7 +3,6 @@ import { useEndpoint } from '@rocket.chat/ui-contexts';
 import { useCallback } from 'react';
 
 import { Messages } from '../../../../../../app/models/client';
-import { onClientMessageReceived } from '../../../../../lib/onClientMessageReceived';
 import { mapMessageFromApi } from '../../../../../lib/utils/mapMessageFromApi';
 
 export const useGetMessageByID = () => {
@@ -13,8 +12,7 @@ export const useGetMessageByID = () => {
 		async (mid: IMessage['_id']) => {
 			try {
 				const { message: rawMessage } = await getMessage({ msgId: mid });
-				const mappedMessage = mapMessageFromApi(rawMessage);
-				const message = (await onClientMessageReceived(mappedMessage)) || mappedMessage;
+				const message = mapMessageFromApi(rawMessage);
 				Messages.upsert({ _id: message._id }, { $set: message });
 				return message;
 			} catch (error) {

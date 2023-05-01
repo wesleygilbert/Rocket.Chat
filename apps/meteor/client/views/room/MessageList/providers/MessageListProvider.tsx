@@ -1,6 +1,6 @@
 import type { IMessage } from '@rocket.chat/core-typings';
 import { isMessageReactionsNormalized, isThreadMainMessage } from '@rocket.chat/core-typings';
-import { useLayout, useUser, useUserPreference, useSetting, useEndpoint, useQueryStringParameter } from '@rocket.chat/ui-contexts';
+import { useLayout, useUser, useUserPreference, useSetting, useEndpoint } from '@rocket.chat/ui-contexts';
 import type { VFC, ReactNode } from 'react';
 import React, { useMemo, memo } from 'react';
 
@@ -8,23 +8,16 @@ import { EmojiPicker } from '../../../../../app/emoji/client';
 import { getRegexHighlight, getRegexHighlightUrl } from '../../../../../app/highlight-words/client/helper';
 import type { MessageListContextValue } from '../../../../components/message/list/MessageListContext';
 import { MessageListContext } from '../../../../components/message/list/MessageListContext';
-import AttachmentProvider from '../../../../providers/AttachmentProvider';
 import { useRoom, useRoomSubscription } from '../../contexts/RoomContext';
 import ToolboxProvider from '../../providers/ToolboxProvider';
 import { useAutoTranslate } from '../hooks/useAutoTranslate';
 import { useKatex } from '../hooks/useKatex';
-import { useLoadSurroundingMessages } from '../hooks/useLoadSurroundingMessages';
 
 type MessageListProviderProps = {
 	children: ReactNode;
-	scrollMessageList?: MessageListContextValue['scrollMessageList'];
-	attachmentDimension?: {
-		width?: number;
-		height?: number;
-	};
 };
 
-const MessageListProvider: VFC<MessageListProviderProps> = ({ children, scrollMessageList, attachmentDimension }) => {
+const MessageListProvider: VFC<MessageListProviderProps> = ({ children }) => {
 	const room = useRoom();
 
 	if (!room) {
@@ -52,9 +45,6 @@ const MessageListProvider: VFC<MessageListProviderProps> = ({ children, scrollMe
 	const { katexEnabled, katexDollarSyntaxEnabled, katexParenthesisSyntaxEnabled } = useKatex();
 
 	const hasSubscription = Boolean(subscription);
-	const msgParameter = useQueryStringParameter('msg');
-
-	useLoadSurroundingMessages(msgParameter);
 
 	const context: MessageListContextValue = useMemo(
 		() => ({
@@ -65,7 +55,7 @@ const MessageListProvider: VFC<MessageListProviderProps> = ({ children, scrollMe
 					? (reaction: string): string[] =>
 							reactions?.[reaction]?.usernames.filter((user) => user !== username).map((username) => `@${username}`) || []
 					: (reaction: string): string[] => {
-							if (!reactions?.[reaction]) {
+							if (!reactions || !reactions[reaction]) {
 								return [];
 							}
 							if (!isMessageReactionsNormalized(message)) {
@@ -102,8 +92,6 @@ const MessageListProvider: VFC<MessageListProviderProps> = ({ children, scrollMe
 			showRoles,
 			showRealName,
 			showUsername,
-			scrollMessageList,
-			jumpToMessageParam: msgParameter,
 			...(katexEnabled && {
 				katex: {
 					dollarSyntaxEnabled: katexDollarSyntaxEnabled,
@@ -144,16 +132,12 @@ const MessageListProvider: VFC<MessageListProviderProps> = ({ children, scrollMe
 			highlights,
 			reactToMessage,
 			showColors,
-			msgParameter,
-			scrollMessageList,
 		],
 	);
 
 	return (
 		<ToolboxProvider room={room}>
-			<AttachmentProvider width={attachmentDimension?.width} height={attachmentDimension?.height}>
-				<MessageListContext.Provider value={context}>{children}</MessageListContext.Provider>
-			</AttachmentProvider>
+			<MessageListContext.Provider value={context}>{children}</MessageListContext.Provider>
 		</ToolboxProvider>
 	);
 };

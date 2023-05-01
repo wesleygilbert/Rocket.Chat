@@ -1,9 +1,18 @@
-import type { IMessage, IRoom, ISubscription } from '@rocket.chat/core-typings';
-import type { UIEvent } from 'react';
+import type { IMessage, IRoom } from '@rocket.chat/core-typings';
 
 import type { FormattingButton } from '../../../app/ui-message/client/messageBox/messageBoxFormatting';
 import type { Subscribable } from '../../definitions/Subscribable';
 import type { Upload } from './Upload';
+
+export type UserActionAPI = {
+	readonly action: {
+		get(): {
+			action: 'typing' | 'recording' | 'uploading' | 'playing';
+			users: string[];
+		}[];
+		subscribe(callback: () => void): () => void;
+	};
+};
 
 export type ComposerAPI = {
 	release(): void;
@@ -22,19 +31,6 @@ export type ComposerAPI = {
 	insertNewLine(): void;
 	clear(): void;
 	focus(): void;
-	blur(): void;
-
-	getCursorPosition(): number | undefined;
-
-	substring(start: number, end?: number): string;
-
-	replaceText(
-		text: string,
-		selection: {
-			start: number;
-			end: number;
-		},
-	): void;
 
 	setCursorToEnd(): void;
 	setCursorToStart(): void;
@@ -53,18 +49,15 @@ export type ComposerAPI = {
 	setRecordingVideo(recording: boolean): void;
 	readonly recordingVideo: Subscribable<boolean>;
 
-	setIsMicrophoneDenied(isMicrophoneDenied: boolean): void;
-	readonly isMicrophoneDenied: Subscribable<boolean>;
-
 	readonly formatters: Subscribable<FormattingButton[]>;
 };
 
 export type DataAPI = {
 	composeMessage(
 		text: string,
-		options: { sendToChannel?: boolean; quotedMessages: IMessage[]; originalMessage?: IMessage | null },
+		options: { sendToChannel?: boolean; quotedMessages: IMessage[]; originalMessage?: IMessage },
 	): Promise<IMessage>;
-	findMessageByID(mid: IMessage['_id']): Promise<IMessage | null>;
+	findMessageByID(mid: IMessage['_id']): Promise<IMessage | undefined>;
 	getMessageByID(mid: IMessage['_id']): Promise<IMessage>;
 	findLastMessage(): Promise<IMessage | undefined>;
 	getLastMessage(): Promise<IMessage>;
@@ -89,10 +82,6 @@ export type DataAPI = {
 	markRoomAsRead(): Promise<void>;
 	findDiscussionByID(drid: IRoom['_id']): Promise<IRoom | undefined>;
 	getDiscussionByID(drid: IRoom['_id']): Promise<IRoom>;
-	findSubscription(): Promise<ISubscription | undefined>;
-	getSubscription(): Promise<ISubscription>;
-	findSubscriptionFromMessage(message: IMessage): Promise<ISubscription | undefined>;
-	getSubscriptionFromMessage(message: IMessage): Promise<ISubscription>;
 };
 
 export type UploadsAPI = {
@@ -104,8 +93,6 @@ export type UploadsAPI = {
 };
 
 export type ChatAPI = {
-	readonly uid: string | null;
-
 	readonly composer?: ComposerAPI;
 	readonly setComposerAPI: (composer: ComposerAPI) => void;
 	readonly data: DataAPI;
@@ -124,26 +111,20 @@ export type ChatAPI = {
 				cancel(): Promise<void>;
 		  }
 		| undefined;
-
-	readonly userCard: {
-		open(username: string): (event: UIEvent) => void;
-		close(): void;
-	};
-
-	readonly action: {
-		start(action: 'typing'): void;
-		stop(action: 'typing' | 'recording' | 'uploading' | 'playing'): void;
-		performContinuously(action: 'recording' | 'uploading' | 'playing'): void;
-	};
-
 	readonly flows: {
 		readonly uploadFiles: (files: readonly File[]) => Promise<void>;
 		readonly sendMessage: ({ text, tshow }: { text: string; tshow?: boolean }) => Promise<boolean>;
-		readonly processSlashCommand: (message: IMessage, userId: string | null) => Promise<boolean>;
+		readonly processSlashCommand: (message: IMessage) => Promise<boolean>;
 		readonly processTooLongMessage: (message: IMessage) => Promise<boolean>;
 		readonly processMessageEditing: (message: Pick<IMessage, '_id' | 't'> & Partial<Omit<IMessage, '_id' | 't'>>) => Promise<boolean>;
 		readonly processSetReaction: (message: Pick<IMessage, 'msg'>) => Promise<boolean>;
 		readonly requestMessageDeletion: (message: IMessage) => Promise<void>;
 		readonly replyBroadcast: (message: IMessage) => Promise<void>;
+
+		readonly action: {
+			start(action: 'typing'): void;
+			stop(action: 'typing' | 'recording' | 'uploading' | 'playing'): void;
+			performContinuously(action: 'recording' | 'uploading' | 'playing'): void;
+		};
 	};
 };

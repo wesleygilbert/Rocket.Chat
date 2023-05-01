@@ -1,6 +1,6 @@
 import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
-import { InstanceStatus } from '@rocket.chat/instance-status';
+import { InstanceStatus } from 'meteor/konecty:multiple-instances-status';
 import _ from 'underscore';
 
 import { settings } from '../../../settings/server';

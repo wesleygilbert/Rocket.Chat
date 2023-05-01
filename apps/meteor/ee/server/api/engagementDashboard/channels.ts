@@ -3,7 +3,6 @@ import { check, Match } from 'meteor/check';
 import { API } from '../../../../app/api/server';
 import { findAllChannelsWithNumberOfMessages } from '../../lib/engagementDashboard/channels';
 import { isDateISOString, mapDateForAPI } from '../../lib/engagementDashboard/date';
-import { getPaginationItems } from '../../../../app/api/server/helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'engagement-dashboard/channels/list',
@@ -18,13 +17,11 @@ API.v1.addRoute(
 				Match.ObjectIncluding({
 					start: Match.Where(isDateISOString),
 					end: Match.Where(isDateISOString),
-					offset: Match.Maybe(String),
-					count: Match.Maybe(String),
 				}),
 			);
 
 			const { start, end } = this.queryParams;
-			const { offset, count } = await getPaginationItems(this.queryParams);
+			const { offset, count } = this.getPaginationItems();
 
 			const { channels, total } = await findAllChannelsWithNumberOfMessages({
 				start: mapDateForAPI(start),

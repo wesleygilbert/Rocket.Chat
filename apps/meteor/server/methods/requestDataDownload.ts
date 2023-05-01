@@ -4,27 +4,14 @@ import { tmpdir } from 'os';
 
 import { Meteor } from 'meteor/meteor';
 import { ExportOperations, UserDataFiles } from '@rocket.chat/models';
-import type { IExportOperation } from '@rocket.chat/core-typings';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
+import type { IExportOperation, IUser } from '@rocket.chat/core-typings';
 
 import { settings } from '../../app/settings/server';
 import * as dataExport from '../lib/dataExport';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		requestDataDownload(params: { fullExport?: boolean }): Promise<{
-			requested: boolean;
-			exportOperation: IExportOperation;
-			url: string | null;
-			pendingOperationsBeforeMyRequest: number;
-		}>;
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	async requestDataDownload({ fullExport = false }) {
-		const currentUserData = await Meteor.userAsync();
+		const currentUserData = Meteor.user() as IUser | null;
 
 		if (!currentUserData) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user');

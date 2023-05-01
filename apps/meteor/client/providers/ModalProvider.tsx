@@ -2,6 +2,7 @@ import { ModalContext } from '@rocket.chat/ui-contexts';
 import type { ReactNode, ReactElement } from 'react';
 import React, { useState, useMemo, memo } from 'react';
 
+import { modal } from '../../app/ui-utils/client/lib/modal';
 import { useImperativeModal } from '../views/hooks/useImperativeModal';
 
 type ModalProviderProps = {
@@ -13,9 +14,9 @@ const ModalProvider = ({ children }: ModalProviderProps): ReactElement => {
 
 	const contextValue = useMemo(
 		() => ({
-			modal: {
+			modal: Object.assign(modal, {
 				setModal: setCurrentModal,
-			},
+			}),
 			currentModal,
 		}),
 		[currentModal],

@@ -4,6 +4,7 @@ import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
 import { RoutePolicy } from 'meteor/routepolicy';
 import bodyParser from 'body-parser';
+import fiber from 'fibers';
 import type { IIncomingMessage } from '@rocket.chat/core-typings';
 
 import { SystemLogger } from '../../../server/lib/logger/system';
@@ -38,12 +39,12 @@ const samlUrlToObject = function (url: string | undefined): ISAMLAction | null {
 	return result;
 };
 
-const middleware = async function (req: IIncomingMessage, res: ServerResponse, next: (err?: any) => void): Promise<void> {
+const middleware = function (req: IIncomingMessage, res: ServerResponse, next: (err?: any) => void): void {
 	// Make sure to catch any exceptions because otherwise we'd crash
 	// the runner
 	try {
 		const samlObject = samlUrlToObject(req.url);
-		if (!samlObject?.serviceName) {
+		if (!samlObject || !samlObject.serviceName) {
 			next();
 			return;
 		}
@@ -58,7 +59,7 @@ const middleware = async function (req: IIncomingMessage, res: ServerResponse, n
 			throw new Error('SAML Service Provider not found.');
 		}
 
-		await SAML.processRequest(req, res, service, samlObject);
+		SAML.processRequest(req, res, service, samlObject);
 	} catch (err) {
 		// @ToDo: Ideally we should send some error message to the client, but there's no way to do it on a redirect right now.
 		SystemLogger.error(err);
@@ -72,6 +73,10 @@ const middleware = async function (req: IIncomingMessage, res: ServerResponse, n
 };
 
 // Listen to incoming SAML http requests
-WebApp.connectHandlers
-	.use(bodyParser.json())
-	.use(async (req: IncomingMessage, res: ServerResponse, next: (err?: any) => void) => middleware(req as IIncomingMessage, res, next));
+WebApp.connectHandlers.use(bodyParser.json()).use(function (req: IncomingMessage, res: ServerResponse, next: (err?: any) => void) {
+	// Need to create a fiber since we're using synchronous http calls and nothing
+	// else is wrapping this in a fiber automatically
+	fiber(function () {
+		middleware(req as IIncomingMessage, res, next);
+	}).run();
+});

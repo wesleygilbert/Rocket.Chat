@@ -1,3 +1,3 @@
-export default async function handleOnJoinRoom(user, room) {
+export default function handleOnJoinRoom(user, room) {
 	this.sendCommand('joinedChannel', { room, user });
 }

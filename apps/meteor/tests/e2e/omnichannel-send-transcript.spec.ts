@@ -1,11 +1,17 @@
 import { faker } from '@faker-js/faker';
-import type { Page } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
 
-import { IS_EE } from './config/constants';
-import { createAuxContext } from './fixtures/createAuxContext';
-import { Users } from './fixtures/userStates';
-import { OmnichannelLiveChat, HomeChannel } from './page-objects';
 import { test, expect } from './utils/test';
+import { OmnichannelLiveChat, HomeChannel } from './page-objects';
+
+const createAuxContext = async (browser: Browser, storageState: string): Promise<{ page: Page; poHomeChannel: HomeChannel }> => {
+	const page = await browser.newPage({ storageState });
+	const poHomeChannel = new HomeChannel(page);
+	await page.goto('/');
+	await page.locator('.main-content').waitFor();
+
+	return { page, poHomeChannel };
+};
 
 test.describe('omnichannel-transcript', () => {
 	let poLiveChat: OmnichannelLiveChat;
@@ -22,8 +28,7 @@ test.describe('omnichannel-transcript', () => {
 		await api.post('/livechat/users/agent', { username: 'user1' });
 		await api.post('/livechat/users/manager', { username: 'user1' });
 
-		const { page } = await createAuxContext(browser, Users.user1);
-		agent = { page, poHomeChannel: new HomeChannel(page) };
+		agent = await createAuxContext(browser, 'user1-session.json');
 	});
 	test.beforeEach(async ({ page }) => {
 		poLiveChat = new OmnichannelLiveChat(page);
@@ -32,7 +37,6 @@ test.describe('omnichannel-transcript', () => {
 	test.afterAll(async ({ api }) => {
 		await api.delete('/livechat/users/agent/user1');
 		await api.delete('/livechat/users/manager/user1');
-		await agent.page.close();
 	});
 
 	test('Receiving a message from visitor', async ({ page }) => {
@@ -48,18 +52,10 @@ test.describe('omnichannel-transcript', () => {
 			await agent.poHomeChannel.sidenav.openChat(newUser.name);
 		});
 
-		await test.step('Expect to be able to send transcript to email', async () => {
+		await test.step('Expect to be able to create transcript', async () => {
 			await agent.poHomeChannel.content.btnSendTranscript.click();
-			await agent.poHomeChannel.content.btnSendTranscriptToEmail.click();
 			await agent.poHomeChannel.content.btnModalConfirm.click();
 			await expect(agent.poHomeChannel.toastSuccess).toBeVisible();
-		});
-
-		await test.step('Expect to be not able send transcript as PDF', async () => {
-			test.skip(!IS_EE, 'Enterprise Only');
-			await agent.poHomeChannel.content.btnSendTranscript.click();
-			await agent.poHomeChannel.content.btnSendTranscriptAsPDF.hover();
-			await expect(agent.poHomeChannel.content.btnSendTranscriptAsPDF).toHaveAttribute('aria-disabled', 'true');
 		});
 	});
 });

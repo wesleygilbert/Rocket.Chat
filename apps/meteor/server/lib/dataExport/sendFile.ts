@@ -5,7 +5,7 @@ import { tmpdir } from 'os';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import type { IUser } from '@rocket.chat/core-typings';
 
-import { getURL } from '../../../app/utils/server/getURL';
+import { getURL } from '../../../app/utils/lib/getURL';
 import { getPath } from './getPath';
 import { copyFileUpload } from './copyFileUpload';
 import { getRoomData } from './getRoomData';
@@ -32,7 +32,7 @@ export const sendFile = async (data: ExportFile, user: IUser): Promise<void> => 
 	await mkdir(exportPath, { recursive: true });
 	await mkdir(assetsPath, { recursive: true });
 
-	const roomData = await getRoomData(data.rid);
+	const roomData = getRoomData(data.rid);
 
 	roomData.targetFile = `${(data.format === 'json' && roomData.roomName) || roomData.roomId}.${data.format}`;
 
@@ -79,5 +79,5 @@ export const sendFile = async (data: ExportFile, user: IUser): Promise<void> => 
 		download_link: getURL(getPath(file._id), { cdn: false, full: true }),
 	});
 
-	await sendEmail(user, subject, body);
+	sendEmail(user, subject, body);
 };

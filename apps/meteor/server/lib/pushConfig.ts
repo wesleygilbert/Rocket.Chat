@@ -1,23 +1,14 @@
 import { Meteor } from 'meteor/meteor';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
-import { AppsTokens } from '@rocket.chat/models';
 
 import { getWorkspaceAccessToken } from '../../app/cloud/server';
-import { hasPermissionAsync } from '../../app/authorization/server/functions/hasPermission';
+import { hasPermission } from '../../app/authorization/server';
 import { settings } from '../../app/settings/server';
-import { Push } from '../../app/push/server';
+import { appTokensCollection, Push } from '../../app/push/server';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		push_test(): { message: string; params: number[] };
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async push_test() {
-		const user = await Meteor.userAsync();
+Meteor.methods({
+	push_test() {
+		const user = Meteor.user();
 
 		if (!user) {
 			throw new Meteor.Error('error-not-allowed', 'Not allowed', {
@@ -25,7 +16,7 @@ Meteor.methods<ServerMethods>({
 			});
 		}
 
-		if (!(await hasPermissionAsync(user._id, 'test-admin-options'))) {
+		if (!hasPermission(user._id, 'test-admin-options')) {
 			throw new Meteor.Error('error-not-allowed', 'Not allowed', {
 				method: 'push_test',
 			});
@@ -59,7 +50,7 @@ Meteor.methods<ServerMethods>({
 			],
 		};
 
-		const tokens = await AppsTokens.col.countDocuments(query);
+		const tokens = appTokensCollection.find(query).count();
 
 		if (tokens === 0) {
 			throw new Meteor.Error('error-no-tokens-for-this-user', 'There are no tokens for this user', {
@@ -67,7 +58,7 @@ Meteor.methods<ServerMethods>({
 			});
 		}
 
-		await Push.send({
+		Push.send({
 			from: 'push',
 			title: `@${user.username}`,
 			text: TAPi18n.__('This_is_a_push_test_messsage'),
@@ -146,8 +137,8 @@ settings.watch<boolean>('Push_enable', async function (enabled) {
 		production: settings.get('Push_production'),
 		gateways,
 		uniqueId: settings.get('uniqueID'),
-		async getAuthorization() {
-			return `Bearer ${await getWorkspaceAccessToken()}`;
+		getAuthorization() {
+			return `Bearer ${Promise.await(getWorkspaceAccessToken())}`;
 		},
 	});
 });

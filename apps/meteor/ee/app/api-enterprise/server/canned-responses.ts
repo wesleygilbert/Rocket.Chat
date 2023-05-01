@@ -3,7 +3,6 @@ import { isPOSTCannedResponsesProps, isDELETECannedResponsesProps, isCannedRespo
 
 import { API } from '../../../../app/api/server';
 import { findAllCannedResponses, findAllCannedResponsesFilter, findOneCannedResponse } from './lib/canned-responses';
-import { getPaginationItems } from '../../../../app/api/server/helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'canned-responses.get',
@@ -26,9 +25,9 @@ API.v1.addRoute(
 	},
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { sort, fields } = await this.parseJsonQuery();
-			const { shortcut, text, scope, tags, departmentId, createdBy } = this.queryParams;
+			const { offset, count } = this.getPaginationItems();
+			const { sort, fields } = this.parseJsonQuery();
+			const { shortcut, text, scope, tags, departmentId, createdBy } = this.requestParams();
 			const { cannedResponses, total } = await findAllCannedResponsesFilter({
 				shortcut,
 				text,
@@ -53,18 +52,22 @@ API.v1.addRoute(
 		},
 		async post() {
 			const { _id, shortcut, text, scope, departmentId, tags } = this.bodyParams;
-			await Meteor.callAsync('saveCannedResponse', _id, {
-				shortcut,
-				text,
-				scope,
-				...(tags && { tags }),
-				...(departmentId && { departmentId }),
+			Meteor.runAsUser(this.userId, () => {
+				Meteor.call('saveCannedResponse', _id, {
+					shortcut,
+					text,
+					scope,
+					...(tags && { tags }),
+					...(departmentId && { departmentId }),
+				});
 			});
 			return API.v1.success();
 		},
 		async delete() {
-			const { _id } = this.bodyParams;
-			await Meteor.callAsync('removeCannedResponse', _id);
+			const { _id } = this.requestParams();
+			Meteor.runAsUser(this.userId, () => {
+				Meteor.call('removeCannedResponse', _id);
+			});
 			return API.v1.success();
 		},
 	},

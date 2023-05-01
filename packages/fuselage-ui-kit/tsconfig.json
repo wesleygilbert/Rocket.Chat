@@ -6,6 +6,7 @@
     "allowJs": false,
     "noImplicitReturns": true,
     "noImplicitThis": true,
+    "suppressImplicitAnyIndexErrors": true
   },
   "exclude": ["node_modules", "dist"]
 }

@@ -12,7 +12,7 @@ export const isTotpInvalidError = (error: unknown): error is Meteor.Error & ({ e
 	(error as { error?: unknown } | undefined)?.error === 'totp-invalid' ||
 	(error as { errorType?: unknown } | undefined)?.errorType === 'totp-invalid';
 
-const isLoginCancelledError = (error: unknown): error is Meteor.Error =>
+export const isLoginCancelledError = (error: unknown): error is Meteor.Error =>
 	error instanceof Meteor.Error && error.error === Accounts.LoginCancelledError.numericError;
 
 export const reportError = <T>(error: T, callback?: (error?: T) => void): void => {

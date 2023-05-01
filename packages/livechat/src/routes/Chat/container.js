@@ -7,7 +7,7 @@ import { ModalManager } from '../../components/Modal';
 import { debounce, getAvatarUrl, canRenderMessage, throttle, upsert } from '../../components/helpers';
 import { normalizeQueueAlert } from '../../lib/api';
 import constants from '../../lib/constants';
-import { getLastReadMessage, loadConfig, processUnread, shouldMarkAsUnread } from '../../lib/main';
+import { loadConfig, processUnread } from '../../lib/main';
 import { parentCall, runCallbackEventEmitter } from '../../lib/parentCall';
 import { createToken } from '../../lib/random';
 import { initRoom, closeChat, loadMessages, loadMoreMessages, defaultRoomParams, getGreetingMessages } from '../../lib/room';
@@ -321,23 +321,16 @@ class ChatContainer extends Component {
 	}
 
 	async componentDidUpdate(prevProps) {
-		const { messages, dispatch, user } = this.props;
+		const { messages, visible, minimized, dispatch } = this.props;
 		const { messages: prevMessages, alerts: prevAlerts } = prevProps;
 
-		const renderedMessages = messages.filter((message) => canRenderMessage(message));
-		const lastRenderedMessage = renderedMessages[renderedMessages.length - 1];
-		const prevRenderedMessages = prevMessages.filter((message) => canRenderMessage(message));
-
-		const shouldMarkUnread = shouldMarkAsUnread();
-
-		if (
-			(lastRenderedMessage && lastRenderedMessage.u?._id === user?._id) ||
-			(!shouldMarkUnread && renderedMessages?.length !== prevRenderedMessages?.length)
-		) {
-			const nextLastMessage = lastRenderedMessage;
-			const lastReadMessage = getLastReadMessage();
-
-			if (nextLastMessage && nextLastMessage._id !== lastReadMessage?._id) {
+		if (messages && prevMessages && messages.length !== prevMessages.length && visible && !minimized) {
+			const nextLastMessage = messages[messages.length - 1];
+			const lastMessage = prevMessages[prevMessages.length - 1];
+			if (
+				(nextLastMessage && lastMessage && nextLastMessage._id !== lastMessage._id) ||
+				(messages.length === 1 && prevMessages.length === 0)
+			) {
 				const newAlerts = prevAlerts.filter((item) => item.id !== constants.unreadMessagesAlertId);
 				dispatch({ alerts: newAlerts, unread: null, lastReadMessageId: nextLastMessage._id });
 			}
@@ -411,7 +404,6 @@ export const ChatConnector = ({ ref, t, ...props }) => (
 			queueInfo,
 			incomingCallAlert,
 			ongoingCall,
-			messageListPosition,
 		}) => (
 			<ChatContainer
 				ref={ref}
@@ -479,7 +471,6 @@ export const ChatConnector = ({ ref, t, ...props }) => (
 				limitTextLength={limitTextLength}
 				incomingCallAlert={incomingCallAlert}
 				ongoingCall={ongoingCall}
-				messageListPosition={messageListPosition}
 			/>
 		)}
 	</Consumer>

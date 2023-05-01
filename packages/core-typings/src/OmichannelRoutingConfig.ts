@@ -1,4 +1,4 @@
-import type { ILivechatInquiryRecord } from './IInquiry';
+import type { IRoom } from './IRoom';
 
 export type OmichannelRoutingConfig = {
 	previewRoom: boolean;
@@ -13,7 +13,7 @@ export type OmichannelRoutingConfig = {
 export type Inquiries =
 	| {
 			enabled: true;
-			queue: Array<ILivechatInquiryRecord>;
+			queue: Array<IRoom>;
 	  }
 	| {
 			enabled: false;

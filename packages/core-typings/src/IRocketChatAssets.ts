@@ -36,9 +36,7 @@ export interface IRocketChatAsset {
 
 export interface IRocketChatAssets {
 	logo: IRocketChatAsset;
-	logo_dark: IRocketChatAsset;
 	background: IRocketChatAsset;
-	background_dark: IRocketChatAsset;
 	favicon_ico: IRocketChatAsset;
 	favicon: IRocketChatAsset;
 	favicon_16: IRocketChatAsset;

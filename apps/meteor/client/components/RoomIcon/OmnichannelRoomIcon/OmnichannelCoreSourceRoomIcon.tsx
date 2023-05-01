@@ -4,9 +4,9 @@ import type { ComponentProps, ReactElement } from 'react';
 import React from 'react';
 
 const colors = {
-	busy: 'status-font-on-danger',
-	away: 'status-font-on-warning',
-	online: 'status-font-on-success',
+	busy: 'on-danger',
+	away: 'on-warning',
+	online: 'on-success',
 	offline: 'annotation',
 };
 

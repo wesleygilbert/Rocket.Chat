@@ -278,7 +278,7 @@ export class LDAPConnection {
 
 	public async searchAndCount(baseDN: string, searchOptions: ldapjs.SearchOptions): Promise<number> {
 		let count = 0;
-		await this.doCustomSearch(baseDN, searchOptions, async () => {
+		await this.doCustomSearch(baseDN, searchOptions, () => {
 			count++;
 		});
 
@@ -612,7 +612,7 @@ export class LDAPConnection {
 	}
 
 	private _updateIdle(override?: boolean): void {
-		// @ts-expect-error use a private function to signal to the lib that we're still working
+		// @ts-ignore calling a private method
 		this.client._updateIdle(override);
 	}
 

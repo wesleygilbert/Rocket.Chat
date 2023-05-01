@@ -8,7 +8,7 @@ addAction('rocket-search', {
 	id: 'rocket-search',
 	title: 'Search_Messages',
 	icon: 'magnifier',
-	template: lazy(() => import('../../contextualBar/MessageSearchTab')),
+	template: 'RocketSearch',
 	order: 6,
 });
 

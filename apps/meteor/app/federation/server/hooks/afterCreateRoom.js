@@ -1,6 +1,5 @@
-import { FederationRoomEvents, Users, Subscriptions } from '@rocket.chat/models';
-
 import { clientLogger } from '../lib/logger';
+import { FederationRoomEvents, Subscriptions, Users } from '../../../models/server';
 import { normalizers } from '../normalizers';
 import { deleteRoom } from '../../../lib/server/functions';
 import { getFederationDomain } from '../lib/getFederationDomain';
@@ -15,12 +14,12 @@ export async function doAfterCreateRoom(room, users, subscriptions) {
 	//
 	const addUserEvents = [];
 
-	for await (const user of users) {
+	for (const user of users) {
 		/* eslint-disable no-await-in-loop */
 
 		const subscription = subscriptions[user._id];
 
-		const normalizedSourceUser = await normalizers.normalizeUser(user);
+		const normalizedSourceUser = normalizers.normalizeUser(user);
 		const normalizedSourceSubscription = normalizers.normalizeSubscription(subscription);
 
 		normalizedUsers.push(normalizedSourceUser);
@@ -63,7 +62,7 @@ async function afterCreateRoom(roomOwner, room) {
 	}
 
 	// Find all subscriptions of this room
-	let subscriptions = await Subscriptions.findByRoomIdWhenUsernameExists(room._id).toArray();
+	let subscriptions = Subscriptions.findByRoomIdWhenUsernameExists(room._id).fetch();
 	subscriptions = subscriptions.reduce((acc, s) => {
 		acc[s.u._id] = s;
 
@@ -74,7 +73,7 @@ async function afterCreateRoom(roomOwner, room) {
 	const userIds = Object.keys(subscriptions);
 
 	// Load all the users
-	const users = await Users.findUsersWithUsernameByIds(userIds).toArray();
+	const users = Users.findUsersWithUsernameByIds(userIds).fetch();
 
 	// Check if there is a federated user on this room
 	const hasFederatedUser = users.find((u) => u.username.indexOf('@') !== -1);
@@ -94,7 +93,7 @@ async function afterCreateRoom(roomOwner, room) {
 
 		await doAfterCreateRoom(room, users, subscriptions);
 	} catch (err) {
-		await deleteRoom(room._id);
+		deleteRoom(room._id);
 
 		clientLogger.error({ msg: 'afterCreateRoom => Could not create federated room:', err });
 	}
@@ -104,6 +103,6 @@ async function afterCreateRoom(roomOwner, room) {
 
 export const definition = {
 	hook: 'afterCreateRoom',
-	callback: afterCreateRoom,
+	callback: (roomOwner, room) => Promise.await(afterCreateRoom(roomOwner, room)),
 	id: 'federation-after-create-room',
 };

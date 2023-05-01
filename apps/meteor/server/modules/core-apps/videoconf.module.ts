@@ -14,7 +14,7 @@ export class VideoConfModule implements IUiKitCoreApp {
 		} = payload;
 
 		if (actionId === 'join') {
-			await VideoConf.join(userId, callId, {});
+			VideoConf.join(userId, callId, {});
 		}
 
 		if (actionId === 'info') {

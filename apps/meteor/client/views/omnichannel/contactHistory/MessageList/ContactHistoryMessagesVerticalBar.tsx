@@ -1,5 +1,5 @@
 import { Box, Icon, Margins, States, StatesIcon, StatesSubtitle, StatesTitle, TextInput, Throbber } from '@rocket.chat/fuselage';
-import { useSetting, useTranslation, useUserPreference } from '@rocket.chat/ui-contexts';
+import { useSetting, useTranslation } from '@rocket.chat/ui-contexts';
 import type { ChangeEvent, Dispatch, ReactElement, SetStateAction } from 'react';
 import React, { useMemo, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
@@ -24,7 +24,6 @@ const ContactHistoryMessagesVerticalBar = ({
 }): ReactElement => {
 	const [text, setText] = useState('');
 	const t = useTranslation();
-	const showUserAvatar = !!useUserPreference<boolean>('displayAvatars');
 	const { itemsList: messageList, loadMoreItems } = useHistoryMessageList(
 		useMemo(() => ({ roomId: chatId, filter: text }), [chatId, text]),
 	);
@@ -100,9 +99,7 @@ const ContactHistoryMessagesVerticalBar = ({
 								const lastMessage = messages[index - 1];
 								const isSequential = isMessageSequential(data, lastMessage, messageGroupingPeriod);
 								const isNewDay = isMessageNewDay(data, lastMessage);
-								return (
-									<ContactHistoryMessage message={data} sequential={isSequential} isNewDay={isNewDay} showUserAvatar={showUserAvatar} />
-								);
+								return <ContactHistoryMessage message={data} sequential={isSequential} isNewDay={isNewDay} />;
 							}}
 						/>
 					)}

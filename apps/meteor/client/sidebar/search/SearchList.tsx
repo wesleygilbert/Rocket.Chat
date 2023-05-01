@@ -1,7 +1,14 @@
-import type { IRoom, ISubscription } from '@rocket.chat/core-typings';
+import type { IRoom, ISubscription, RoomType } from '@rocket.chat/core-typings';
 import { css } from '@rocket.chat/css-in-js';
 import { Sidebar, TextInput, Box, Icon } from '@rocket.chat/fuselage';
-import { useMutableCallback, useDebouncedValue, useAutoFocus, useUniqueId, useMergedRefs } from '@rocket.chat/fuselage-hooks';
+import {
+	useMutableCallback,
+	useDebouncedValue,
+	useStableArray,
+	useAutoFocus,
+	useUniqueId,
+	useMergedRefs,
+} from '@rocket.chat/fuselage-hooks';
 import { escapeRegExp } from '@rocket.chat/string-helpers';
 import { useUserPreference, useUserSubscriptions, useSetting, useTranslation, useMethod } from '@rocket.chat/ui-contexts';
 import type { UseQueryResult } from '@tanstack/react-query';
@@ -13,7 +20,6 @@ import type { VirtuosoHandle } from 'react-virtuoso';
 import { Virtuoso } from 'react-virtuoso';
 import tinykeys from 'tinykeys';
 
-import { getConfig } from '../../lib/utils/getConfig';
 import { useAvatarTemplate } from '../hooks/useAvatarTemplate';
 import { usePreventDefault } from '../hooks/usePreventDefault';
 import { useTemplateByViewMode } from '../hooks/useTemplateByViewMode';
@@ -30,18 +36,17 @@ const shortcut = ((): string => {
 	return '(\u2303+K)';
 })();
 
-const LIMIT = parseInt(String(getConfig('Sidebar_Search_Spotlight_LIMIT', 20)));
-
 const options = {
 	sort: {
 		lm: -1,
 		name: 1,
 	},
-	limit: LIMIT,
-} as const;
+};
 
 const useSearchItems = (filterText: string): UseQueryResult<(ISubscription & IRoom)[] | undefined, Error> => {
-	const [, mention, name] = useMemo(() => filterText.match(/(@|#)?(.*)/i) || [], [filterText]);
+	const expression = /(@|#)?(.*)/i;
+	const [, mention, name] = filterText.match(expression) || [];
+
 	const query = useMemo(() => {
 		const filterRegex = new RegExp(escapeRegExp(name), 'i');
 
@@ -53,32 +58,28 @@ const useSearchItems = (filterText: string): UseQueryResult<(ISubscription & IRo
 		};
 	}, [name, mention]);
 
-	const localRooms = useUserSubscriptions(query, options);
+	const localRooms: { rid: string; t: RoomType; _id: string; name: string; uids?: string }[] = useUserSubscriptions(query, options);
 
-	const usernamesFromClient = [...localRooms?.map(({ t, name }) => (t === 'd' ? name : null))].filter(Boolean) as string[];
+	const usernamesFromClient = useStableArray([...localRooms?.map(({ t, name }) => (t === 'd' ? name : null))].filter(Boolean)) as string[];
 
 	const searchForChannels = mention === '#';
 	const searchForDMs = mention === '@';
 
 	const type = useMemo(() => {
 		if (searchForChannels) {
-			return { users: false, rooms: true, includeFederatedRooms: true };
+			return { users: false, rooms: true };
 		}
 		if (searchForDMs) {
 			return { users: true, rooms: false };
 		}
-		return { users: true, rooms: true, includeFederatedRooms: true };
+		return { users: true, rooms: true };
 	}, [searchForChannels, searchForDMs]);
 
 	const getSpotlight = useMethod('spotlight');
 
 	return useQuery(
-		['sidebar/search/spotlight', name, usernamesFromClient, type],
+		['sidebar/search/spotlight', name, usernamesFromClient, type, localRooms],
 		async () => {
-			if (localRooms.length === LIMIT) {
-				return localRooms;
-			}
-
 			const spotlight = await getSpotlight(name, usernamesFromClient, type);
 
 			const filterUsersUnique = ({ _id }: { _id: string }, index: number, arr: { _id: string }[]): boolean =>
@@ -90,7 +91,7 @@ const useSearchItems = (filterText: string): UseQueryResult<(ISubscription & IRo
 						(room.t === 'd' && room.uids && room.uids.length > 1 && room.uids?.includes(item._id)) ||
 						[item.rid, item._id].includes(room._id),
 				);
-			const usersFilter = (user: { _id: string }): boolean =>
+			const usersfilter = (user: { _id: string }): boolean =>
 				!localRooms.find((room) => room.t === 'd' && room.uids && room.uids?.length === 2 && room.uids.includes(user._id));
 
 			const userMap = (user: {
@@ -122,7 +123,7 @@ const useSearchItems = (filterText: string): UseQueryResult<(ISubscription & IRo
 			}[];
 
 			const resultsFromServer: resultsFromServerType = [];
-			resultsFromServer.push(...spotlight.users.filter(filterUsersUnique).filter(usersFilter).map(userMap));
+			resultsFromServer.push(...spotlight.users.filter(filterUsersUnique).filter(usersfilter).map(userMap));
 			resultsFromServer.push(...spotlight.rooms.filter(roomFilter));
 
 			const exact = resultsFromServer?.filter((item) => [item.name, item.fname].includes(name));
@@ -244,7 +245,7 @@ const SearchList = forwardRef(function SearchList({ onClose }: SearchListProps, 
 		if (!cursorRef?.current) {
 			return;
 		}
-		return tinykeys(cursorRef?.current, {
+		const unsubscribe = tinykeys(cursorRef?.current, {
 			Escape: (event) => {
 				event.preventDefault();
 				setFilterValue((value) => {
@@ -274,6 +275,9 @@ const SearchList = forwardRef(function SearchList({ onClose }: SearchListProps, 
 				}
 			},
 		});
+		return (): void => {
+			unsubscribe();
+		};
 	}, [cursorRef, changeSelection, items.length, onClose, resetCursor, setFilterValue]);
 
 	const handleClick: MouseEventHandler<HTMLElement> = (e): void => {
@@ -297,21 +301,20 @@ const SearchList = forwardRef(function SearchList({ onClose }: SearchListProps, 
 				top: 0;
 			`}
 			ref={ref}
-			role='search'
 		>
-			<Sidebar.TopBar.Section {...({ flexShrink: 0 } as any)} is='form'>
+			<Sidebar.TopBar.Section {...({ role: 'search', flexShrink: 0 } as any)} is='form'>
 				<TextInput
 					aria-owns={listId}
 					data-qa='sidebar-search-input'
 					ref={autofocus}
 					{...filter}
 					placeholder={placeholder}
-					role='searchbox'
 					addon={<Icon name='cross' size='x20' onClick={onClose} />}
 				/>
 			</Sidebar.TopBar.Section>
 			<Box
 				ref={boxRef}
+				aria-expanded='true'
 				role='listbox'
 				id={listId}
 				tabIndex={-1}
@@ -319,8 +322,6 @@ const SearchList = forwardRef(function SearchList({ onClose }: SearchListProps, 
 				h='full'
 				w='full'
 				data-qa='sidebar-search-result'
-				aria-live='polite'
-				aria-atomic='true'
 				aria-busy={isLoading}
 				onClick={handleClick}
 			>
@@ -329,7 +330,6 @@ const SearchList = forwardRef(function SearchList({ onClose }: SearchListProps, 
 					totalCount={items.length}
 					data={items}
 					components={{ Scroller: ScrollerWithCustomProps }}
-					computeItemKey={(_, room) => room._id}
 					itemContent={(_, data): ReactElement => <Row data={itemData} item={data} />}
 					ref={listRef}
 				/>

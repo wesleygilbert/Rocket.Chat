@@ -55,7 +55,7 @@ export class IMAPInterceptor extends EventEmitter {
 		});
 		this.retries = 0;
 		this.inboxId = id;
-		void this.start();
+		this.start();
 	}
 
 	openInbox(): Promise<IMAP.Box> {
@@ -123,7 +123,7 @@ export class IMAPInterceptor extends EventEmitter {
 			clearTimeout(this.backoff);
 			this.backoffDurationMS = 3000;
 		}
-		const loop = async (): Promise<void> => {
+		const loop = (): void => {
 			logger.debug(`Reconnecting to ${this.config.user}: ${this.retries}`);
 			if (this.canRetry()) {
 				this.backoffDurationMS *= 2;
@@ -132,11 +132,11 @@ export class IMAPInterceptor extends EventEmitter {
 				logger.info(`IMAP reconnection failed on inbox ${this.config.user}`);
 				clearTimeout(this.backoff);
 				this.stop();
-				await this.selfDisable();
+				this.selfDisable();
 				return;
 			}
 			this.stop();
-			await this.start();
+			this.start();
 		};
 		this.backoff = setTimeout(loop, this.backoffDurationMS);
 	}

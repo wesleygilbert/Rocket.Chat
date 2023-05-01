@@ -1,4 +1,3 @@
-import { useEndpoint } from '@rocket.chat/ui-contexts';
 import type { ReactElement } from 'react';
 import React from 'react';
 
@@ -28,24 +27,18 @@ type TwoFactorModalProps = {
 );
 
 const TwoFactorModal = ({ onConfirm, onClose, ...props }: TwoFactorModalProps): ReactElement => {
-	const logoutOtherSessions = useEndpoint('POST', '/v1/users.logoutOtherClients');
-
-	const confirm = (code: any, method: Method): void => {
-		onConfirm(code, method);
-		logoutOtherSessions();
-	};
 	if (props.method === Method.TOTP) {
-		return <TwoFactorTotp onConfirm={confirm} onClose={onClose} />;
+		return <TwoFactorTotp onConfirm={onConfirm} onClose={onClose} />;
 	}
 
 	if (props.method === Method.EMAIL) {
 		const { emailOrUsername } = props;
 
-		return <TwoFactorEmail onConfirm={confirm} onClose={onClose} emailOrUsername={emailOrUsername} />;
+		return <TwoFactorEmail onConfirm={onConfirm} onClose={onClose} emailOrUsername={emailOrUsername} />;
 	}
 
 	if (props.method === Method.PASSWORD) {
-		return <TwoFactorPassword onConfirm={confirm} onClose={onClose} />;
+		return <TwoFactorPassword onConfirm={onConfirm} onClose={onClose} />;
 	}
 
 	throw new Error('Invalid Two Factor method');

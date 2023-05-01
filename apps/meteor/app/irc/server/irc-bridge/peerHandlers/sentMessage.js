@@ -1,17 +1,16 @@
-import { Users, Rooms } from '@rocket.chat/models';
-
-import { sendMessage, createDirectRoom } from '../../../../lib/server';
+import { Users, Rooms } from '../../../../models/server';
+import { sendMessage, createDirectRoom } from '../../../../lib';
 /*
  *
  * Get direct chat room helper
  *
  *
  */
-const getDirectRoom = async (source, target) => {
+const getDirectRoom = (source, target) => {
 	const uids = [source._id, target._id];
-	const { _id, ...extraData } = await createDirectRoom([source, target]);
+	const { _id, ...extraData } = createDirectRoom([source, target]);
 
-	const room = await Rooms.findOneDirectRoomContainingAllUserIDs(uids);
+	const room = Rooms.findOneDirectRoomContainingAllUserIDs(uids);
 	if (room) {
 		return {
 			t: 'd',
@@ -26,8 +25,8 @@ const getDirectRoom = async (source, target) => {
 	};
 };
 
-export default async function handleSentMessage(args) {
-	const user = await Users.findOne({
+export default function handleSentMessage(args) {
+	const user = Users.findOne({
 		'profile.irc.nick': args.nick,
 	});
 
@@ -38,13 +37,13 @@ export default async function handleSentMessage(args) {
 	let room;
 
 	if (args.roomName) {
-		room = await Rooms.findOneByName(args.roomName);
+		room = Rooms.findOneByName(args.roomName);
 	} else {
-		const recipientUser = await Users.findOne({
+		const recipientUser = Users.findOne({
 			'profile.irc.nick': args.recipientNick,
 		});
 
-		room = await getDirectRoom(user, recipientUser);
+		room = getDirectRoom(user, recipientUser);
 	}
 
 	const message = {
@@ -52,5 +51,5 @@ export default async function handleSentMessage(args) {
 		ts: new Date(),
 	};
 
-	await sendMessage(user, message, room);
+	sendMessage(user, message, room);
 }

@@ -2,18 +2,10 @@ import { TAPi18n, TAPi18next } from 'meteor/rocketchat:tap-i18n';
 
 import { settings } from '../../../app/settings/client';
 
-const parseToJSON = (customTranslations: string) => {
-	try {
-		return JSON.parse(customTranslations);
-	} catch (e) {
-		return false;
-	}
-};
-
 export const applyCustomTranslations = (): void => {
 	const customTranslations: string | undefined = settings.get('Custom_Translations');
 
-	if (!customTranslations || !parseToJSON(customTranslations)) {
+	if (!customTranslations) {
 		return;
 	}
 

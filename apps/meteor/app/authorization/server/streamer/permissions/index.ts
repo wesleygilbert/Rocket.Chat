@@ -1,21 +1,9 @@
 import { Meteor } from 'meteor/meteor';
 import { check, Match } from 'meteor/check';
 import { Permissions } from '@rocket.chat/models';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
-import type { IPermission, RocketChatRecordDeleted } from '@rocket.chat/core-typings';
-import type { WithId } from 'mongodb';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		'permissions/get'(
-			updatedSince?: Date,
-		): Promise<IPermission[] | { update: IPermission[]; remove: WithId<RocketChatRecordDeleted<IPermission>>[] }>;
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async 'permissions/get'(updatedAt?: Date) {
+Meteor.methods({
+	async 'permissions/get'(updatedAt: Date) {
 		check(updatedAt, Match.Maybe(Date));
 
 		// TODO: should we return this for non logged users?

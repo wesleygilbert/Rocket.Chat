@@ -1,6 +1,6 @@
-import { settings } from '../../settings/client';
-import { hasAllPermission } from '../../authorization/client';
-import { AccountBox, MessageTypes } from '../../ui-utils/client';
+import { settings } from '../../settings';
+import { hasAllPermission } from '../../authorization';
+import { AccountBox, MessageTypes } from '../../ui-utils';
 
 AccountBox.addItem({
 	name: 'Omnichannel',

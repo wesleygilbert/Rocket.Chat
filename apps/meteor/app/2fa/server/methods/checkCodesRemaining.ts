@@ -1,20 +1,12 @@
 import { Meteor } from 'meteor/meteor';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		'2fa:checkCodesRemaining': () => { remaining: number };
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async '2fa:checkCodesRemaining'() {
+Meteor.methods({
+	'2fa:checkCodesRemaining'() {
 		if (!Meteor.userId()) {
 			throw new Meteor.Error('not-authorized');
 		}
 
-		const user = await Meteor.userAsync();
+		const user = Meteor.user();
 
 		if (!user) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
@@ -22,7 +14,7 @@ Meteor.methods<ServerMethods>({
 			});
 		}
 
-		if (!user.services?.totp?.enabled) {
+		if (!user.services || !user.services.totp || !user.services.totp.enabled) {
 			throw new Meteor.Error('invalid-totp');
 		}
 

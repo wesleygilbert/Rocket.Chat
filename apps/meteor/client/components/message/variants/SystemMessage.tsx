@@ -17,10 +17,11 @@ import type { ReactElement } from 'react';
 import React, { memo } from 'react';
 
 import { MessageTypes } from '../../../../app/ui-utils/client';
-import { getUserDisplayName } from '../../../../lib/getUserDisplayName';
 import { useFormatDateAndTime } from '../../../hooks/useFormatDateAndTime';
 import { useFormatTime } from '../../../hooks/useFormatTime';
+import { useUserCard } from '../../../hooks/useUserCard';
 import { useUserData } from '../../../hooks/useUserData';
+import { getUserDisplayName } from '../../../lib/getUserDisplayName';
 import type { UserPresence } from '../../../lib/presence';
 import {
 	useIsSelecting,
@@ -28,7 +29,6 @@ import {
 	useIsSelectedMessage,
 	useCountSelected,
 } from '../../../views/room/MessageList/contexts/SelectedMessagesContext';
-import { useChat } from '../../../views/room/contexts/ChatContext';
 import UserAvatar from '../../avatar/UserAvatar';
 import Attachments from '../content/Attachments';
 import MessageActions from '../content/MessageActions';
@@ -36,14 +36,13 @@ import { useMessageListShowRealName, useMessageListShowUsername } from '../list/
 
 type SystemMessageProps = {
 	message: IMessage;
-	showUserAvatar: boolean;
 };
 
-const SystemMessage = ({ message, showUserAvatar }: SystemMessageProps): ReactElement => {
+const SystemMessage = ({ message }: SystemMessageProps): ReactElement => {
 	const t = useTranslation();
 	const formatTime = useFormatTime();
 	const formatDateAndTime = useFormatDateAndTime();
-	const chat = useChat();
+	const { open: openUserCard } = useUserCard();
 
 	const showRealName = useMessageListShowRealName();
 	const user: UserPresence = { ...message.u, roles: [], ...useUserData(message.u._id) };
@@ -66,18 +65,15 @@ const SystemMessage = ({ message, showUserAvatar }: SystemMessageProps): ReactEl
 			data-system-message-type={message.t}
 		>
 			<MessageSystemLeftContainer>
-				{!isSelecting && showUserAvatar && <UserAvatar username={message.u.username} size='x18' />}
+				{!isSelecting && <UserAvatar username={message.u.username} size='x18' />}
 				{isSelecting && <CheckBox checked={isSelected} onChange={toggleSelected} />}
 			</MessageSystemLeftContainer>
 			<MessageSystemContainer>
 				<MessageSystemBlock>
 					<MessageNameContainer>
 						<MessageSystemName
-							{...(user.username !== undefined &&
-								chat?.userCard && {
-									onClick: chat?.userCard.open(user.username),
-									style: { cursor: 'pointer' },
-								})}
+							onClick={user.username !== undefined ? openUserCard(user.username) : undefined}
+							style={{ cursor: 'pointer' }}
 						>
 							{getUserDisplayName(user.name, user.username, showRealName)}
 						</MessageSystemName>
@@ -86,11 +82,8 @@ const SystemMessage = ({ message, showUserAvatar }: SystemMessageProps): ReactEl
 								{' '}
 								<MessageUsername
 									data-username={user.username}
-									{...(user.username !== undefined &&
-										chat?.userCard && {
-											onClick: chat?.userCard.open(user.username),
-											style: { cursor: 'pointer' },
-										})}
+									onClick={user.username !== undefined ? openUserCard(user.username) : undefined}
+									style={{ cursor: 'pointer' }}
 								>
 									@{user.username}
 								</MessageUsername>
@@ -111,7 +104,7 @@ const SystemMessage = ({ message, showUserAvatar }: SystemMessageProps): ReactEl
 				</MessageSystemBlock>
 				{message.attachments && (
 					<MessageSystemBlock>
-						<Attachments attachments={message.attachments} />
+						<Attachments attachments={message.attachments} file={message.file} />
 					</MessageSystemBlock>
 				)}
 				{message.actionLinks?.length && (

@@ -20,11 +20,7 @@ export interface ILivechatAgentActivityModel extends IBaseModel<ILivechatAgentAc
 
 	findOpenSessions(): FindCursor<ILivechatAgentActivity>;
 
-	findAllAverageAvailableServiceTime(params: { date: Date; departmentId?: string }): Promise<
-		{
-			averageAvailableServiceTimeInSeconds: number;
-		}[]
-	>;
+	findAllAverageAvailableServiceTime(params: { date: Date; departmentId: string }): Promise<ILivechatAgentActivity[]>;
 
 	findAvailableServiceTimeHistory(params: {
 		start: string;

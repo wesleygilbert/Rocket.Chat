@@ -1,8 +1,8 @@
 import { escapeRegExp } from '@rocket.chat/string-helpers';
 
-const checkHighlightedWordsInUrls = (msg, urlRegex) => msg.match(urlRegex);
+export const checkHighlightedWordsInUrls = (msg, urlRegex) => msg.match(urlRegex);
 
-const removeHighlightedUrls = (msg, highlight, urlMatches) => {
+export const removeHighlightedUrls = (msg, highlight, urlMatches) => {
 	const highlightRegex = new RegExp(highlight, 'gmi');
 
 	return urlMatches.reduce((msg, match) => {

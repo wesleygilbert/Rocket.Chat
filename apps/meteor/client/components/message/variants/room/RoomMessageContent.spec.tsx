@@ -5,7 +5,6 @@ import proxyquire from 'proxyquire';
 import type { ReactNode } from 'react';
 import React, { useMemo } from 'react';
 
-import FakeChatProvider from '../../../../../tests/mocks/client/FakeChatProvider';
 import FakeRoomProvider from '../../../../../tests/mocks/client/FakeRoomProvider';
 import RouterContextMock from '../../../../../tests/mocks/client/RouterContextMock';
 import { createFakeMessageWithMd } from '../../../../../tests/mocks/data';
@@ -24,7 +23,6 @@ describe('RoomMessageContent', () => {
 		'../../MessageContentBody': () => fakeMessage.msg,
 		'../../content/DiscussionMetrics': () => null,
 		'../../content/MessageActions': () => null,
-		'../../hooks/useNormalizedMessage': { useNormalizedMessage: (args: any) => ({ md: fakeMessage.md, ...args }) },
 	});
 
 	const ProvidersMock = ({ children }: { children: ReactNode }) => {
@@ -32,21 +30,19 @@ describe('RoomMessageContent', () => {
 			<QueryClientProvider client={queryClient}>
 				<RouterContextMock>
 					<FakeRoomProvider>
-						<FakeChatProvider>
-							<UserPresenceContext.Provider
-								value={useMemo(
-									() => ({
-										queryUserData: () => ({
-											subscribe: () => () => undefined,
-											get: () => undefined,
-										}),
+						<UserPresenceContext.Provider
+							value={useMemo(
+								() => ({
+									queryUserData: () => ({
+										subscribe: () => () => undefined,
+										get: () => undefined,
 									}),
-									[],
-								)}
-							>
-								{children}
-							</UserPresenceContext.Provider>
-						</FakeChatProvider>
+								}),
+								[],
+							)}
+						>
+							{children}
+						</UserPresenceContext.Provider>
 					</FakeRoomProvider>
 				</RouterContextMock>
 			</QueryClientProvider>

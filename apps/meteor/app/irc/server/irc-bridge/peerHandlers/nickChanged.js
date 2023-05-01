@@ -1,7 +1,7 @@
-import { Users } from '@rocket.chat/models';
+import { Users } from '../../../../models/server';
 
-export default async function handleNickChanged(args) {
-	const user = await Users.findOne({
+export default function handleNickChanged(args) {
+	const user = Users.findOne({
 		'profile.irc.nick': args.nick,
 	});
 
@@ -12,7 +12,7 @@ export default async function handleNickChanged(args) {
 	this.log(`${user.username} changed nick: ${args.nick} -> ${args.newNick}`);
 
 	// Update on the database
-	await Users.updateOne(
+	Users.update(
 		{ _id: user._id },
 		{
 			$set: {

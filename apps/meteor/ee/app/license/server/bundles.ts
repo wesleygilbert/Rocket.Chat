@@ -13,8 +13,7 @@ export type BundleFeature =
 	| 'device-management'
 	| 'oauth-enterprise'
 	| 'federation'
-	| 'videoconference-enterprise'
-	| 'message-read-receipt';
+	| 'videoconference-enterprise';
 
 interface IBundle {
 	[key: string]: BundleFeature[];
@@ -37,7 +36,6 @@ const bundles: IBundle = {
 		'device-management',
 		'federation',
 		'videoconference-enterprise',
-		'message-read-receipt',
 	],
 	pro: [],
 };

@@ -2,7 +2,7 @@
  * This class implements logger.
  * @remarks
  */
-enum LogLevel {
+export enum LogLevel {
 	'fatal',
 	'error',
 	'warn',
@@ -10,7 +10,6 @@ enum LogLevel {
 	'debug',
 	'verbose',
 }
-
 export class ClientLogger {
 	module: string | undefined;
 

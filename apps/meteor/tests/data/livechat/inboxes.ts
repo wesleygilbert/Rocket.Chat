@@ -11,6 +11,7 @@ export const createEmailInbox = async (): Promise<{ _id: string }> => {
 					email: `test${new Date().getTime()}@test.com`,
 					description: 'test',
 					senderInfo: 'test',
+					department: 'test',
 					smtp: {
 						server: 'smtp.example.com',
 						port: 587,

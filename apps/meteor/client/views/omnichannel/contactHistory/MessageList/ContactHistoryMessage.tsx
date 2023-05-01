@@ -21,40 +21,37 @@ import { useTranslation } from '@rocket.chat/ui-contexts';
 import type { FC } from 'react';
 import React, { memo } from 'react';
 
-import { getUserDisplayName } from '../../../../../lib/getUserDisplayName';
 import UserAvatar from '../../../../components/avatar/UserAvatar';
 import MessageContentBody from '../../../../components/message/MessageContentBody';
 import StatusIndicators from '../../../../components/message/StatusIndicators';
 import UiKitSurface from '../../../../components/message/content/UiKitSurface';
 import { useFormatDate } from '../../../../hooks/useFormatDate';
 import { useFormatTime } from '../../../../hooks/useFormatTime';
-import { useChat } from '../../../room/contexts/ChatContext';
+import { useUserCard } from '../../../../hooks/useUserCard';
+import { getUserDisplayName } from '../../../../lib/getUserDisplayName';
 
 const ContactHistoryMessage: FC<{
 	message: IMessage;
 	sequential: boolean;
 	isNewDay: boolean;
-	showUserAvatar: boolean;
-}> = ({ message, sequential, isNewDay, showUserAvatar }) => {
+}> = ({ message, sequential, isNewDay }) => {
 	const format = useFormatDate();
 	const formatTime = useFormatTime();
 
 	const t = useTranslation();
-	const chat = useChat();
+	const { open: openUserCard } = useUserCard();
 
 	if (message.t === 'livechat-close') {
 		return (
 			<MessageSystem>
 				<MessageSystemLeftContainer>
-					{showUserAvatar && (
-						<UserAvatar
-							url={message.avatar}
-							username={message.u.username}
-							size={'x18'}
-							onClick={chat?.userCard.open(message.u.username)}
-							style={{ cursor: 'pointer' }}
-						/>
-					)}
+					<UserAvatar
+						url={message.avatar}
+						username={message.u.username}
+						size={'x18'}
+						onClick={openUserCard(message.u.username)}
+						style={{ cursor: 'pointer' }}
+					/>
 				</MessageSystemLeftContainer>
 				<MessageSystemContainer>
 					<MessageSystemBlock>
@@ -74,12 +71,12 @@ const ContactHistoryMessage: FC<{
 			{isNewDay && <MessageDivider>{format(message.ts)}</MessageDivider>}
 			<MessageTemplate isPending={message.temp} sequential={sequential} role='listitem' data-qa='chat-history-message'>
 				<MessageLeftContainer>
-					{!sequential && message.u.username && showUserAvatar && (
+					{!sequential && message.u.username && (
 						<UserAvatar
 							url={message.avatar}
 							username={message.u.username}
 							size={'x36'}
-							onClick={chat?.userCard.open(message.u.username)}
+							onClick={openUserCard(message.u.username)}
 							style={{ cursor: 'pointer' }}
 						/>
 					)}

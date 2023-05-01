@@ -1,4 +1,4 @@
-import type { Document, FindOptions, Filter, SchemaMember } from 'mongodb';
+import type { FindOptions, Filter, SchemaMember } from 'mongodb';
 
 import type { IRocketChatRecord } from './IRocketChatRecord';
 import type { IRole } from './IRole';
@@ -34,7 +34,7 @@ export interface IPaginationOptions {
 }
 
 // TODO move this definition to a more broader file
-export interface IQueryOptions<T extends Document> {
+export interface IQueryOptions<T> {
 	sort?: FindOptions<T>['sort'];
 	query?: Filter<T>;
 	fields?: SchemaMember<T, number | boolean>;

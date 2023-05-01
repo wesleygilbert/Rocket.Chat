@@ -5,12 +5,15 @@
 import { Meteor } from 'meteor/meteor';
 import { escapeHTML } from '@rocket.chat/string-helpers';
 
+import { marked } from './parser/marked/marked';
 import { original } from './parser/original/original';
 import { filtered } from './parser/filtered/filtered';
 import { code } from './parser/original/code';
+import { settings } from '../../settings';
 
 const parsers = {
 	original,
+	marked,
 	filtered,
 };
 
@@ -30,11 +33,29 @@ class MarkdownClass {
 	}
 
 	parseMessageNotEscaped(message) {
+		const parser = settings.get('Markdown_Parser');
+
+		if (parser === 'disabled') {
+			return message;
+		}
+
 		const options = {
+			supportSchemesForLink: settings.get('Markdown_SupportSchemesForLink'),
+			headers: settings.get('Markdown_Headers'),
 			rootUrl: Meteor.absoluteUrl(),
+			marked: {
+				gfm: settings.get('Markdown_Marked_GFM'),
+				tables: settings.get('Markdown_Marked_Tables'),
+				breaks: settings.get('Markdown_Marked_Breaks'),
+				pedantic: settings.get('Markdown_Marked_Pedantic'),
+				smartLists: settings.get('Markdown_Marked_SmartLists'),
+				smartypants: settings.get('Markdown_Marked_Smartypants'),
+			},
 		};
 
-		return parsers.original(message, options);
+		const parse = typeof parsers[parser] === 'function' ? parsers[parser] : parsers.original;
+
+		return parse(message, options);
 	}
 
 	mountTokensBackRecursively(message, tokenList, useHtml = true) {
@@ -70,7 +91,9 @@ class MarkdownClass {
 	}
 
 	filterMarkdownFromMessage(message) {
-		return parsers.filtered(message);
+		return parsers.filtered(message, {
+			supportSchemesForLink: settings.get('Markdown_SupportSchemesForLink'),
+		});
 	}
 }
 
@@ -78,15 +101,20 @@ export const Markdown = new MarkdownClass();
 
 export const filterMarkdown = (message) => Markdown.filterMarkdownFromMessage(message);
 
-export const createMarkdownMessageRenderer = ({ ...options }) => {
-	const markedParser = parsers.marked;
-	return (message, useMarkedParser = false) => {
+export const createMarkdownMessageRenderer = ({ parser, ...options }) => {
+	if (!parser || parser === 'disabled') {
+		return (message) => message;
+	}
+
+	const parse = typeof parsers[parser] === 'function' ? parsers[parser] : parsers.original;
+
+	return (message) => {
 		if (!message?.html?.trim()) {
 			return message;
 		}
 
-		return useMarkedParser ? markedParser(message, options) : parsers.original(message, options);
+		return parse(message, options);
 	};
 };
 
-export const createMarkdownNotificationRenderer = () => (message) => parsers.filtered(message);
+export const createMarkdownNotificationRenderer = (options) => (message) => parsers.filtered(message, options);

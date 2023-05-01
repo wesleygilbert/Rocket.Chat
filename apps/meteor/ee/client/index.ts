@@ -1,3 +1,4 @@
+import '../app/auditing/client';
 import '../app/authorization/client';
 import '../app/canned-responses/client';
 import '../app/license/client';

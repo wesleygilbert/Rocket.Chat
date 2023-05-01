@@ -3,9 +3,9 @@ import { Match } from 'meteor/check';
 import { Babel } from 'meteor/babel-compiler';
 import _ from 'underscore';
 import type { IUser, INewOutgoingIntegration, IOutgoingIntegration, IUpdateOutgoingIntegration } from '@rocket.chat/core-typings';
-import { Subscriptions, Users, Rooms } from '@rocket.chat/models';
 
-import { hasPermissionAsync, hasAllPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { Rooms, Users, Subscriptions } from '../../../models/server';
+import { hasPermission, hasAllPermission } from '../../../authorization/server';
 import { outgoingEvents } from '../../lib/outgoingEvents';
 import { parseCSV } from '../../../../lib/utils/parseCSV';
 
@@ -51,12 +51,12 @@ function _verifyRequiredFields(integration: INewOutgoingIntegration | IUpdateOut
 	}
 }
 
-async function _verifyUserHasPermissionForChannels(userId: IUser['_id'], channels: string[]): Promise<void> {
-	for await (let channel of channels) {
+function _verifyUserHasPermissionForChannels(userId: IUser['_id'], channels: string[]): void {
+	for (let channel of channels) {
 		if (scopedChannels.includes(channel)) {
 			if (channel === 'all_public_channels') {
 				// No special permissions needed to add integration to public channels
-			} else if (!(await hasPermissionAsync(userId, 'manage-outgoing-integrations'))) {
+			} else if (!hasPermission(userId, 'manage-outgoing-integrations')) {
 				throw new Meteor.Error('error-invalid-channel', 'Invalid Channel', {
 					function: 'validateOutgoing._verifyUserHasPermissionForChannels',
 				});
@@ -68,12 +68,12 @@ async function _verifyUserHasPermissionForChannels(userId: IUser['_id'], channel
 
 			switch (channelType) {
 				case '#':
-					record = await Rooms.findOne({
+					record = Rooms.findOne({
 						$or: [{ _id: channel }, { name: channel }],
 					});
 					break;
 				case '@':
-					record = await Users.findOne({
+					record = Users.findOne({
 						$or: [{ _id: channel }, { username: channel }],
 					});
 					break;
@@ -86,8 +86,8 @@ async function _verifyUserHasPermissionForChannels(userId: IUser['_id'], channel
 			}
 
 			if (
-				!(await hasAllPermissionAsync(userId, ['manage-outgoing-integrations', 'manage-own-outgoing-integrations'])) &&
-				!(await Subscriptions.findOneByRoomIdAndUserId(record._id, userId, { projection: { _id: 1 } }))
+				!hasAllPermission(userId, ['manage-outgoing-integrations', 'manage-own-outgoing-integrations']) &&
+				!Subscriptions.findOneByRoomIdAndUserId(record._id, userId, { fields: { _id: 1 } })
 			) {
 				throw new Meteor.Error('error-invalid-channel', 'Invalid Channel', {
 					function: 'validateOutgoing._verifyUserHasPermissionForChannels',
@@ -105,18 +105,19 @@ function _verifyRetryInformation(integration: IOutgoingIntegration): void {
 	// Don't allow negative retry counts
 	integration.retryCount =
 		integration.retryCount && parseInt(String(integration.retryCount)) > 0 ? parseInt(String(integration.retryCount)) : 4;
-	integration.retryDelay = !integration.retryDelay?.trim() ? 'powers-of-ten' : integration.retryDelay.toLowerCase();
+	integration.retryDelay =
+		!integration.retryDelay || !integration.retryDelay.trim() ? 'powers-of-ten' : integration.retryDelay.toLowerCase();
 }
 
-export const validateOutgoingIntegration = async function (
+export const validateOutgoingIntegration = function (
 	integration: INewOutgoingIntegration | IUpdateOutgoingIntegration,
 	userId: IUser['_id'],
-): Promise<IOutgoingIntegration> {
+): IOutgoingIntegration {
 	if (integration.channel && Match.test(integration.channel, String) && integration.channel.trim() === '') {
 		delete integration.channel;
 	}
 
-	// Moved to it's own function to satisfy the complexity rule
+	// Moved to it's own function to statisfy the complexity rule
 	_verifyRequiredFields(integration);
 
 	let channels: string[] = [];
@@ -136,13 +137,13 @@ export const validateOutgoingIntegration = async function (
 				}
 			}
 		}
-	} else if (!(await hasPermissionAsync(userId, 'manage-outgoing-integrations'))) {
+	} else if (!hasPermission(userId, 'manage-outgoing-integrations')) {
 		throw new Meteor.Error('error-invalid-permissions', 'Invalid permission for required Integration creation.', {
 			function: 'validateOutgoing',
 		});
 	}
 
-	const user = await Users.findOne({ username: integration.username });
+	const user = Users.findOne({ username: integration.username });
 
 	if (!user) {
 		throw new Meteor.Error('error-invalid-user', 'Invalid user (did you delete the `rocket.cat` user?)', { function: 'validateOutgoing' });
@@ -154,7 +155,7 @@ export const validateOutgoingIntegration = async function (
 		channel: channels,
 		userId: user._id,
 		_createdAt: new Date(),
-		_createdBy: await Users.findOne(userId, { projection: { username: 1 } }),
+		_createdBy: Users.findOne(userId, { fields: { username: 1 } }),
 	};
 
 	if (outgoingEvents[integration.event].use.triggerWords && integration.triggerWords) {
@@ -190,7 +191,7 @@ export const validateOutgoingIntegration = async function (
 		integrationData.runOnEdits = integration.runOnEdits === true;
 	}
 
-	await _verifyUserHasPermissionForChannels(userId, channels);
+	_verifyUserHasPermissionForChannels(userId, channels);
 	_verifyRetryInformation(integrationData);
 
 	return integrationData;

@@ -1,12 +1,12 @@
+import _ from 'underscore';
 import { Blaze } from 'meteor/blaze';
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Tracker } from 'meteor/tracker';
 
-import { emoji } from '../lib';
+import { emoji } from '../../lib/rocketchat';
 import { updateRecentEmoji } from '../emojiPicker';
-import { withDebouncing } from '../../../../lib/utils/highOrderFunctions';
 
 let updatePositions = true;
 
@@ -34,25 +34,24 @@ export const EmojiPicker = {
 
 		Blaze.render(Template.emojiPicker, document.body);
 
-		document.addEventListener('click', (event) => {
+		$(document).click((event) => {
 			if (!this.opened) {
 				return;
 			}
-			if (!event.target.closest('.emoji-picker') && !event.target.matches('.emoji-picker')) {
+			if (!$(event.target).closest('.emoji-picker').length && !$(event.target).is('.emoji-picker')) {
 				if (this.opened) {
 					this.close();
 				}
 			}
 		});
 
-		window.addEventListener(
-			'resize',
-			withDebouncing({ wait: 300 })(() => {
+		$(window).resize(
+			_.debounce(() => {
 				if (!this.opened) {
 					return;
 				}
 				this.setPosition();
-			}),
+			}, 300),
 		);
 	},
 	isOpened() {
@@ -93,11 +92,7 @@ export const EmojiPicker = {
 			cssProperties.left = isLargerThanWindow ? 0 : windowWidth - this.width - windowBorder;
 		}
 
-		const emojiPickerElement = document.querySelector('.emoji-picker');
-		emojiPickerElement.style.top = `${cssProperties.top}px`;
-		emojiPickerElement.style.left = `${cssProperties.left}px`;
-
-		return emojiPickerElement;
+		return $('.emoji-picker').css(cssProperties);
 	},
 	/**
 	 * @param {Element} source
@@ -111,10 +106,12 @@ export const EmojiPicker = {
 		this.source = source;
 
 		const containerEl = this.setPosition();
-		containerEl.classList.add('show');
+		containerEl.addClass('show');
 
-		const emojiInput = containerEl.querySelector('.js-emojipicker-search');
-		emojiInput?.focus();
+		const emojiInput = containerEl.find('.js-emojipicker-search');
+		if (emojiInput) {
+			emojiInput.focus();
+		}
 
 		this.calculateCategoryPositions();
 
@@ -125,8 +122,7 @@ export const EmojiPicker = {
 		this.opened = true;
 	},
 	close() {
-		const emojiPickerElement = document.querySelector('.emoji-picker');
-		emojiPickerElement.classList.remove('show');
+		$('.emoji-picker').removeClass('show');
 		this.opened = false;
 		this.source.focus();
 	},
@@ -170,12 +166,13 @@ export const EmojiPicker = {
 		}
 		updatePositions = false;
 
-		const emojisElement = document.querySelector('.emoji-picker .emojis');
+		const containerScroll = $('.emoji-picker .emojis').scrollTop();
 
 		this.catPositions = Array.from(document.querySelectorAll('.emoji-list-category')).map((el) => {
+			const { top } = $(el).position();
 			return {
 				el,
-				top: el.offsetTop + emojisElement.scrollTop,
+				top: top + containerScroll,
 			};
 		});
 	},
@@ -185,42 +182,29 @@ export const EmojiPicker = {
 	showCategory(category, animate = true) {
 		this.scrollingToCategory = animate;
 
-		const emojiPickerSearchElement = document.querySelector('.emoji-picker .js-emojipicker-search');
-		emojiPickerSearchElement.value = '';
-		emojiPickerSearchElement.dispatchEvent(new Event('change'));
-		emojiPickerSearchElement.focus();
+		$('.emoji-picker .js-emojipicker-search').val('').change().focus();
 
 		this.currentCategory.set(category);
 
 		Tracker.afterFlush(() => {
-			const header = document.querySelector(`#emoji-list-category-${category}`);
-			const container = document.querySelector('.emoji-picker .emojis');
+			const header = $(`#emoji-list-category-${category}`);
+			const container = $('.emoji-picker .emojis');
+
+			const scrollTop = header.position().top + container.scrollTop(); // - container.position().top;
 
 			if (animate) {
-				header.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-				const callback = () => {
-					this.scrollingToCategory = false;
-				};
-
-				if ('onscrollend' in window) {
-					container.addEventListener('scrollend', callback, { once: true });
-				} else {
-					let scrollEndTimer;
-					const handler = () => {
-						clearTimeout(scrollEndTimer);
-						scrollEndTimer = setTimeout(() => {
-							callback();
-							container.removeEventListener('scroll', handler);
-						}, 100);
-					};
-					container.addEventListener('scroll', handler);
-				}
-
-				return;
+				return container.animate(
+					{
+						scrollTop,
+					},
+					300,
+					() => {
+						this.scrollingToCategory = false;
+					},
+				);
 			}
 
-			header.scrollIntoView({ block: 'start' });
+			container.scrollTop(scrollTop);
 		});
 	},
 };

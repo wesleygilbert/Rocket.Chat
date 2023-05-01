@@ -1,12 +1,9 @@
-import type { MessageQuoteAttachment } from '@rocket.chat/core-typings';
 import { css } from '@rocket.chat/css-in-js';
 import { IconButton, Box, Margins } from '@rocket.chat/fuselage';
-import { useSetting } from '@rocket.chat/ui-contexts';
 import type { ReactElement } from 'react';
 import React, { memo } from 'react';
 import { useSubscription } from 'use-subscription';
 
-import { getUserDisplayName } from '../../../../../../../lib/getUserDisplayName';
 import { QuoteAttachment } from '../../../../../../components/message/content/attachments/QuoteAttachment';
 import { useChat } from '../../../../contexts/ChatContext';
 
@@ -21,8 +18,6 @@ const MessageBoxReplies = (): ReactElement | null => {
 		getCurrentValue: chat.composer.quotedMessages.get,
 		subscribe: chat.composer.quotedMessages.subscribe,
 	});
-
-	const useRealName = Boolean(useSetting('UI_Use_Real_Name'));
 
 	if (!replies.length) {
 		return null;
@@ -43,13 +38,11 @@ const MessageBoxReplies = (): ReactElement | null => {
 							attachment={
 								{
 									text: reply.msg,
-									md: reply.md,
-									author_name: reply.alias || getUserDisplayName(reply.u.name, reply.u.username, useRealName),
+									author_name: reply.u.username,
 									author_icon: `/avatar/${reply.u.username}`,
 									ts: reply.ts,
-									attachments: reply?.attachments?.map((obj) => ({ ...obj, collapsed: true })),
-									collapsed: true,
-								} as MessageQuoteAttachment
+									attachments: reply.attachments,
+								} as any
 							}
 						/>
 						<Box

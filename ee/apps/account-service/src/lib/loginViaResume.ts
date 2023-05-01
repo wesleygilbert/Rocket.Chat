@@ -22,9 +22,9 @@ export async function loginViaResume(resume: string, loginExpiration: number): P
 		return false;
 	}
 
-	const token = user.services?.resume?.loginTokens?.find((token) => token.hashedToken === hashedToken);
+	const { when } = user.services?.resume?.loginTokens?.find((token) => token.hashedToken === hashedToken) || {};
 
-	const tokenExpires = token && 'when' in token && _tokenExpiration(token.when, loginExpiration);
+	const tokenExpires = when && _tokenExpiration(when, loginExpiration);
 	if (tokenExpires && new Date() >= tokenExpires) {
 		throw new MeteorError(403, 'Your session has expired. Please log in again.');
 	}

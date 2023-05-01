@@ -6,8 +6,9 @@ import type { ReactElement } from 'react';
 import React, { memo } from 'react';
 
 import { useUserData } from '../../../../hooks/useUserData';
+import type { MessageWithMdEnforced } from '../../../../lib/parseMessageTextToAstMarkdown';
 import type { UserPresence } from '../../../../lib/presence';
-import { useChat } from '../../../../views/room/contexts/ChatContext';
+import { useRoomSubscription } from '../../../../views/room/contexts/RoomContext';
 import MessageContentBody from '../../MessageContentBody';
 import ReadReceiptIndicator from '../../ReadReceiptIndicator';
 import Attachments from '../../content/Attachments';
@@ -19,59 +20,46 @@ import Reactions from '../../content/Reactions';
 import ThreadMetrics from '../../content/ThreadMetrics';
 import UiKitSurface from '../../content/UiKitSurface';
 import UrlPreviews from '../../content/UrlPreviews';
-import { useNormalizedMessage } from '../../hooks/useNormalizedMessage';
 import { useOembedLayout } from '../../hooks/useOembedLayout';
-import { useSubscriptionFromMessageQuery } from '../../hooks/useSubscriptionFromMessageQuery';
 
 type RoomMessageContentProps = {
-	message: IMessage;
+	message: MessageWithMdEnforced<IMessage>;
 	unread: boolean;
 	mention: boolean;
 	all: boolean;
-	searchText?: string;
 };
 
-const RoomMessageContent = ({ message, unread, all, mention, searchText }: RoomMessageContentProps): ReactElement => {
+const RoomMessageContent = ({ message, unread, all, mention }: RoomMessageContentProps): ReactElement => {
 	const encrypted = isE2EEMessage(message);
 	const { enabled: oembedEnabled } = useOembedLayout();
-	const subscription = useSubscriptionFromMessageQuery(message).data ?? undefined;
-	const broadcast = subscription?.broadcast ?? false;
+	const broadcast = useRoomSubscription()?.broadcast ?? false;
 	const uid = useUserId();
 	const messageUser: UserPresence = { ...message.u, roles: [], ...useUserData(message.u._id) };
 	const readReceiptEnabled = useSetting('Message_Read_Receipt_Enabled', false);
-	const chat = useChat();
-	const t = useTranslation();
 
-	const normalizedMessage = useNormalizedMessage(message);
+	const t = useTranslation();
 
 	return (
 		<>
-			{!normalizedMessage.blocks?.length && !!normalizedMessage.md?.length && (
+			{!message.blocks?.length && !!message.md?.length && (
 				<>
-					{(!encrypted || normalizedMessage.e2e === 'done') && (
-						<MessageContentBody
-							md={normalizedMessage.md}
-							mentions={normalizedMessage.mentions}
-							channels={normalizedMessage.channels}
-							searchText={searchText}
-						/>
+					{(!encrypted || message.e2e === 'done') && (
+						<MessageContentBody md={message.md} mentions={message.mentions} channels={message.channels} />
 					)}
-					{encrypted && normalizedMessage.e2e === 'pending' && t('E2E_message_encrypted_placeholder')}
+					{encrypted && message.e2e === 'pending' && t('E2E_message_encrypted_placeholder')}
 				</>
 			)}
 
-			{normalizedMessage.blocks && (
-				<UiKitSurface mid={normalizedMessage._id} blocks={normalizedMessage.blocks} appId rid={normalizedMessage.rid} />
-			)}
+			{message.blocks && <UiKitSurface mid={message._id} blocks={message.blocks} appId rid={message.rid} />}
 
-			{!!normalizedMessage?.attachments?.length && <Attachments attachments={normalizedMessage.attachments} />}
+			{!!message?.attachments?.length && <Attachments attachments={message.attachments} file={message.file} />}
 
-			{oembedEnabled && !!normalizedMessage.urls?.length && <UrlPreviews urls={normalizedMessage.urls} />}
+			{oembedEnabled && !!message.urls?.length && <UrlPreviews urls={message.urls} />}
 
-			{normalizedMessage.actionLinks?.length && (
+			{message.actionLinks?.length && (
 				<MessageActions
-					message={normalizedMessage}
-					actions={normalizedMessage.actionLinks.map(({ method_id: methodId, i18nLabel, ...action }) => ({
+					message={message}
+					actions={message.actionLinks.map(({ method_id: methodId, i18nLabel, ...action }) => ({
 						methodId,
 						i18nLabel: i18nLabel as TranslationKey,
 						...action,
@@ -79,38 +67,31 @@ const RoomMessageContent = ({ message, unread, all, mention, searchText }: RoomM
 				/>
 			)}
 
-			{normalizedMessage.reactions && Object.keys(normalizedMessage.reactions).length && <Reactions message={normalizedMessage} />}
+			{message.reactions && Object.keys(message.reactions).length && <Reactions message={message} />}
 
-			{chat && isThreadMainMessage(normalizedMessage) && (
+			{isThreadMainMessage(message) && (
 				<ThreadMetrics
-					counter={normalizedMessage.tcount}
-					following={Boolean(uid && normalizedMessage?.replies?.indexOf(uid) > -1)}
-					mid={normalizedMessage._id}
-					rid={normalizedMessage.rid}
-					lm={normalizedMessage.tlm}
+					counter={message.tcount}
+					following={Boolean(uid && message?.replies?.indexOf(uid) > -1)}
+					mid={message._id}
+					rid={message.rid}
+					lm={message.tlm}
 					unread={unread}
 					mention={mention}
 					all={all}
-					participants={normalizedMessage?.replies?.length}
+					participants={message?.replies?.length}
 				/>
 			)}
 
-			{isDiscussionMessage(normalizedMessage) && (
-				<DiscussionMetrics
-					count={normalizedMessage.dcount}
-					drid={normalizedMessage.drid}
-					lm={normalizedMessage.dlm}
-					rid={normalizedMessage.rid}
-				/>
+			{isDiscussionMessage(message) && <DiscussionMetrics count={message.dcount} drid={message.drid} lm={message.dlm} rid={message.rid} />}
+
+			{message.location && <Location location={message.location} />}
+
+			{broadcast && !!messageUser.username && message.u._id !== uid && (
+				<BroadcastMetrics username={messageUser.username} message={message} />
 			)}
 
-			{normalizedMessage.location && <Location location={normalizedMessage.location} />}
-
-			{broadcast && !!messageUser.username && normalizedMessage.u._id !== uid && (
-				<BroadcastMetrics username={messageUser.username} message={normalizedMessage} />
-			)}
-
-			{readReceiptEnabled && <ReadReceiptIndicator unread={normalizedMessage.unread} />}
+			{readReceiptEnabled && <ReadReceiptIndicator unread={message.unread} />}
 		</>
 	);
 };

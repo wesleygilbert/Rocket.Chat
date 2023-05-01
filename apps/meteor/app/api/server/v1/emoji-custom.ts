@@ -7,14 +7,13 @@ import { getUploadFormData } from '../lib/getUploadFormData';
 import { findEmojisCustom } from '../lib/emoji-custom';
 import { SystemLogger } from '../../../../server/lib/logger/system';
 import { settings } from '../../../settings/server';
-import { getPaginationItems } from '../helpers/getPaginationItems';
 
 API.v1.addRoute(
 	'emoji-custom.list',
 	{ authRequired: true },
 	{
 		async get() {
-			const { query } = await this.parseJsonQuery();
+			const { query } = this.parseJsonQuery();
 			const { updatedSince } = this.queryParams;
 			if (updatedSince) {
 				const updatedSinceDate = new Date(updatedSince);
@@ -48,8 +47,8 @@ API.v1.addRoute(
 	{ authRequired: true },
 	{
 		async get() {
-			const { offset, count } = await getPaginationItems(this.queryParams);
-			const { sort, query } = await this.parseJsonQuery();
+			const { offset, count } = this.getPaginationItems();
+			const { sort, query } = this.parseJsonQuery();
 
 			return API.v1.success(
 				await findEmojisCustom({
@@ -88,12 +87,12 @@ API.v1.addRoute(
 			fields.extension = extension;
 
 			try {
-				await Meteor.callAsync('insertOrUpdateEmoji', {
+				Meteor.call('insertOrUpdateEmoji', {
 					...fields,
 					newFile: true,
 					aliases: fields.aliases || '',
 				});
-				await Meteor.callAsync('uploadEmojiCustom', fileBuffer, mimetype, {
+				Meteor.call('uploadEmojiCustom', fileBuffer, mimetype, {
 					...fields,
 					newFile: true,
 					aliases: fields.aliases || '',
@@ -148,9 +147,9 @@ API.v1.addRoute(
 				fields.extension = emojiToUpdate.extension;
 			}
 
-			await Meteor.callAsync('insertOrUpdateEmoji', { ...fields, newFile });
+			Meteor.call('insertOrUpdateEmoji', { ...fields, newFile });
 			if (fields.newFile) {
-				await Meteor.callAsync('uploadEmojiCustom', fileBuffer, mimetype, { ...fields, newFile });
+				Meteor.call('uploadEmojiCustom', fileBuffer, mimetype, { ...fields, newFile });
 			}
 			return API.v1.success();
 		},
@@ -161,13 +160,13 @@ API.v1.addRoute(
 	'emoji-custom.delete',
 	{ authRequired: true },
 	{
-		async post() {
+		post() {
 			const { emojiId } = this.bodyParams;
 			if (!emojiId) {
 				return API.v1.failure('The "emojiId" params is required!');
 			}
 
-			await Meteor.callAsync('deleteEmojiCustom', emojiId);
+			Meteor.call('deleteEmojiCustom', emojiId);
 
 			return API.v1.success();
 		},

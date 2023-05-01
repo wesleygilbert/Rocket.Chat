@@ -1,19 +1,12 @@
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 import { Meteor } from 'meteor/meteor';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		sendSystemMessages(rid: string, user: string, id: string): void;
-	}
-}
+import { Messages } from '../../../models/server';
 
-Meteor.methods<ServerMethods>({
-	sendSystemMessages() {
+Meteor.methods({
+	sendSystemMessages(rid, user, id) {
 		if (!Meteor.userId()) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', { method: 'sendSystemMessages' });
 		}
-
-		// deprecated, use REST /v1/chat.otr instead
+		Messages.createOtrSystemMessagesWithRoomIdAndUser(rid, user, id);
 	},
 });

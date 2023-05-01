@@ -1,3 +1,4 @@
+import type { ILivechatDepartmentRecord } from '@rocket.chat/core-typings';
 import { useEndpoint, useTranslation } from '@rocket.chat/ui-contexts';
 import { useCallback, useState } from 'react';
 
@@ -13,27 +14,19 @@ type DepartmentsListOptions = {
 	haveNone?: boolean;
 	excludeDepartmentId?: string;
 	enabled?: boolean;
-	showArchived?: boolean;
-};
-
-type DepartmentListItem = {
-	_id: string;
-	label: string;
-	value: string;
-	_updatedAt: Date;
 };
 
 export const useDepartmentsList = (
 	options: DepartmentsListOptions,
 ): {
-	itemsList: RecordList<DepartmentListItem>;
+	itemsList: RecordList<ILivechatDepartmentRecord>;
 	initialItemCount: number;
 	reload: () => void;
 	loadMoreItems: (start: number, end: number) => void;
 } => {
 	const t = useTranslation();
-	const [itemsList, setItemsList] = useState(() => new RecordList<DepartmentListItem>());
-	const reload = useCallback(() => setItemsList(new RecordList<DepartmentListItem>()), []);
+	const [itemsList, setItemsList] = useState(() => new RecordList<ILivechatDepartmentRecord>());
+	const reload = useCallback(() => setItemsList(new RecordList<ILivechatDepartmentRecord>()), []);
 
 	const getDepartments = useEndpoint('GET', '/v1/livechat/department');
 
@@ -51,7 +44,6 @@ export const useDepartmentsList = (
 				sort: `{ "name": 1 }`,
 				excludeDepartmentId: options.excludeDepartmentId,
 				enabled: options.enabled ? 'true' : 'false',
-				showArchived: options.showArchived ? 'true' : 'false',
 			});
 
 			const items = departments
@@ -61,28 +53,24 @@ export const useDepartmentsList = (
 					}
 					return true;
 				})
-				.map(({ _id, name, _updatedAt, ...department }): DepartmentListItem => {
-					return {
-						_id,
-						label: department.archived ? `${name} [${t('Archived')}]` : name,
-						value: _id,
-						_updatedAt: new Date(_updatedAt || ''),
-					};
+				.map((department: any) => {
+					department._updatedAt = new Date(department._updatedAt);
+					department.label = department.name;
+					department.value = { value: department._id, label: department.name };
+					return department;
 				});
 
 			options.haveAll &&
 				items.unshift({
-					_id: '',
 					label: t('All'),
-					value: 'all',
+					value: { value: 'all', label: t('All') },
 					_updatedAt: new Date(),
 				});
 
 			options.haveNone &&
 				items.unshift({
-					_id: '',
 					label: t('None'),
-					value: '',
+					value: { value: '', label: t('None') },
 					_updatedAt: new Date(),
 				});
 
@@ -93,14 +81,13 @@ export const useDepartmentsList = (
 		},
 		[
 			getDepartments,
-			options.onlyMyDepartments,
+			options.departmentId,
 			options.filter,
+			options.haveAll,
+			options.onlyMyDepartments,
+			options.haveNone,
 			options.excludeDepartmentId,
 			options.enabled,
-			options.showArchived,
-			options.haveAll,
-			options.haveNone,
-			options.departmentId,
 			t,
 		],
 	);

@@ -2,8 +2,9 @@ import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
 import { Tracker } from 'meteor/tracker';
 import type { IRoom, ISubscription, IUser } from '@rocket.chat/core-typings';
+import type { Blaze } from 'meteor/blaze';
 
-import { Subscriptions, ChatRoom, Users } from '../../../models/client';
+import { Subscriptions, Rooms, Users } from '../../../models/client';
 import { hasPermission } from '../../../authorization/client';
 import { settings } from '../../../settings/client';
 import { getUserPreference } from '../../../utils/client';
@@ -13,6 +14,7 @@ import type { CommonRoomTemplateInstance } from '../../../ui/client/views/app/li
 const fields = {
 	'name': 1,
 	'username': 1,
+	'settings.preferences.useLegacyMessageTemplate': 1,
 	'settings.preferences.autoImageLoad': 1,
 	'settings.preferences.saveMobileBandwidth': 1,
 	'settings.preferences.collapseMediaByDefault': 1,
@@ -21,10 +23,10 @@ const fields = {
 
 export const createMessageContext = ({
 	uid = Meteor.userId(),
-	user = uid ? Users.findOne({ _id: uid }, { fields }) : undefined,
+	user = Users.findOne({ _id: uid }, { fields }) || {},
 	rid = (Template.instance() as CommonRoomTemplateInstance).data.rid,
 	room = Tracker.nonreactive(() =>
-		ChatRoom.findOne(
+		Rooms.findOne(
 			{ _id: rid },
 			{
 				fields: {
@@ -49,6 +51,7 @@ export const createMessageContext = ({
 	),
 	translateLanguage = AutoTranslate.getLanguage(rid),
 	autoImageLoad = getUserPreference(user, 'autoImageLoad'),
+	useLegacyMessageTemplate = getUserPreference(user, 'useLegacyMessageTemplate'),
 	saveMobileBandwidth = Meteor.Device.isPhone() && getUserPreference(user, 'saveMobileBandwidth'),
 	collapseMediaByDefault = getUserPreference(user, 'collapseMediaByDefault'),
 	showreply = true,
@@ -67,17 +70,24 @@ export const createMessageContext = ({
 	// eslint-disable-next-line @typescript-eslint/naming-convention
 	Message_AllowEditing_BlockEditInMinutes = settings.get('Message_AllowEditing_BlockEditInMinutes'),
 	// eslint-disable-next-line @typescript-eslint/naming-convention
+	Message_ShowEditedStatus = settings.get('Message_ShowEditedStatus'),
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	API_Embed = settings.get('API_Embed'),
+	// eslint-disable-next-line @typescript-eslint/naming-convention
+	API_EmbedDisabledFor = settings.get('API_EmbedDisabledFor'),
 	// eslint-disable-next-line @typescript-eslint/naming-convention
 	Message_GroupingPeriod = settings.get('Message_GroupingPeriod') * 1000,
 }: {
 	uid?: IUser['_id'] | null;
-	user?: Pick<IUser, '_id' | 'settings'>;
+	user?: Partial<IUser>;
 	rid?: IRoom['_id'];
 	room?: Omit<IRoom, '_updatedAt' | 'lastMessage'>;
 	subscription?: Pick<ISubscription, 'name' | 'autoTranslate' | 'rid' | 'tunread' | 'tunreadUser' | 'tunreadGroup'>;
+	instance?: Blaze.TemplateInstance | ((actionId: string, context: string) => void);
+	embeddedLayout?: boolean;
 	translateLanguage?: unknown;
 	autoImageLoad?: unknown;
+	useLegacyMessageTemplate?: unknown;
 	saveMobileBandwidth?: unknown;
 	collapseMediaByDefault?: unknown;
 	showreply?: unknown;
@@ -90,7 +100,9 @@ export const createMessageContext = ({
 	AutoTranslate_Enabled?: unknown;
 	Message_AllowEditing?: unknown;
 	Message_AllowEditing_BlockEditInMinutes?: unknown;
+	Message_ShowEditedStatus?: unknown;
 	API_Embed?: unknown;
+	API_EmbedDisabledFor?: unknown;
 	Message_GroupingPeriod?: unknown;
 } = {}) => {
 	return {
@@ -100,6 +112,7 @@ export const createMessageContext = ({
 		settings: {
 			translateLanguage,
 			autoImageLoad,
+			useLegacyMessageTemplate,
 			saveMobileBandwidth,
 			collapseMediaByDefault,
 			showreply,
@@ -112,7 +125,9 @@ export const createMessageContext = ({
 			AutoTranslate_Enabled,
 			Message_AllowEditing,
 			Message_AllowEditing_BlockEditInMinutes,
+			Message_ShowEditedStatus,
 			API_Embed,
+			API_EmbedDisabledFor,
 			Message_GroupingPeriod,
 		},
 	} as const;

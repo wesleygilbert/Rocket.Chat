@@ -13,7 +13,6 @@ export class MatrixBridgedUserRaw extends BaseRaw<IMatrixBridgedUser> implements
 		return [
 			{ key: { uid: 1 }, unique: true, sparse: true },
 			{ key: { mui: 1 }, unique: true, sparse: true },
-			{ key: { fromServer: 1 }, sparse: true },
 		];
 	}
 
@@ -43,7 +42,7 @@ export class MatrixBridgedUserRaw extends BaseRaw<IMatrixBridgedUser> implements
 		return this.findOne({ uid: localUserId });
 	}
 
-	async createOrUpdateByLocalId(localUserId: string, externalUserId: string, remote: boolean, fromServer: string): Promise<void> {
+	async createOrUpdateByLocalId(localUserId: string, externalUserId: string, remote: boolean): Promise<void> {
 		await this.updateOne(
 			{ uid: localUserId },
 			{
@@ -51,7 +50,6 @@ export class MatrixBridgedUserRaw extends BaseRaw<IMatrixBridgedUser> implements
 					uid: localUserId,
 					mui: externalUserId,
 					remote,
-					fromServer,
 				},
 			},
 			{ upsert: true },

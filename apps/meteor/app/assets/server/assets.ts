@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import type { ServerResponse, IncomingMessage } from 'http';
 
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 import { Meteor } from 'meteor/meteor';
 import { WebApp, WebAppInternals } from 'meteor/webapp';
 import { WebAppHashing } from 'meteor/webapp-hashing';
@@ -13,10 +12,10 @@ import type { IRocketChatAssets, IRocketChatAsset, IRocketChatAssetCache } from 
 import { Settings } from '@rocket.chat/models';
 
 import { settings, settingsRegistry } from '../../settings/server';
-import { getURL } from '../../utils/server/getURL';
+import { getURL } from '../../utils/lib/getURL';
 import { getExtension } from '../../utils/lib/mimeTypes';
-import { hasPermissionAsync } from '../../authorization/server/functions/hasPermission';
-import { RocketChatFile } from '../../file/server';
+import { hasPermission } from '../../authorization/server';
+import { RocketChatFile } from '../../file';
 import { methodDeprecationLogger } from '../../lib/server/lib/deprecationWarningLogger';
 
 const RocketChatAssetsInstance = new RocketChatFile.GridFS({
@@ -35,23 +34,8 @@ const assets: IRocketChatAssets = {
 			order: 2,
 		},
 	},
-	logo_dark: {
-		label: 'logo - dark theme (svg, png, jpg)',
-		defaultUrl: 'images/logo/logo_dark.svg',
-		constraints: {
-			type: 'image',
-			extensions: ['svg', 'png', 'jpg', 'jpeg'],
-		},
-	},
 	background: {
 		label: 'login background (svg, png, jpg)',
-		constraints: {
-			type: 'image',
-			extensions: ['svg', 'png', 'jpg', 'jpeg'],
-		},
-	},
-	background_dark: {
-		label: 'login background - dark theme (svg, png, jpg)',
 		constraints: {
 			type: 'image',
 			extensions: ['svg', 'png', 'jpg', 'jpeg'],
@@ -202,7 +186,7 @@ class RocketChatAssetsClass {
 		return assets;
 	}
 
-	public async setAsset(binaryContent: string, contentType: string, asset: string): Promise<void> {
+	public setAsset(binaryContent: BufferEncoding, contentType: string, asset: string): void {
 		const assetInstance = getAssetByKey(asset);
 		if (!assetInstance) {
 			throw new Meteor.Error('error-invalid-asset', 'Invalid asset', {
@@ -231,42 +215,45 @@ class RocketChatAssetsClass {
 		}
 
 		const rs = RocketChatFile.bufferToStream(file);
-		await RocketChatAssetsInstance.deleteFile(asset);
+		RocketChatAssetsInstance.deleteFile(asset);
 
 		const ws = RocketChatAssetsInstance.createWriteStream(asset, contentType);
-		ws.on('end', function () {
-			return setTimeout(async function () {
-				const key = `Assets_${asset}`;
-				const value = {
-					url: `assets/${asset}.${extension}`,
-					defaultUrl: assetInstance.defaultUrl,
-				};
+		ws.on(
+			'end',
+			Meteor.bindEnvironment(function () {
+				return Meteor.setTimeout(function () {
+					const key = `Assets_${asset}`;
+					const value = {
+						url: `assets/${asset}.${extension}`,
+						defaultUrl: assetInstance.defaultUrl,
+					};
 
-				void Settings.updateValueById(key, value);
-				// eslint-disable-next-line @typescript-eslint/no-use-before-define
-				return RocketChatAssets.processAsset(key, value);
-			}, 200);
-		});
+					Settings.updateValueById(key, value);
+					// eslint-disable-next-line @typescript-eslint/no-use-before-define
+					return RocketChatAssets.processAsset(key, value);
+				}, 200);
+			}),
+		);
 
 		rs.pipe(ws);
 	}
 
-	public async unsetAsset(asset: string): Promise<void> {
+	public unsetAsset(asset: string): void {
 		if (!getAssetByKey(asset)) {
 			throw new Meteor.Error('error-invalid-asset', 'Invalid asset', {
 				function: 'RocketChat.Assets.unsetAsset',
 			});
 		}
 
-		await RocketChatAssetsInstance.deleteFile(asset);
+		RocketChatAssetsInstance.deleteFile(asset);
 		const key = `Assets_${asset}`;
 		const value = {
 			defaultUrl: getAssetByKey(asset).defaultUrl,
 		};
 
-		void Settings.updateValueById(key, value);
+		Settings.updateValueById(key, value);
 		// eslint-disable-next-line @typescript-eslint/no-use-before-define
-		await RocketChatAssets.processAsset(key, value);
+		RocketChatAssets.processAsset(key, value);
 	}
 
 	public refreshClients(): boolean {
@@ -275,7 +262,7 @@ class RocketChatAssetsClass {
 		});
 	}
 
-	public async processAsset(settingKey: string, settingValue: any): Promise<Record<string, any> | undefined> {
+	public processAsset(settingKey: string, settingValue: any): Record<string, any> | undefined {
 		if (settingKey.indexOf('Assets_') !== 0) {
 			return;
 		}
@@ -287,12 +274,12 @@ class RocketChatAssetsClass {
 			return;
 		}
 
-		if (!settingValue?.url) {
+		if (!settingValue || !settingValue.url) {
 			assetValue.cache = undefined;
 			return;
 		}
 
-		const file = await RocketChatAssetsInstance.getFile(assetKey);
+		const file = RocketChatAssetsInstance.getFileSync(assetKey);
 		if (!file) {
 			assetValue.cache = undefined;
 			return;
@@ -323,16 +310,24 @@ class RocketChatAssetsClass {
 		const asset = settings.get<IRocketChatAsset>(assetName);
 		const url = asset.url || asset.defaultUrl;
 
-		return getURL(url as string, options);
+		return getURL(url, options);
 	}
 }
 
 export const RocketChatAssets = new RocketChatAssetsClass();
 
-async function addAssetToSetting(asset: string, value: IRocketChatAsset): Promise<void> {
+settingsRegistry.addGroup('Assets', function () {
+	this.add('Assets_SvgFavicon_Enable', true, {
+		type: 'boolean',
+		group: 'Assets',
+		i18nLabel: 'Enable_Svg_Favicon',
+	});
+});
+
+function addAssetToSetting(asset: string, value: IRocketChatAsset): void {
 	const key = `Assets_${asset}`;
 
-	await settingsRegistry.add(
+	settingsRegistry.add(
 		key,
 		{
 			defaultUrl: value.defaultUrl,
@@ -352,21 +347,19 @@ async function addAssetToSetting(asset: string, value: IRocketChatAsset): Promis
 
 	if (typeof currentValue === 'object' && currentValue.defaultUrl !== getAssetByKey(asset).defaultUrl) {
 		currentValue.defaultUrl = getAssetByKey(asset).defaultUrl;
-		await Settings.updateValueById(key, currentValue);
+		Promise.await(Settings.updateValueById(key, currentValue));
 	}
 }
 
-void (async () => {
-	for await (const key of Object.keys(assets)) {
-		const value = getAssetByKey(key);
-		await addAssetToSetting(key, value);
-	}
-})();
+for (const key of Object.keys(assets)) {
+	const value = getAssetByKey(key);
+	addAssetToSetting(key, value);
+}
 
 settings.watchByRegex(/^Assets_/, (key, value) => RocketChatAssets.processAsset(key, value));
 
 Meteor.startup(() => {
-	setTimeout(() => {
+	Meteor.setTimeout(() => {
 		process.emit('message', {
 			refresh: 'client',
 		});
@@ -422,27 +415,17 @@ WebAppHashing.calculateClientHash = function (manifest, includeFilter, runtimeCo
 	return calculateClientHash.call(this, manifest, includeFilter, runtimeConfigOverride);
 };
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		refreshClients(): boolean;
-		unsetAsset(asset: string): void;
-		setAsset(binaryContent: Buffer, contentType: string, asset: string): void;
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async refreshClients() {
-		const uid = Meteor.userId();
+Meteor.methods({
+	refreshClients() {
 		methodDeprecationLogger.warn('refreshClients will be deprecated in future versions of Rocket.Chat');
 
-		if (!uid) {
+		if (!Meteor.userId()) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
 				method: 'refreshClients',
 			});
 		}
 
-		const _hasPermission = await hasPermissionAsync(uid, 'manage-assets');
+		const _hasPermission = hasPermission(Meteor.userId() as string, 'manage-assets');
 		if (!_hasPermission) {
 			throw new Meteor.Error('error-action-not-allowed', 'Managing assets not allowed', {
 				method: 'refreshClients',
@@ -453,14 +436,14 @@ Meteor.methods<ServerMethods>({
 		return RocketChatAssets.refreshClients();
 	},
 
-	async unsetAsset(asset) {
+	unsetAsset(asset) {
 		if (!Meteor.userId()) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
 				method: 'unsetAsset',
 			});
 		}
 
-		const _hasPermission = await hasPermissionAsync(Meteor.userId() as string, 'manage-assets');
+		const _hasPermission = hasPermission(Meteor.userId() as string, 'manage-assets');
 		if (!_hasPermission) {
 			throw new Meteor.Error('error-action-not-allowed', 'Managing assets not allowed', {
 				method: 'unsetAsset',
@@ -471,14 +454,14 @@ Meteor.methods<ServerMethods>({
 		return RocketChatAssets.unsetAsset(asset);
 	},
 
-	async setAsset(binaryContent, contentType, asset) {
+	setAsset(binaryContent, contentType, asset) {
 		if (!Meteor.userId()) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
 				method: 'setAsset',
 			});
 		}
 
-		const _hasPermission = await hasPermissionAsync(Meteor.userId() as string, 'manage-assets');
+		const _hasPermission = hasPermission(Meteor.userId() as string, 'manage-assets');
 		if (!_hasPermission) {
 			throw new Meteor.Error('error-action-not-allowed', 'Managing assets not allowed', {
 				method: 'setAsset',
@@ -486,11 +469,11 @@ Meteor.methods<ServerMethods>({
 			});
 		}
 
-		await RocketChatAssets.setAsset(binaryContent, contentType, asset);
+		RocketChatAssets.setAsset(binaryContent, contentType, asset);
 	},
 });
 
-const listener = (req: IncomingMessage, res: ServerResponse, next: NextHandleFunction) => {
+const listener = Meteor.bindEnvironment((req: IncomingMessage, res: ServerResponse, next: NextHandleFunction) => {
 	if (!req.url) {
 		return;
 	}
@@ -547,6 +530,6 @@ const listener = (req: IncomingMessage, res: ServerResponse, next: NextHandleFun
 	if (file.size) res.setHeader('Content-Length', file.size);
 	res.writeHead(200);
 	res.end(file.content);
-};
+});
 
 WebApp.connectHandlers.use('/assets/', listener);

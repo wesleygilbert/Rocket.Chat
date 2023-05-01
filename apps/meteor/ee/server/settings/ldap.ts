@@ -1,18 +1,18 @@
 import { settingsRegistry } from '../../../app/settings/server';
 
-export function addSettings(): Promise<void> {
-	return settingsRegistry.addGroup('LDAP', async function () {
+export function addSettings(): void {
+	settingsRegistry.addGroup('LDAP', function () {
 		const enableQuery = { _id: 'LDAP_Enable', value: true };
 
-		await this.with(
+		this.with(
 			{
 				tab: 'LDAP_Enterprise',
 				enterprise: true,
 				modules: ['ldap-enterprise'],
 			},
-			async function () {
-				await this.section('LDAP_DataSync_BackgroundSync', async function () {
-					await this.add('LDAP_Background_Sync', false, {
+			function () {
+				this.section('LDAP_DataSync_BackgroundSync', function () {
+					this.add('LDAP_Background_Sync', false, {
 						type: 'boolean',
 						enableQuery,
 						invalidValue: false,
@@ -20,39 +20,39 @@ export function addSettings(): Promise<void> {
 
 					const backgroundSyncQuery = [enableQuery, { _id: 'LDAP_Background_Sync', value: true }];
 
-					await this.add('LDAP_Background_Sync_Interval', 'Every 24 hours', {
+					this.add('LDAP_Background_Sync_Interval', 'Every 24 hours', {
 						type: 'string',
 						enableQuery: backgroundSyncQuery,
 						invalidValue: 'Every 24 hours',
 					});
 
-					await this.add('LDAP_Background_Sync_Import_New_Users', true, {
+					this.add('LDAP_Background_Sync_Import_New_Users', true, {
 						type: 'boolean',
 						enableQuery: backgroundSyncQuery,
 						invalidValue: true,
 					});
 
-					await this.add('LDAP_Background_Sync_Keep_Existant_Users_Updated', true, {
+					this.add('LDAP_Background_Sync_Keep_Existant_Users_Updated', true, {
 						type: 'boolean',
 						enableQuery: backgroundSyncQuery,
 						invalidValue: true,
 					});
 
-					await this.add('LDAP_Background_Sync_Avatars', false, {
+					this.add('LDAP_Background_Sync_Avatars', false, {
 						type: 'boolean',
 						enableQuery,
 						invalidValue: false,
 					});
 
-					await this.add('LDAP_Background_Sync_Avatars_Interval', 'Every 24 hours', {
+					this.add('LDAP_Background_Sync_Avatars_Interval', 'Every 24 hours', {
 						type: 'string',
 						enableQuery: [enableQuery, { _id: 'LDAP_Background_Sync_Avatars', value: true }],
 						invalidValue: 'Every 24 hours',
 					});
 				});
 
-				await this.section('LDAP_DataSync_Advanced', async function () {
-					await this.add('LDAP_Sync_User_Active_State', 'disable', {
+				this.section('LDAP_DataSync_Advanced', function () {
+					this.add('LDAP_Sync_User_Active_State', 'disable', {
 						type: 'select',
 						values: [
 							{ key: 'none', i18nLabel: 'LDAP_Sync_User_Active_State_Nothing' },
@@ -64,35 +64,35 @@ export function addSettings(): Promise<void> {
 						invalidValue: 'none',
 					});
 
-					await this.add('LDAP_User_Search_AttributesToQuery', '*,+', {
+					this.add('LDAP_User_Search_AttributesToQuery', '*,+', {
 						type: 'string',
 						enableQuery: { _id: 'LDAP_Enable', value: true },
 						invalidValue: '*,+',
 					});
 				});
 
-				await this.section('LDAP_DataSync_AutoLogout', async function () {
-					await this.add('LDAP_Sync_AutoLogout_Enabled', false, {
+				this.section('LDAP_DataSync_AutoLogout', function () {
+					this.add('LDAP_Sync_AutoLogout_Enabled', false, {
 						type: 'boolean',
 						enableQuery,
 						invalidValue: false,
 					});
 
-					await this.add('LDAP_Sync_AutoLogout_Interval', 'Every 5 minutes', {
+					this.add('LDAP_Sync_AutoLogout_Interval', 'Every 5 minutes', {
 						type: 'string',
 						enableQuery: [enableQuery, { _id: 'LDAP_Sync_AutoLogout_Enabled', value: true }],
 						invalidValue: '',
 					});
 				});
 
-				await this.section('LDAP_DataSync_CustomFields', async function () {
-					await this.add('LDAP_Sync_Custom_Fields', false, {
+				this.section('LDAP_DataSync_CustomFields', function () {
+					this.add('LDAP_Sync_Custom_Fields', false, {
 						type: 'boolean',
 						enableQuery,
 						invalidValue: false,
 					});
 
-					await this.add('LDAP_CustomFieldMap', '{}', {
+					this.add('LDAP_CustomFieldMap', '{}', {
 						type: 'code',
 						multiline: true,
 						enableQuery: [enableQuery, { _id: 'LDAP_Sync_Custom_Fields', value: true }],
@@ -100,32 +100,32 @@ export function addSettings(): Promise<void> {
 					});
 				});
 
-				await this.section('LDAP_DataSync_Roles', async function () {
-					await this.add('LDAP_Sync_User_Data_Roles', false, {
+				this.section('LDAP_DataSync_Roles', function () {
+					this.add('LDAP_Sync_User_Data_Roles', false, {
 						type: 'boolean',
 						enableQuery,
 						invalidValue: false,
 					});
 					const syncRolesQuery = [enableQuery, { _id: 'LDAP_Sync_User_Data_Roles', value: true }];
-					await this.add('LDAP_Sync_User_Data_Roles_AutoRemove', false, {
+					this.add('LDAP_Sync_User_Data_Roles_AutoRemove', false, {
 						type: 'boolean',
 						enableQuery: syncRolesQuery,
 						invalidValue: false,
 					});
 
-					await this.add('LDAP_Sync_User_Data_Roles_Filter', '(&(cn=#{groupName})(memberUid=#{username}))', {
+					this.add('LDAP_Sync_User_Data_Roles_Filter', '(&(cn=#{groupName})(memberUid=#{username}))', {
 						type: 'string',
 						enableQuery: syncRolesQuery,
 						invalidValue: '',
 					});
 
-					await this.add('LDAP_Sync_User_Data_Roles_BaseDN', '', {
+					this.add('LDAP_Sync_User_Data_Roles_BaseDN', '', {
 						type: 'string',
 						enableQuery: syncRolesQuery,
 						invalidValue: '',
 					});
 
-					await this.add('LDAP_Sync_User_Data_RolesMap', '{\n\t"rocket-admin": "admin",\n\t"tech-support": "support"\n}', {
+					this.add('LDAP_Sync_User_Data_RolesMap', '{\n\t"rocket-admin": "admin",\n\t"tech-support": "support"\n}', {
 						type: 'code',
 						multiline: true,
 						public: false,
@@ -135,8 +135,8 @@ export function addSettings(): Promise<void> {
 					});
 				});
 
-				await this.section('LDAP_DataSync_Channels', async function () {
-					await this.add('LDAP_Sync_User_Data_Channels', false, {
+				this.section('LDAP_DataSync_Channels', function () {
+					this.add('LDAP_Sync_User_Data_Channels', false, {
 						type: 'boolean',
 						enableQuery,
 						invalidValue: false,
@@ -144,25 +144,25 @@ export function addSettings(): Promise<void> {
 
 					const syncChannelsQuery = [enableQuery, { _id: 'LDAP_Sync_User_Data_Channels', value: true }];
 
-					await this.add('LDAP_Sync_User_Data_Channels_Admin', 'rocket.cat', {
+					this.add('LDAP_Sync_User_Data_Channels_Admin', 'rocket.cat', {
 						type: 'string',
 						enableQuery: syncChannelsQuery,
 						invalidValue: 'rocket.cat',
 					});
 
-					await this.add('LDAP_Sync_User_Data_Channels_Filter', '(&(cn=#{groupName})(memberUid=#{username}))', {
+					this.add('LDAP_Sync_User_Data_Channels_Filter', '(&(cn=#{groupName})(memberUid=#{username}))', {
 						type: 'string',
 						enableQuery: syncChannelsQuery,
 						invalidValue: '',
 					});
 
-					await this.add('LDAP_Sync_User_Data_Channels_BaseDN', '', {
+					this.add('LDAP_Sync_User_Data_Channels_BaseDN', '', {
 						type: 'string',
 						enableQuery: syncChannelsQuery,
 						invalidValue: '',
 					});
 
-					await this.add(
+					this.add(
 						'LDAP_Sync_User_Data_ChannelsMap',
 						'{\n\t"employee": "general",\n\t"techsupport": [\n\t\t"helpdesk",\n\t\t"support"\n\t]\n}',
 						{
@@ -175,15 +175,15 @@ export function addSettings(): Promise<void> {
 						},
 					);
 
-					await this.add('LDAP_Sync_User_Data_Channels_Enforce_AutoChannels', false, {
+					this.add('LDAP_Sync_User_Data_Channels_Enforce_AutoChannels', false, {
 						type: 'boolean',
 						enableQuery: syncChannelsQuery,
 						invalidValue: false,
 					});
 				});
 
-				await this.section('LDAP_DataSync_Teams', async function () {
-					await this.add('LDAP_Enable_LDAP_Groups_To_RC_Teams', false, {
+				this.section('LDAP_DataSync_Teams', function () {
+					this.add('LDAP_Enable_LDAP_Groups_To_RC_Teams', false, {
 						type: 'boolean',
 						enableQuery: { _id: 'LDAP_Enable', value: true },
 						invalidValue: false,
@@ -191,28 +191,28 @@ export function addSettings(): Promise<void> {
 
 					const enableQueryTeams = { _id: 'LDAP_Enable_LDAP_Groups_To_RC_Teams', value: true };
 
-					await this.add('LDAP_Groups_To_Rocket_Chat_Teams', '{}', {
+					this.add('LDAP_Groups_To_Rocket_Chat_Teams', '{}', {
 						type: 'code',
 						enableQuery: enableQueryTeams,
 						invalidValue: '{}',
 					});
-					await this.add('LDAP_Validate_Teams_For_Each_Login', false, {
+					this.add('LDAP_Validate_Teams_For_Each_Login', false, {
 						type: 'boolean',
 						enableQuery: enableQueryTeams,
 						invalidValue: false,
 					});
-					await this.add('LDAP_Teams_BaseDN', '', {
+					this.add('LDAP_Teams_BaseDN', '', {
 						type: 'string',
 						enableQuery: enableQueryTeams,
 						invalidValue: '',
 					});
-					await this.add('LDAP_Teams_Name_Field', 'ou,cn', {
+					this.add('LDAP_Teams_Name_Field', 'ou,cn', {
 						type: 'string',
 						enableQuery: enableQueryTeams,
 						invalidValue: '',
 					});
 
-					await this.add('LDAP_Query_To_Get_User_Teams', '(&(ou=*)(uniqueMember=#{userdn}))', {
+					this.add('LDAP_Query_To_Get_User_Teams', '(&(ou=*)(uniqueMember=#{userdn}))', {
 						type: 'string',
 						enableQuery: enableQueryTeams,
 						invalidValue: '',

@@ -1,5 +1,5 @@
 import gcm from 'node-gcm';
-import EJSON from 'ejson';
+import { EJSON } from 'meteor/ejson';
 
 import { logger } from './logger';
 

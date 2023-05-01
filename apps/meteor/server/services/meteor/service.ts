@@ -6,11 +6,12 @@ import type { ILivechatAgent } from '@rocket.chat/core-typings';
 import { api, ServiceClassInternal } from '@rocket.chat/core-services';
 import type { AutoUpdateRecord, IMeteor } from '@rocket.chat/core-services';
 
-import { metrics } from '../../../app/metrics/server';
+import { metrics } from '../../../app/metrics';
 import { Livechat } from '../../../app/livechat/server';
 import { settings } from '../../../app/settings/server';
 import { setValue, updateValue } from '../../../app/settings/server/raw';
 import { onlineAgents, monitorAgents } from '../../../app/livechat/server/lib/stream/agentStatus';
+import { matrixBroadCastActions } from '../../stream/streamBroadcast';
 import { triggerHandler } from '../../../app/integrations/server/lib/triggerHandler';
 import { ListenersModule } from '../../modules/listeners/listeners.module';
 import notifications from '../../../app/notifications/server/lib/Notifications';
@@ -142,6 +143,17 @@ export class MeteorService extends ServiceClassInternal implements IMeteor {
 			setValue(setting._id, undefined);
 		});
 
+		this.onEvent('watch.instanceStatus', async ({ clientAction, id, data }): Promise<void> => {
+			if (clientAction === 'removed') {
+				matrixBroadCastActions?.removed?.(id);
+				return;
+			}
+
+			if (clientAction === 'inserted' && data?.extraInformation?.port) {
+				matrixBroadCastActions?.added?.(data);
+			}
+		});
+
 		if (disableOplog) {
 			this.onEvent('watch.loginServiceConfiguration', ({ clientAction, id, data }) => {
 				if (clientAction === 'removed') {
@@ -216,7 +228,7 @@ export class MeteorService extends ServiceClassInternal implements IMeteor {
 		});
 
 		this.onEvent('watch.emailInbox', async () => {
-			await configureEmailInboxes();
+			configureEmailInboxes();
 		});
 
 		if (!disableMsgRoundtripTracking) {
@@ -236,11 +248,11 @@ export class MeteorService extends ServiceClassInternal implements IMeteor {
 		Meteor.server.publish_handlers.meteor_autoupdate_clientVersions.call({
 			added(_collection: string, _id: string, version: AutoUpdateRecord) {
 				clientVersionsStore.set(_id, version);
-				void api.broadcast('meteor.clientVersionUpdated', version);
+				api.broadcast('meteor.clientVersionUpdated', version);
 			},
 			changed(_collection: string, _id: string, version: AutoUpdateRecord) {
 				clientVersionsStore.set(_id, version);
-				void api.broadcast('meteor.clientVersionUpdated', version);
+				api.broadcast('meteor.clientVersionUpdated', version);
 			},
 			onStop() {
 				//
@@ -256,7 +268,7 @@ export class MeteorService extends ServiceClassInternal implements IMeteor {
 	}
 
 	async getLoginServiceConfiguration(): Promise<any[]> {
-		return ServiceConfiguration.configurations.find({}, { fields: { secret: 0 } }).fetchAsync();
+		return ServiceConfiguration.configurations.find({}, { fields: { secret: 0 } }).fetch();
 	}
 
 	async callMethodWithToken(userId: string, token: string, method: string, args: any[]): Promise<void | any> {
@@ -265,12 +277,12 @@ export class MeteorService extends ServiceClassInternal implements IMeteor {
 		});
 		if (!user) {
 			return {
-				result: Meteor.callAsync(method, ...args),
+				result: Meteor.call(method, ...args),
 			};
 		}
 
 		return {
-			result: Meteor.runAsUser(userId, () => Meteor.callAsync(method, ...args)),
+			result: Meteor.runAsUser(userId, () => Meteor.call(method, ...args)),
 		};
 	}
 

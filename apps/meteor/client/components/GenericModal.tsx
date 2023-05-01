@@ -17,10 +17,10 @@ type GenericModalProps = RequiredModalProps & {
 	title?: string | ReactElement;
 	icon?: ComponentProps<typeof Icon>['name'] | ReactElement | null;
 	confirmDisabled?: boolean;
-	tagline?: ReactNode;
-	onCancel?: () => Promise<void> | void;
-	onClose?: () => Promise<void> | void;
-} & Omit<ComponentProps<typeof Modal>, 'title'>;
+	onCancel?: () => void;
+	onClose?: () => void;
+	onConfirm: () => void;
+};
 
 const iconMap: Record<string, ComponentProps<typeof Icon>['name']> = {
 	danger: 'modal-warning',
@@ -68,18 +68,15 @@ const GenericModal: FC<GenericModalProps> = ({
 	onConfirm,
 	dontAskAgain,
 	confirmDisabled,
-	tagline,
-	wrapperFunction,
 	...props
 }) => {
 	const t = useTranslation();
 
 	return (
-		<Modal wrapperFunction={wrapperFunction} {...props}>
+		<Modal {...props}>
 			<Modal.Header>
 				{renderIcon(icon, variant)}
 				<Modal.HeaderText>
-					{tagline && <Modal.Tagline>{tagline}</Modal.Tagline>}
 					<Modal.Title>{title ?? t('Are_you_sure')}</Modal.Title>
 				</Modal.HeaderText>
 				<Modal.Close title={t('Close')} onClick={onClose} />
@@ -93,16 +90,9 @@ const GenericModal: FC<GenericModalProps> = ({
 							{cancelText ?? t('Cancel')}
 						</Button>
 					)}
-					{wrapperFunction && (
-						<Button {...getButtonProps(variant)} type='submit' disabled={confirmDisabled}>
-							{confirmText ?? t('Ok')}
-						</Button>
-					)}
-					{!wrapperFunction && (
-						<Button {...getButtonProps(variant)} onClick={onConfirm} disabled={confirmDisabled}>
-							{confirmText ?? t('Ok')}
-						</Button>
-					)}
+					<Button {...getButtonProps(variant)} onClick={onConfirm} disabled={confirmDisabled}>
+						{confirmText ?? t('Ok')}
+					</Button>
 				</Modal.FooterControllers>
 			</Modal.Footer>
 		</Modal>

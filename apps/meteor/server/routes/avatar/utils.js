@@ -1,10 +1,9 @@
 import sharp from 'sharp';
 import { throttle } from 'underscore';
 import { Cookies } from 'meteor/ostrio:cookies';
-import { hashLoginToken } from '@rocket.chat/account-utils';
-import { Users } from '@rocket.chat/models';
 
-import { getAvatarColor } from '../../../app/utils/server';
+import { Users } from '../../../app/models/server';
+import { getAvatarColor } from '../../../app/utils';
 import { settings } from '../../../app/settings/server';
 
 const FALLBACK_LAST_MODIFIED = 'Thu, 01 Jan 2015 00:00:00 GMT';
@@ -32,7 +31,7 @@ export const wasFallbackModified = (reqModifiedHeader) => {
 	return false;
 };
 
-async function isUserAuthenticated({ headers, query }) {
+function isUserAuthenticated({ headers, query }) {
 	let { rc_uid, rc_token } = query;
 
 	if (!rc_uid && headers.cookie) {
@@ -44,7 +43,7 @@ async function isUserAuthenticated({ headers, query }) {
 		return false;
 	}
 
-	const userFound = await Users.findOneByIdAndLoginToken(rc_uid, hashLoginToken(rc_token), { projection: { _id: 1 } }); // TODO memoize find
+	const userFound = Users.findOneByIdAndLoginToken(rc_uid, rc_token, { fields: { _id: 1 } }); // TODO memoize find
 
 	return !!userFound;
 }
@@ -53,12 +52,12 @@ const warnUnauthenticatedAccess = throttle(() => {
 	console.warn('The server detected an unauthenticated access to an user avatar. This type of request will soon be blocked by default.');
 }, 60000 * 30); // 30 minutes
 
-export async function userCanAccessAvatar({ headers = {}, query = {} }) {
+export function userCanAccessAvatar({ headers = {}, query = {} }) {
 	if (!settings.get('Accounts_AvatarBlockUnauthenticatedAccess')) {
 		return true;
 	}
 
-	const isAuthenticated = await isUserAuthenticated({ headers, query });
+	const isAuthenticated = isUserAuthenticated({ headers, query });
 	if (!isAuthenticated) {
 		warnUnauthenticatedAccess();
 	}

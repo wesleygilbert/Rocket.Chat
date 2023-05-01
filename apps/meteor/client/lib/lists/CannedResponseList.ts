@@ -2,7 +2,7 @@ import type { ILivechatDepartment, IOmnichannelCannedResponse } from '@rocket.ch
 
 import { RecordList } from './RecordList';
 
-type CannedResponseOptions = {
+export type CannedResponseOptions = {
 	filter: string;
 	type: string;
 };

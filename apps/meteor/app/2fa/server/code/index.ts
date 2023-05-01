@@ -3,13 +3,13 @@ import crypto from 'crypto';
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 import type { IUser, IMethodConnection } from '@rocket.chat/core-typings';
-import { Users } from '@rocket.chat/models';
 
 import { settings } from '../../../settings/server';
 import { TOTPCheck } from './TOTPCheck';
 import { EmailCheck } from './EmailCheck';
 import { PasswordCheckFallback } from './PasswordCheckFallback';
 import type { ICodeCheck } from './ICodeCheck';
+import { Users } from '../../../models/server';
 
 export interface ITwoFactorOptions {
 	disablePasswordFallback?: boolean;
@@ -17,16 +17,16 @@ export interface ITwoFactorOptions {
 	requireSecondFactor?: boolean; // whether any two factor should be required
 }
 
-const totpCheck = new TOTPCheck();
+export const totpCheck = new TOTPCheck();
 export const emailCheck = new EmailCheck();
-const passwordCheckFallback = new PasswordCheckFallback();
+export const passwordCheckFallback = new PasswordCheckFallback();
 
-const checkMethods = new Map<string, ICodeCheck>();
+export const checkMethods = new Map<string, ICodeCheck>();
 
 checkMethods.set(totpCheck.name, totpCheck);
 checkMethods.set(emailCheck.name, emailCheck);
 
-function getMethodByNameOrFirstActiveForUser(user: IUser, name?: string): ICodeCheck | undefined {
+export function getMethodByNameOrFirstActiveForUser(user: IUser, name?: string): ICodeCheck | undefined {
 	if (name && checkMethods.has(name)) {
 		return checkMethods.get(name);
 	}
@@ -34,7 +34,7 @@ function getMethodByNameOrFirstActiveForUser(user: IUser, name?: string): ICodeC
 	return Array.from(checkMethods.values()).find((method) => method.isEnabled(user));
 }
 
-function getAvailableMethodNames(user: IUser): string[] | [] {
+export function getAvailableMethodNames(user: IUser): string[] | [] {
 	return (
 		Array.from(checkMethods)
 			.filter(([, method]) => method.isEnabled(user))
@@ -42,9 +42,9 @@ function getAvailableMethodNames(user: IUser): string[] | [] {
 	);
 }
 
-export async function getUserForCheck(userId: string): Promise<IUser | null> {
+export function getUserForCheck(userId: string): IUser {
 	return Users.findOneById(userId, {
-		projection: {
+		fields: {
 			'emails': 1,
 			'language': 1,
 			'createdAt': 1,
@@ -57,7 +57,7 @@ export async function getUserForCheck(userId: string): Promise<IUser | null> {
 	});
 }
 
-function getFingerprintFromConnection(connection: IMethodConnection): string {
+export function getFingerprintFromConnection(connection: IMethodConnection): string {
 	const data = JSON.stringify({
 		userAgent: connection.httpHeaders['user-agent'],
 		clientAddress: connection.clientAddress,
@@ -79,7 +79,7 @@ function getRememberDate(from: Date = new Date()): Date | undefined {
 	return expires;
 }
 
-function isAuthorizedForToken(connection: IMethodConnection, user: IUser, options: ITwoFactorOptions): boolean {
+export function isAuthorizedForToken(connection: IMethodConnection, user: IUser, options: ITwoFactorOptions): boolean {
 	const currentToken = Accounts._getLoginToken(connection.id);
 	const tokenObject = user.services?.resume?.loginTokens?.find((i) => i.hashedToken === currentToken);
 
@@ -92,7 +92,7 @@ function isAuthorizedForToken(connection: IMethodConnection, user: IUser, option
 		return false;
 	}
 
-	if ('bypassTwoFactor' in tokenObject && tokenObject.bypassTwoFactor === true) {
+	if (tokenObject.bypassTwoFactor === true) {
 		return true;
 	}
 
@@ -121,7 +121,7 @@ function isAuthorizedForToken(connection: IMethodConnection, user: IUser, option
 	return true;
 }
 
-async function rememberAuthorization(connection: IMethodConnection, user: IUser): Promise<void> {
+export function rememberAuthorization(connection: IMethodConnection, user: IUser): void {
 	const currentToken = Accounts._getLoginToken(connection.id);
 
 	const expires = getRememberDate();
@@ -129,16 +129,7 @@ async function rememberAuthorization(connection: IMethodConnection, user: IUser)
 		return;
 	}
 
-	if (!currentToken) {
-		return;
-	}
-
-	await Users.setTwoFactorAuthorizationHashAndUntilForUserIdAndToken(
-		user._id,
-		currentToken,
-		getFingerprintFromConnection(connection),
-		expires,
-	);
+	Users.setTwoFactorAuthorizationHashAndUntilForUserIdAndToken(user._id, currentToken, getFingerprintFromConnection(connection), expires);
 }
 
 interface ICheckCodeForUser {
@@ -167,7 +158,7 @@ const getSecondFactorMethod = (user: IUser, method: string | undefined, options:
 	}
 };
 
-export async function checkCodeForUser({ user, code, method, options = {}, connection }: ICheckCodeForUser): Promise<boolean> {
+export function checkCodeForUser({ user, code, method, options = {}, connection }: ICheckCodeForUser): boolean {
 	if (process.env.TEST_MODE && !options.requireSecondFactor) {
 		return true;
 	}
@@ -176,16 +167,8 @@ export async function checkCodeForUser({ user, code, method, options = {}, conne
 		return true;
 	}
 
-	let existingUser: IUser | null;
-
 	if (typeof user === 'string') {
-		existingUser = await getUserForCheck(user);
-	} else {
-		existingUser = user;
-	}
-
-	if (!existingUser) {
-		throw new Meteor.Error('totp-user-not-found', 'TOTP User not found');
+		user = getUserForCheck(user);
 	}
 
 	if (!code && !method && connection?.httpHeaders?.['x-2fa-code'] && connection.httpHeaders['x-2fa-method']) {
@@ -193,20 +176,20 @@ export async function checkCodeForUser({ user, code, method, options = {}, conne
 		method = connection.httpHeaders['x-2fa-method'];
 	}
 
-	if (connection && isAuthorizedForToken(connection, existingUser, options)) {
+	if (connection && isAuthorizedForToken(connection, user, options)) {
 		return true;
 	}
 
 	// select a second factor method or return if none is found/available
-	const selectedMethod = getSecondFactorMethod(existingUser, method, options);
+	const selectedMethod = getSecondFactorMethod(user, method, options);
 	if (!selectedMethod) {
 		return true;
 	}
 
-	const data = await selectedMethod.processInvalidCode(existingUser);
+	const data = selectedMethod.processInvalidCode(user);
 
 	if (!code) {
-		const availableMethods = getAvailableMethodNames(existingUser);
+		const availableMethods = getAvailableMethodNames(user);
 
 		throw new Meteor.Error('totp-required', 'TOTP Required', {
 			method: selectedMethod.name,
@@ -215,7 +198,7 @@ export async function checkCodeForUser({ user, code, method, options = {}, conne
 		});
 	}
 
-	const valid = await selectedMethod.verify(existingUser, code, options.requireSecondFactor);
+	const valid = selectedMethod.verify(user, code, options.requireSecondFactor);
 	if (!valid) {
 		throw new Meteor.Error('totp-invalid', 'TOTP Invalid', {
 			method: selectedMethod.name,
@@ -224,7 +207,7 @@ export async function checkCodeForUser({ user, code, method, options = {}, conne
 	}
 
 	if (options.disableRememberMe !== true && connection) {
-		await rememberAuthorization(connection, existingUser);
+		rememberAuthorization(connection, user);
 	}
 
 	return true;

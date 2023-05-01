@@ -1,5 +1,5 @@
 import { ServiceConfiguration } from 'meteor/service-configuration';
-import { Random } from '@rocket.chat/random';
+import { Random } from 'meteor/random';
 import { OAuth } from 'meteor/oauth';
 
 export const Linkedin = {};
@@ -9,16 +9,17 @@ export const Linkedin = {};
 // @param credentialRequestCompleteCallback {Function} Callback function to call on
 //   completion. Takes one argument, credentialToken on success, or Error on
 //   error.
-Linkedin.requestCredential = async function (options, credentialRequestCompleteCallback) {
+Linkedin.requestCredential = function (options, credentialRequestCompleteCallback) {
 	// support both (options, callback) and (callback).
 	if (!credentialRequestCompleteCallback && typeof options === 'function') {
 		credentialRequestCompleteCallback = options;
 		options = {};
 	}
 
-	const config = await ServiceConfiguration.configurations.findOneAsync({ service: 'linkedin' });
+	const config = ServiceConfiguration.configurations.findOne({ service: 'linkedin' });
 	if (!config) {
-		throw new ServiceConfiguration.ConfigError('Service not configured');
+		credentialRequestCompleteCallback && credentialRequestCompleteCallback(new ServiceConfiguration.ConfigError('Service not configured'));
+		return;
 	}
 
 	const credentialToken = Random.secret();

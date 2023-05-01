@@ -10,7 +10,14 @@ const AdminInfoStep = (): ReactElement => {
 	const regexpForUsernameValidation = useSetting('UTF8_User_Names_Validation');
 	const usernameRegExp = new RegExp(`^${regexpForUsernameValidation}$`);
 
-	const { currentStep, validateEmail, registerAdminUser, maxSteps } = useSetupWizardContext();
+	const {
+		setupWizardData: { adminData },
+		setSetupWizardData,
+		goToNextStep,
+		currentStep,
+		validateEmail,
+		maxSteps,
+	} = useSetupWizardContext();
 
 	// TODO: check if username exists
 	const validateUsername = (username: string): boolean | string => {
@@ -22,7 +29,8 @@ const AdminInfoStep = (): ReactElement => {
 	};
 
 	const handleSubmit: ComponentProps<typeof AdminInfoPage>['onSubmit'] = async (data) => {
-		registerAdminUser(data);
+		setSetupWizardData((prevState) => ({ ...prevState, adminData: data }));
+		goToNextStep();
 	};
 
 	return (
@@ -32,6 +40,7 @@ const AdminInfoStep = (): ReactElement => {
 			validateUsername={validateUsername}
 			validateEmail={validateEmail}
 			currentStep={currentStep}
+			initialValues={adminData}
 			stepCount={maxSteps}
 			onSubmit={handleSubmit}
 		/>

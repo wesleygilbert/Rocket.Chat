@@ -6,7 +6,7 @@ import type { IProcessor, IOnetimeSchedule, IRecurringSchedule, IJobContext } fr
 import { StartupType } from '@rocket.chat/apps-engine/definition/scheduler';
 import { SchedulerBridge } from '@rocket.chat/apps-engine/server/bridges/SchedulerBridge';
 
-import type { AppServerOrchestrator } from '../../../../ee/server/apps/orchestrator';
+import type { AppServerOrchestrator } from '../orchestrator';
 
 function _callProcessor(processor: IProcessor['processor']): (job: Job) => Promise<void> {
 	return (job) => {
@@ -17,11 +17,11 @@ function _callProcessor(processor: IProcessor['processor']): (job: Job) => Promi
 
 		data.jobId = job.attrs._id.toString();
 
-		return (processor as (jobContext: IJobContext) => Promise<void>)(data).then(async () => {
+		return (processor as (jobContext: IJobContext) => Promise<void>)(data).then(() => {
 			// ensure the 'normal' ('onetime' in our vocab) type job is removed after it is run
 			// as Agenda does not remove it from the DB
 			if (job.attrs.type === 'normal') {
-				await job.agenda.cancel({ _id: job.attrs._id });
+				job.agenda.cancel({ _id: job.attrs._id });
 			}
 		});
 	};

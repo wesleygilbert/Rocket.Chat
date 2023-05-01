@@ -7,7 +7,7 @@ import { cbLogger } from '../lib/logger';
 
 let timer = 0;
 
-const scheduleInquiry = async (inquiry: any): Promise<void> => {
+const scheduleInquiry = (inquiry: any): void => {
 	if (!inquiry?._id) {
 		cbLogger.debug('Skipping callback. No inquiry provided');
 		return;
@@ -21,7 +21,7 @@ const scheduleInquiry = async (inquiry: any): Promise<void> => {
 	// schedule individual jobs instead of property for close inactivty
 	const newQueueTime = moment(inquiry._updatedAt || inquiry._createdAt).add(timer, 'minutes');
 	cbLogger.debug(`Scheduling estimated close time at ${newQueueTime} for queued inquiry ${inquiry._id}`);
-	await OmnichannelQueueInactivityMonitor.scheduleInquiry(inquiry._id, new Date(newQueueTime.format()));
+	OmnichannelQueueInactivityMonitor.scheduleInquiry(inquiry._id, new Date(newQueueTime.format()));
 };
 
 settings.watch('Livechat_max_queue_wait_time', (value) => {

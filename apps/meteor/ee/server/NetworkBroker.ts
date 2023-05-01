@@ -75,10 +75,10 @@ export class NetworkBroker implements IBroker {
 		if (!name) {
 			return;
 		}
-		void this.broker.destroyService(name);
+		this.broker.destroyService(name);
 	}
 
-	createService(instance: IServiceClass, serviceDependencies?: string[]): void {
+	createService(instance: IServiceClass): void {
 		const methods = (
 			instance.constructor?.name === 'Object'
 				? Object.getOwnPropertyNames(instance)
@@ -97,8 +97,7 @@ export class NetworkBroker implements IBroker {
 			return;
 		}
 
-		// Allow services to depend on other services too
-		const dependencies = name !== 'license' ? { dependencies: ['license', ...(serviceDependencies || [])] } : {};
+		const dependencies = name !== 'license' ? { dependencies: ['license'] } : {};
 
 		const service: ServiceSchema = {
 			name,
@@ -165,7 +164,7 @@ export class NetworkBroker implements IBroker {
 	}
 
 	async broadcastLocal<T extends keyof EventSignatures>(event: T, ...args: Parameters<EventSignatures[T]>): Promise<void> {
-		void this.broker.broadcastLocal(event, args);
+		this.broker.broadcastLocal(event, args);
 	}
 
 	async broadcastToServices<T extends keyof EventSignatures>(
@@ -173,7 +172,7 @@ export class NetworkBroker implements IBroker {
 		event: T,
 		...args: Parameters<EventSignatures[T]>
 	): Promise<void> {
-		void this.broker.broadcast(event, args, services);
+		this.broker.broadcast(event, args, services);
 	}
 
 	async nodeList(): Promise<IBrokerNode[]> {

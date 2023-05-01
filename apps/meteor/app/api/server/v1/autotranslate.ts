@@ -4,10 +4,10 @@ import {
 	isAutotranslateTranslateMessageParamsPOST,
 	isAutotranslateGetSupportedLanguagesParamsGET,
 } from '@rocket.chat/rest-typings';
-import { Messages } from '@rocket.chat/models';
 
 import { API } from '../api';
 import { settings } from '../../../settings/server';
+import { Messages } from '../../../models/server';
 
 API.v1.addRoute(
 	'autotranslate.getSupportedLanguages',
@@ -16,12 +16,12 @@ API.v1.addRoute(
 		validateParams: isAutotranslateGetSupportedLanguagesParamsGET,
 	},
 	{
-		async get() {
+		get() {
 			if (!settings.get('AutoTranslate_Enabled')) {
 				return API.v1.failure('AutoTranslate is disabled.');
 			}
 			const { targetLanguage } = this.queryParams;
-			const languages = await Meteor.callAsync('autoTranslate.getSupportedLanguages', targetLanguage);
+			const languages = Meteor.call('autoTranslate.getSupportedLanguages', targetLanguage);
 
 			return API.v1.success({ languages: languages || [] });
 		},
@@ -35,7 +35,7 @@ API.v1.addRoute(
 		validateParams: isAutotranslateSaveSettingsParamsPOST,
 	},
 	{
-		async post() {
+		post() {
 			const { roomId, field, value, defaultLanguage } = this.bodyParams;
 			if (!settings.get('AutoTranslate_Enabled')) {
 				return API.v1.failure('AutoTranslate is disabled.');
@@ -58,9 +58,7 @@ API.v1.addRoute(
 				return API.v1.failure('The bodyParam "autoTranslateLanguage" must be a string.');
 			}
 
-			await Meteor.callAsync('autoTranslate.saveSettings', roomId, field, value === true ? '1' : String(value).valueOf(), {
-				defaultLanguage,
-			});
+			Meteor.call('autoTranslate.saveSettings', roomId, field, value === true ? '1' : String(value).valueOf(), { defaultLanguage });
 
 			return API.v1.success();
 		},
@@ -74,7 +72,7 @@ API.v1.addRoute(
 		validateParams: isAutotranslateTranslateMessageParamsPOST,
 	},
 	{
-		async post() {
+		post() {
 			const { messageId, targetLanguage } = this.bodyParams;
 			if (!settings.get('AutoTranslate_Enabled')) {
 				return API.v1.failure('AutoTranslate is disabled.');
@@ -82,12 +80,12 @@ API.v1.addRoute(
 			if (!messageId) {
 				return API.v1.failure('The bodyParam "messageId" is required.');
 			}
-			const message = await Messages.findOneById(messageId);
+			const message = Messages.findOneById(messageId);
 			if (!message) {
 				return API.v1.failure('Message not found.');
 			}
 
-			const translatedMessage = await Meteor.callAsync('autoTranslate.translateMessage', message, targetLanguage);
+			const translatedMessage = Meteor.call('autoTranslate.translateMessage', message, targetLanguage);
 
 			return API.v1.success({ message: translatedMessage });
 		},

@@ -1,12 +1,11 @@
-import { FederationRoomEvents, Rooms } from '@rocket.chat/models';
-
 import { clientLogger } from '../lib/logger';
+import { FederationRoomEvents, Rooms } from '../../../models/server';
 import { hasExternalDomain } from '../functions/helpers';
 import { getFederationDomain } from '../lib/getFederationDomain';
 import { dispatchEvent } from '../handler';
 
 async function beforeDeleteRoom(roomId) {
-	const room = await Rooms.findOneById(roomId, { projection: { federation: 1 } });
+	const room = Rooms.findOneById(roomId, { fields: { federation: 1 } });
 
 	// If room does not exist, skip
 	if (!room) {
@@ -37,6 +36,6 @@ async function beforeDeleteRoom(roomId) {
 
 export const definition = {
 	hook: 'beforeDeleteRoom',
-	callback: beforeDeleteRoom,
+	callback: (roomId) => Promise.await(beforeDeleteRoom(roomId)),
 	id: 'federation-before-delete-room',
 };

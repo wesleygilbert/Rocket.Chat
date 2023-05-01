@@ -1,6 +1,5 @@
-import { Users } from '@rocket.chat/models';
-
 import { API } from '../../../api/server';
+import { Users } from '../../../models/server';
 import { normalizers } from '../normalizers';
 import { serverLogger } from '../lib/logger';
 import { isFederationEnabled } from '../lib/isFederationEnabled';
@@ -11,12 +10,12 @@ API.v1.addRoute(
 	'federation.users.search',
 	{ authRequired: false },
 	{
-		async get() {
+		get() {
 			if (!isFederationEnabled()) {
 				return API.v1.failure('Federation not enabled');
 			}
 
-			const { username, domain } = this.queryParams;
+			const { username, domain } = this.requestParams();
 
 			serverLogger.debug(`federation.users.search => username=${username} domain=${domain}`);
 
@@ -25,9 +24,9 @@ API.v1.addRoute(
 				$or: [{ name: username }, { username }, { 'emails.address': `${username}@${domain}` }],
 			};
 
-			let users = await Users.find(query, { projection: userFields }).toArray();
+			let users = Users.find(query, { fields: userFields }).fetch();
 
-			users = await normalizers.normalizeAllUsers(users);
+			users = normalizers.normalizeAllUsers(users);
 
 			return API.v1.success({ users });
 		},
@@ -38,12 +37,12 @@ API.v1.addRoute(
 	'federation.users.getByUsername',
 	{ authRequired: false },
 	{
-		async get() {
+		get() {
 			if (!isFederationEnabled()) {
 				return API.v1.failure('Federation not enabled');
 			}
 
-			const { username } = this.queryParams;
+			const { username } = this.requestParams();
 
 			serverLogger.debug(`federation.users.getByUsername => username=${username}`);
 
@@ -52,9 +51,9 @@ API.v1.addRoute(
 				username,
 			};
 
-			let user = await Users.findOne(query, { projection: userFields });
+			let user = Users.findOne(query, { fields: userFields });
 
-			user = await normalizers.normalizeUser(user);
+			user = normalizers.normalizeUser(user);
 
 			return API.v1.success({ user });
 		},

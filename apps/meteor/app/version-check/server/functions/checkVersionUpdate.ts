@@ -1,48 +1,14 @@
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import semver from 'semver';
-import { Settings, Users } from '@rocket.chat/models';
-import type { IUser } from '@rocket.chat/core-typings';
+import { Settings } from '@rocket.chat/models';
 
 import { getNewUpdates } from './getNewUpdates';
 import { settings } from '../../../settings/server';
 import { Info } from '../../../utils/server';
+import { Users } from '../../../models/server';
 import logger from '../logger';
 import { sendMessagesToAdmins } from '../../../../server/lib/sendMessagesToAdmins';
 // import getNewUpdates from '../sampleUpdateData';
-
-const getMessagesToSendToAdmins = async (
-	alerts: {
-		id: string;
-		priority: number;
-		title: string;
-		text: string;
-		textArguments?: string[];
-		modifiers: string[];
-		infoUrl: string;
-	}[],
-	adminUser: IUser,
-): Promise<{ msg: string }[]> => {
-	const msgs = [];
-	for await (const alert of alerts) {
-		if (!(await Users.bannerExistsById(adminUser._id, `alert-${alert.id}`))) {
-			continue;
-		}
-		msgs.push({
-			msg: `*${TAPi18n.__('Rocket_Chat_Alert', { ...(adminUser.language && { lng: adminUser.language }) })}:*\n\n*${TAPi18n.__(
-				alert.title,
-				{ ...(adminUser.language && { lng: adminUser.language }) },
-			)}*\n${TAPi18n.__(alert.text, {
-				...(adminUser.language && { lng: adminUser.language }),
-				...(Array.isArray(alert.textArguments) && {
-					postProcess: 'sprintf',
-					sprintf: alert.textArguments,
-				}),
-				...((!Array.isArray(alert.textArguments) && alert.textArguments) || {}), // bien dormido
-			})}\n${alert.infoUrl}`,
-		});
-	}
-	return msgs;
-};
 
 export const checkVersionUpdate = async () => {
 	logger.info('Checking for version updates');
@@ -66,7 +32,7 @@ export const checkVersionUpdate = async () => {
 		await Settings.updateValueById('Update_LatestAvailableVersion', version.version);
 
 		await sendMessagesToAdmins({
-			msgs: async ({ adminUser }) => [
+			msgs: ({ adminUser }) => [
 				{
 					msg: `*${TAPi18n.__('Update_your_RocketChat', { ...(adminUser.language && { lng: adminUser.language }) })}*\n${TAPi18n.__(
 						'New_version_available_(s)',
@@ -94,7 +60,22 @@ export const checkVersionUpdate = async () => {
 
 	if (alerts?.length) {
 		await sendMessagesToAdmins({
-			msgs: async ({ adminUser }) => getMessagesToSendToAdmins(alerts, adminUser),
+			msgs: ({ adminUser }) =>
+				alerts
+					.filter((alert) => !Users.bannerExistsById(adminUser._id, `alert-${alert.id}`))
+					.map((alert) => ({
+						msg: `*${TAPi18n.__('Rocket_Chat_Alert', { ...(adminUser.language && { lng: adminUser.language }) })}:*\n\n*${TAPi18n.__(
+							alert.title,
+							{ ...(adminUser.language && { lng: adminUser.language }) },
+						)}*\n${TAPi18n.__(alert.text, {
+							...(adminUser.language && { lng: adminUser.language }),
+							...(Array.isArray(alert.textArguments) && {
+								postProcess: 'sprintf',
+								sprintf: alert.textArguments,
+							}),
+							...((!Array.isArray(alert.textArguments) && alert.textArguments) || {}), // bien dormido
+						})}\n${alert.infoUrl}`,
+					})),
 			banners: alerts.map((alert) => ({
 				id: `alert-${alert.id}`.replace(/\./g, '_'),
 				priority: 10,

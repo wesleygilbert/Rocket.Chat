@@ -1,9 +1,7 @@
-import type { ISetting } from '@rocket.chat/core-typings';
-
 import { Notifications } from '../../../app/notifications/client';
 import { CachedCollection } from '../../../app/ui-cached-collection/client';
 
-class PrivateSettingsCachedCollection extends CachedCollection<ISetting> {
+export class PrivateSettingsCachedCollection extends CachedCollection {
 	constructor() {
 		super({
 			name: 'private-settings',
@@ -18,11 +16,14 @@ class PrivateSettingsCachedCollection extends CachedCollection<ISetting> {
 			this.sync();
 		});
 	}
+
+	static instance: PrivateSettingsCachedCollection;
+
+	static get(): PrivateSettingsCachedCollection {
+		if (!PrivateSettingsCachedCollection.instance) {
+			PrivateSettingsCachedCollection.instance = new PrivateSettingsCachedCollection();
+		}
+
+		return PrivateSettingsCachedCollection.instance;
+	}
 }
-
-const instance = new PrivateSettingsCachedCollection();
-
-export {
-	/** @deprecated */
-	instance as PrivateSettingsCachedCollection,
-};

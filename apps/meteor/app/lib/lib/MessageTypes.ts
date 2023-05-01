@@ -1,5 +1,4 @@
 import { Meteor } from 'meteor/meteor';
-import type { MessageTypesValues as MessageTypesValuesType } from '@rocket.chat/core-typings';
 
 import { MessageTypes } from '../../ui-utils/lib/MessageTypes';
 // import { callbacks } from '../../../lib/callbacks';
@@ -267,7 +266,7 @@ Meteor.startup(function () {
 	});
 });
 
-export const MessageTypesValues: Array<{ key: MessageTypesValuesType; i18nLabel: string }> = [
+export const MessageTypesValues = [
 	{
 		key: 'uj', // user joined
 		i18nLabel: 'Message_HideType_uj',

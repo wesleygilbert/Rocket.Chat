@@ -1,8 +1,6 @@
 import type { IRoom, ISubscription, IUser } from '@rocket.chat/core-typings';
-import type { ObjectId, Filter, FindOptions as MongoFindOptions, Document } from 'mongodb';
+import type { ObjectId, Filter } from 'mongodb';
 import { createContext } from 'react';
-
-import type { SubscriptionWithRoom } from './types/SubscriptionWithRoom';
 
 export type SubscriptionQuery =
 	| {
@@ -16,13 +14,17 @@ export type SubscriptionQuery =
 	  }
 	| object;
 
-export type Fields<TSchema extends Document = Document> = Exclude<MongoFindOptions<TSchema>['projection'], undefined>;
+export type Fields = {
+	[key: string]: boolean;
+};
 
-export type Sort<TSchema extends Document = Document> = Exclude<MongoFindOptions<TSchema>['sort'], undefined>;
+export type Sort = {
+	[key: string]: -1 | 1 | number;
+};
 
-export type FindOptions<TSchema extends Document = Document> = {
-	fields?: Fields<TSchema>;
-	sort?: Sort<TSchema>;
+export type FindOptions = {
+	fields?: Fields;
+	sort?: Sort;
 };
 
 export type LoginService = {
@@ -44,8 +46,8 @@ export type UserContextValue = {
 	) => [subscribe: (onStoreChange: () => void) => () => void, getSnapshot: () => T | undefined];
 	querySubscription: (
 		query: Filter<Pick<ISubscription, 'rid' | 'name'>>,
-		fields?: MongoFindOptions<ISubscription>['projection'],
-		sort?: MongoFindOptions<ISubscription>['sort'],
+		fields?: Fields,
+		sort?: Sort,
 	) => [subscribe: (onStoreChange: () => void) => () => void, getSnapshot: () => ISubscription | undefined];
 	queryRoom: (
 		query: Filter<Pick<IRoom, '_id'>>,
@@ -55,9 +57,9 @@ export type UserContextValue = {
 	querySubscriptions: (
 		query: SubscriptionQuery,
 		options?: FindOptions,
-	) => [subscribe: (onStoreChange: () => void) => () => void, getSnapshot: () => SubscriptionWithRoom[]];
+	) => [subscribe: (onStoreChange: () => void) => () => void, getSnapshot: () => Array<ISubscription> | []];
 
-	loginWithPassword: (user: string | { username: string } | { email: string } | { id: string }, password: string) => Promise<void>;
+	loginWithPassword: (user: string | object, password: string) => Promise<void>;
 	loginWithToken: (user: string) => Promise<void>;
 	logout: () => Promise<void>;
 

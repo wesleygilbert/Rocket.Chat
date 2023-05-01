@@ -1,12 +1,12 @@
 import { Meteor } from 'meteor/meteor';
 
 import { ChatMessage } from '../../app/models/client';
-import { LegacyRoomManager } from '../../app/ui-utils/client';
+import { RoomManager } from '../../app/ui-utils/client';
 
 Meteor.startup(() => {
 	ChatMessage.find().observe({
 		removed(record) {
-			if (!LegacyRoomManager.getOpenedRoomByRid(record.rid)) {
+			if (!RoomManager.getOpenedRoomByRid(record.rid)) {
 				return;
 			}
 

@@ -1,15 +1,15 @@
-import { Box, Field, Flex } from '@rocket.chat/fuselage';
+import { Box, Button, Field, Flex } from '@rocket.chat/fuselage';
+import { useToggle } from '@rocket.chat/fuselage-hooks';
+import { useTranslation } from '@rocket.chat/ui-contexts';
 import type { ReactElement } from 'react';
 import React from 'react';
 
 import ResetSettingButton from '../ResetSettingButton';
 import CodeMirror from './CodeMirror';
-import CodeMirrorBox from './CodeMirror/CodeMirrorBox';
 
 type CodeSettingInputProps = {
 	_id: string;
 	label: string;
-	hint: string;
 	value?: string;
 	code: string;
 	placeholder?: string;
@@ -24,7 +24,6 @@ type CodeSettingInputProps = {
 function CodeSettingInput({
 	_id,
 	label,
-	hint,
 	value = '',
 	code,
 	placeholder,
@@ -35,6 +34,10 @@ function CodeSettingInput({
 	onChangeValue,
 	onResetButtonClick,
 }: CodeSettingInputProps): ReactElement {
+	const t = useTranslation();
+
+	const [fullScreen, toggleFullScreen] = useToggle(false);
+
 	const handleChange = (value: string): void => {
 		onChangeValue(value);
 	};
@@ -48,9 +51,9 @@ function CodeSettingInput({
 					</Field.Label>
 					{hasResetButton && <ResetSettingButton data-qa-reset-setting-id={_id} onClick={onResetButtonClick} />}
 				</Box>
-				{hint && <Field.Hint>{hint}</Field.Hint>}
 			</Flex.Container>
-			<CodeMirrorBox label={label}>
+			<div className={['code-mirror-box', fullScreen && 'code-mirror-box-fullscreen content-background-color'].filter(Boolean).join(' ')}>
+				<div className='title'>{label}</div>
 				<CodeMirror
 					data-qa-setting-id={_id}
 					id={_id}
@@ -62,7 +65,12 @@ function CodeSettingInput({
 					autoComplete={autocomplete === false ? 'off' : undefined}
 					onChange={handleChange}
 				/>
-			</CodeMirrorBox>
+				<div className='buttons'>
+					<Button primary onClick={(): void => toggleFullScreen()}>
+						{fullScreen ? t('Exit_Full_Screen') : t('Full_Screen')}
+					</Button>
+				</div>
+			</div>
 		</>
 	);
 }

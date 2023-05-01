@@ -193,7 +193,7 @@ app.use('/api/*', async (req, res) => {
 	}
 
 	try {
-		void proxy(req, res, session);
+		proxy(req, res, session);
 	} catch (e) {
 		res.status(400).send(e instanceof Error ? e.message : String(e));
 	}
@@ -229,7 +229,7 @@ app.use('/sockjs/:id1/:id2/xhr_send', async (req, res) => {
 	}
 
 	try {
-		void proxy(req, res, session, xhrDataRequestProcess, xhrDataResponseProcess);
+		proxy(req, res, session, xhrDataRequestProcess, xhrDataResponseProcess);
 	} catch (e) {
 		res.status(400).send(e instanceof Error ? e.message : String(e));
 	}
@@ -245,7 +245,7 @@ app.use('/sockjs/:id1/:id2/xhr', async (req, res) => {
 	}
 
 	try {
-		void proxy(req, res, session, undefined, xhrDataResponseProcess);
+		proxy(req, res, session, undefined, xhrDataResponseProcess);
 	} catch (e) {
 		res.status(400).send(e instanceof Error ? e.message : String(e));
 	}
@@ -253,5 +253,5 @@ app.use('/sockjs/:id1/:id2/xhr', async (req, res) => {
 
 app.use((req, res) => {
 	res.setHeader('Access-Control-Allow-Origin', '*');
-	void proxy(req, res);
+	proxy(req, res);
 });

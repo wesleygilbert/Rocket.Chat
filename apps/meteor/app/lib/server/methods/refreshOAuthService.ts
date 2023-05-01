@@ -1,18 +1,10 @@
 import { Meteor } from 'meteor/meteor';
 import { ServiceConfiguration } from 'meteor/service-configuration';
 import { Settings } from '@rocket.chat/models';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { hasPermission } from '../../../authorization/server';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		refreshOAuthService(): Promise<void>;
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	async refreshOAuthService() {
 		const userId = Meteor.userId();
 
@@ -22,14 +14,14 @@ Meteor.methods<ServerMethods>({
 			});
 		}
 
-		if ((await hasPermissionAsync(userId, 'add-oauth-service')) !== true) {
+		if (hasPermission(userId, 'add-oauth-service') !== true) {
 			throw new Meteor.Error('error-action-not-allowed', 'Refresh OAuth Services is not allowed', {
 				method: 'refreshOAuthService',
 				action: 'Refreshing_OAuth_Services',
 			});
 		}
 
-		await ServiceConfiguration.configurations.removeAsync({});
+		ServiceConfiguration.configurations.remove({});
 
 		await Settings.update({ _id: /^(Accounts_OAuth_|SAML_|CAS_).+/ }, { $set: { _updatedAt: new Date() } }, { multi: true });
 	},

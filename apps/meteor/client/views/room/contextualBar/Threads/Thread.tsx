@@ -62,13 +62,7 @@ const Thread: VFC<ThreadProps> = ({ tmid }) => {
 	};
 
 	const handleToggleFollowing = () => {
-		const rid = mainMessageQueryResult.data?.rid;
-
-		if (!rid) {
-			return;
-		}
-
-		toggleFollowingMutation.mutate({ rid, tmid, follow: !following });
+		toggleFollowingMutation.mutate({ tmid, follow: !following });
 	};
 
 	const handleClose = () => {

@@ -1,11 +1,12 @@
 import type { IRoom } from '@rocket.chat/core-typings';
 
 import { normalizeMessagesForUser } from '../../../utils/server/lib/normalizeMessagesForUser';
+import { API } from '../api';
 
-export async function composeRoomWithLastMessage(room: IRoom, userId: string) {
+API.helperMethods.set('composeRoomWithLastMessage', function _composeRoomWithLastMessage(room: IRoom, userId: string) {
 	if (room.lastMessage) {
-		const [lastMessage] = await normalizeMessagesForUser([room.lastMessage], userId);
+		const [lastMessage] = normalizeMessagesForUser([room.lastMessage], userId);
 		room.lastMessage = lastMessage;
 	}
 	return room;
-}
+});

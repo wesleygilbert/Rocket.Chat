@@ -49,14 +49,14 @@ SettingsEvents.on('fetch-settings', (settings: Array<ISetting>): void => {
 	}
 });
 
-async function updateSettings(): Promise<void> {
-	const enterpriseSettings = await Settings.findEnterpriseSettings();
+function updateSettings(): void {
+	const enterpriseSettings = Promise.await(Settings.findEnterpriseSettings());
 
-	void enterpriseSettings.forEach((record: ISetting) => settings.set(record));
+	enterpriseSettings.forEach((record: ISetting) => settings.set(record));
 }
 
-Meteor.startup(async () => {
-	await updateSettings();
+Meteor.startup(() => {
+	updateSettings();
 
 	onValidateLicenses(updateSettings);
 });

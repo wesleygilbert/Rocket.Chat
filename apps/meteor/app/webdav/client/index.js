@@ -1,7 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Tracker } from 'meteor/tracker';
 
-import { settings } from '../../settings/client';
+import { settings } from '../../settings';
 
 Meteor.startup(() => {
 	Tracker.autorun((c) => {
@@ -9,6 +9,7 @@ Meteor.startup(() => {
 			return;
 		}
 		c.stop();
+		import('./startup/messageBoxActions');
 		import('./startup/sync');
 		import('./actionButton');
 	});

@@ -1,12 +1,11 @@
-import { FederationRoomEvents, Rooms } from '@rocket.chat/models';
-
+import { FederationRoomEvents, Rooms } from '../../../models/server';
 import { clientLogger } from '../lib/logger';
 import { hasExternalDomain } from '../functions/helpers';
 import { getFederationDomain } from '../lib/getFederationDomain';
 import { dispatchEvent } from '../handler';
 
 async function afterDeleteMessage(message) {
-	const room = await Rooms.findOneById(message.rid, { projection: { federation: 1 } });
+	const room = Rooms.findOneById(message.rid, { fields: { federation: 1 } });
 
 	// If there are not federated users on this room, ignore it
 	if (!hasExternalDomain(room)) {
@@ -26,6 +25,6 @@ async function afterDeleteMessage(message) {
 
 export const definition = {
 	hook: 'afterDeleteMessage',
-	callback: afterDeleteMessage,
+	callback: (message) => Promise.await(afterDeleteMessage(message)),
 	id: 'federation-after-delete-message',
 };

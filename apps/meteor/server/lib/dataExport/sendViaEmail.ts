@@ -1,13 +1,13 @@
 import moment from 'moment';
 import type { IMessage, IUser } from '@rocket.chat/core-typings';
-import { Messages, Users } from '@rocket.chat/models';
 
-import * as Mailer from '../../../app/mailer/server/api';
+import * as Mailer from '../../../app/mailer';
+import { Messages, Users } from '../../../app/models/server';
 import { settings } from '../../../app/settings/server';
 import { Message } from '../../../app/ui-utils/server';
 import { getMomentLocale } from '../getMomentLocale';
 
-export async function sendViaEmail(
+export function sendViaEmail(
 	data: {
 		rid: string;
 		toUsers: string[];
@@ -17,18 +17,16 @@ export async function sendViaEmail(
 		language: string;
 	},
 	user: IUser,
-): Promise<{
+): {
 	missing: string[];
-}> {
+} {
 	const emails = data.toEmails.map((email) => email.trim()).filter(Boolean);
 
 	const missing = [...data.toUsers].filter(Boolean);
 
-	(
-		await Users.findUsersByUsernames(data.toUsers, {
-			projection: { 'username': 1, 'emails.address': 1 },
-		}).toArray()
-	).forEach((user: IUser) => {
+	Users.findUsersByUsernames(data.toUsers, {
+		fields: { 'username': 1, 'emails.address': 1 },
+	}).forEach((user: IUser) => {
 		const emailAddress = user.emails?.[0].address;
 
 		if (!emailAddress) {
@@ -60,11 +58,10 @@ export async function sendViaEmail(
 		}
 	}
 
-	const html = (
-		await Messages.findByRoomIdAndMessageIds(data.rid, data.messages, {
-			sort: { ts: 1 },
-		}).toArray()
-	)
+	const html = Messages.findByRoomIdAndMessageIds(data.rid, data.messages, {
+		sort: { ts: 1 },
+	})
+		.fetch()
 		.map((message: IMessage) => {
 			const dateTime = moment(message.ts).locale(lang).format('L LT');
 			return `<p style='margin-bottom: 5px'><b>${
@@ -73,7 +70,7 @@ export async function sendViaEmail(
 		})
 		.join('');
 
-	await Mailer.send({
+	Mailer.send({
 		to: emails,
 		from: settings.get('From_Email'),
 		replyTo: email,

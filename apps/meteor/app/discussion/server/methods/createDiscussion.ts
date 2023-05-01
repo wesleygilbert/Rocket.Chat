@@ -1,55 +1,51 @@
 import { Meteor } from 'meteor/meteor';
-import { Random } from '@rocket.chat/random';
+import { Random } from 'meteor/random';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
 import type { IMessage, IRoom, IUser, MessageAttachmentDefault } from '@rocket.chat/core-typings';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
-import { Messages, Rooms } from '@rocket.chat/models';
-import { Message } from '@rocket.chat/core-services';
 
-import { hasAtLeastOnePermissionAsync } from '../../../authorization/server/functions/hasPermission';
-import { canSendMessageAsync } from '../../../authorization/server/functions/canSendMessage';
+import { hasAtLeastOnePermission, canSendMessage } from '../../../authorization/server';
+import { Messages, Rooms } from '../../../models/server';
 import { createRoom, addUserToRoom, sendMessage, attachMessage } from '../../../lib/server';
 import { settings } from '../../../settings/server';
 import { callbacks } from '../../../../lib/callbacks';
 import { roomCoordinator } from '../../../../server/lib/rooms/roomCoordinator';
 
-const getParentRoom = async (rid: IRoom['_id']) => {
-	const room = await Rooms.findOne(rid);
-	return room && (room.prid ? Rooms.findOne(room.prid, { projection: { _id: 1 } }) : room);
+const getParentRoom = (rid: IRoom['_id']) => {
+	const room = Rooms.findOne(rid);
+	return room && (room.prid ? Rooms.findOne(room.prid, { fields: { _id: 1 } }) : room);
 };
 
-async function createDiscussionMessage(
+const createDiscussionMessage = (
 	rid: IRoom['_id'],
 	user: IUser,
 	drid: IRoom['_id'],
 	msg: IMessage['msg'],
 	messageEmbedded?: MessageAttachmentDefault,
-): Promise<IMessage | null> {
-	const msgId = await Message.saveSystemMessage('discussion-created', rid, msg, user, {
-		drid,
-		...(messageEmbedded && { attachments: [messageEmbedded] }),
-	});
-
-	return Messages.findOneById(msgId);
-}
-
-async function mentionMessage(
-	rid: IRoom['_id'],
-	{ _id, username, name }: Pick<IUser, '_id' | 'username' | 'name'>,
-	messageEmbedded?: MessageAttachmentDefault,
-) {
-	if (!username) {
-		return null;
-	}
-	await Messages.insertOne({
+): IMessage => {
+	const welcomeMessage = {
+		msg,
 		rid,
-		msg: '',
+		drid,
+		attachments: [messageEmbedded].filter((e) => e),
+	};
+	return Messages.createWithTypeRoomIdMessageAndUser('discussion-created', rid, '', user, welcomeMessage) as IMessage;
+};
+
+const mentionMessage = (
+	rid: IRoom['_id'],
+	{ _id, username, name }: Pick<IUser, '_id' | 'name' | 'username'>,
+	messageEmbedded?: MessageAttachmentDefault,
+) => {
+	const welcomeMessage = {
+		rid,
 		u: { _id, username, name },
 		ts: new Date(),
 		_updatedAt: new Date(),
-		...(messageEmbedded && { attachments: [messageEmbedded] }),
-	});
-}
+		attachments: [messageEmbedded].filter((e) => e),
+	};
+
+	return Messages.insert(welcomeMessage);
+};
 
 type CreateDiscussionProperties = {
 	prid: IRoom['_id'];
@@ -61,19 +57,18 @@ type CreateDiscussionProperties = {
 	encrypted?: boolean;
 };
 
-const create = async ({ prid, pmid, t_name: discussionName, reply, users, user, encrypted }: CreateDiscussionProperties) => {
+const create = ({ prid, pmid, t_name: discussionName, reply, users, user, encrypted }: CreateDiscussionProperties) => {
 	// if you set both, prid and pmid, and the rooms dont match... should throw an error)
-	let message: null | IMessage = null;
+	let message: undefined | IMessage;
 	if (pmid) {
-		message = await Messages.findOneById(pmid);
+		message = Messages.findOne({ _id: pmid }) as IMessage | undefined;
 		if (!message) {
 			throw new Meteor.Error('error-invalid-message', 'Invalid message', {
 				method: 'DiscussionCreation',
 			});
 		}
 		if (prid) {
-			const parentRoom = await getParentRoom(message.rid);
-			if (!parentRoom || prid !== parentRoom._id) {
+			if (prid !== getParentRoom(message.rid)._id) {
 				throw new Meteor.Error('error-invalid-arguments', 'Root message room ID does not match parent room ID ', {
 					method: 'DiscussionCreation',
 				});
@@ -89,7 +84,7 @@ const create = async ({ prid, pmid, t_name: discussionName, reply, users, user, 
 
 	let parentRoom;
 	try {
-		parentRoom = await canSendMessageAsync(prid, { uid: user._id, username: user.username, type: user.type });
+		parentRoom = canSendMessage(prid, { uid: user._id, username: user.username, type: user.type });
 	} catch (error) {
 		throw new Meteor.Error((error as Error).message);
 	}
@@ -111,18 +106,18 @@ const create = async ({ prid, pmid, t_name: discussionName, reply, users, user, 
 	}
 
 	if (pmid) {
-		const discussionAlreadyExists = await Rooms.findOne(
+		const discussionAlreadyExists = Rooms.findOne(
 			{
 				prid,
 				pmid,
 			},
 			{
-				projection: { _id: 1 },
+				fields: { _id: 1 },
 			},
 		);
 		if (discussionAlreadyExists) {
 			// do not allow multiple discussions to the same message'\
-			await addUserToRoom(discussionAlreadyExists._id, user);
+			addUserToRoom(discussionAlreadyExists._id, user);
 			return discussionAlreadyExists;
 		}
 	}
@@ -132,7 +127,7 @@ const create = async ({ prid, pmid, t_name: discussionName, reply, users, user, 
 	// auto invite the replied message owner
 	const invitedUsers = message ? [message.u.username, ...users] : users;
 
-	const type = await roomCoordinator.getRoomDirectives(parentRoom.t).getDiscussionType(parentRoom);
+	const type = roomCoordinator.getRoomDirectives(parentRoom.t)?.getDiscussionType(parentRoom);
 	const description = parentRoom.encrypted ? '' : message?.msg;
 	const topic = parentRoom.name;
 
@@ -142,7 +137,7 @@ const create = async ({ prid, pmid, t_name: discussionName, reply, users, user, 
 		});
 	}
 
-	const discussion = await createRoom(
+	const discussion = createRoom(
 		type,
 		name,
 		user.username as string,
@@ -167,31 +162,22 @@ const create = async ({ prid, pmid, t_name: discussionName, reply, users, user, 
 		if (parentRoom.encrypted) {
 			message.msg = TAPi18n.__('Encrypted_message');
 		}
-		await mentionMessage(discussion._id, user, attachMessage(message, parentRoom));
+		mentionMessage(discussion._id, user, attachMessage(message, parentRoom));
 
-		discussionMsg = await createDiscussionMessage(message.rid, user, discussion._id, discussionName, attachMessage(message, parentRoom));
+		discussionMsg = createDiscussionMessage(message.rid, user, discussion._id, discussionName, attachMessage(message, parentRoom));
 	} else {
-		discussionMsg = await createDiscussionMessage(prid, user, discussion._id, discussionName);
+		discussionMsg = createDiscussionMessage(prid, user, discussion._id, discussionName);
 	}
 
-	if (discussionMsg) {
-		callbacks.runAsync('afterSaveMessage', discussionMsg, parentRoom);
-	}
+	callbacks.runAsync('afterSaveMessage', discussionMsg, parentRoom);
 
 	if (reply) {
-		await sendMessage(user, { msg: reply }, discussion);
+		sendMessage(user, { msg: reply }, discussion);
 	}
 	return discussion;
 };
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		createDiscussion: typeof create;
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	/**
 	 * Create discussion by room or message
 	 * @constructor
@@ -202,7 +188,7 @@ Meteor.methods<ServerMethods>({
 	 * @param {string[]} users - users to be added
 	 * @param {boolean} encrypted - if the discussion's e2e encryption should be enabled.
 	 */
-	async createDiscussion({ prid, pmid, t_name: discussionName, reply, users, encrypted }: CreateDiscussionProperties) {
+	createDiscussion({ prid, pmid, t_name: discussionName, reply, users, encrypted }: CreateDiscussionProperties) {
 		if (!settings.get('Discussion_enabled')) {
 			throw new Meteor.Error('error-action-not-allowed', 'You are not allowed to create a discussion', { method: 'createDiscussion' });
 		}
@@ -214,10 +200,10 @@ Meteor.methods<ServerMethods>({
 			});
 		}
 
-		if (!(await hasAtLeastOnePermissionAsync(uid, ['start-discussion', 'start-discussion-other-user']))) {
+		if (!hasAtLeastOnePermission(uid, ['start-discussion', 'start-discussion-other-user'])) {
 			throw new Meteor.Error('error-action-not-allowed', 'You are not allowed to create a discussion', { method: 'createDiscussion' });
 		}
 
-		return create({ prid, pmid, t_name: discussionName, reply, users, user: (await Meteor.userAsync()) as IUser, encrypted });
+		return create({ prid, pmid, t_name: discussionName, reply, users, user: Meteor.user() as IUser, encrypted });
 	},
 });

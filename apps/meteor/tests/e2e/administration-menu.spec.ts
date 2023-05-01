@@ -1,9 +1,8 @@
-import { IS_EE } from './config/constants';
-import { Users } from './fixtures/userStates';
-import { HomeDiscussion } from './page-objects';
 import { test, expect } from './utils/test';
+import { HomeDiscussion } from './page-objects';
+import { IS_EE } from './config/constants';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 test.describe.serial('administration-menu', () => {
 	let poHomeDiscussion: HomeDiscussion;
@@ -33,8 +32,20 @@ test.describe.serial('administration-menu', () => {
 		await expect(page).toHaveURL('omnichannel/current');
 	});
 
+	test('expect open app marketplace page', async ({ page }) => {
+		await poHomeDiscussion.sidenav.openAdministrationByLabel('Marketplace');
+
+		await expect(page).toHaveURL('admin/marketplace/all/list');
+	});
+
+	test('expect open app installed page', async ({ page }) => {
+		await poHomeDiscussion.sidenav.openAdministrationByLabel('Installed');
+
+		await expect(page).toHaveURL('admin/marketplace/installed/list');
+	});
+
 	test.describe('user', () => {
-		test.use({ storageState: Users.user1.state });
+		test.use({ storageState: 'user1-session.json' });
 
 		test('expect to not render administration menu when no permission', async ({ page }) => {
 			await expect(page.locator('role=button[name="Administration"]')).not.toBeVisible();

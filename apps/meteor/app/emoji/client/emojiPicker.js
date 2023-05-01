@@ -1,15 +1,13 @@
+import _ from 'underscore';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveDict } from 'meteor/reactive-dict';
 import { FlowRouter } from 'meteor/kadira:flow-router';
 import { Template } from 'meteor/templating';
 import { escapeRegExp } from '@rocket.chat/string-helpers';
-import $ from 'jquery';
 
 import { t } from '../../utils/client';
 import { EmojiPicker } from './lib/EmojiPicker';
-import { emoji } from './lib';
-import { withThrottling } from '../../../lib/utils/highOrderFunctions';
-import { baseURI } from '../../../client/lib/baseURI';
+import { emoji } from '../lib/rocketchat';
 import './emojiPicker.html';
 
 const ESCAPE = 27;
@@ -23,20 +21,6 @@ const getEmojiElement = (emoji, image) =>
 const loadMoreLink = () => `<li class="emoji-picker-load-more"><a href="#load-more">${t('Load_more')}</a></li>`;
 
 let customItems = 90;
-
-const baseUrlFix = () => `${baseURI}${FlowRouter.current().path.substring(1)}`;
-
-const isMozillaFirefoxBelowVersion = (upperVersion) => {
-	const [, version] = navigator.userAgent.match(/Firefox\/(\d+)\.\d/) || [];
-	return parseInt(version, 10) < upperVersion;
-};
-
-const isGoogleChromeBelowVersion = (upperVersion) => {
-	const [, version] = navigator.userAgent.match(/Chrome\/(\d+)\.\d/) || [];
-	return parseInt(version, 10) < upperVersion;
-};
-
-const isBaseUrlFixNeeded = () => isMozillaFirefoxBelowVersion(55) || isGoogleChromeBelowVersion(55);
 
 const createEmojiList = (category, actualTone, limit = null) => {
 	const html =
@@ -160,12 +144,8 @@ Template.emojiPicker.helpers({
 	searchResults() {
 		return getEmojisBySearchTerm(Template.instance().currentSearchTerm.get(), Template.instance().searchTermItems.get());
 	},
-	emojiList() {
-		emojiListByCategory.all();
-
-		return (category) => {
-			return emojiListByCategory.get(category);
-		};
+	emojiList(category) {
+		return emojiListByCategory.get(category);
 	},
 	currentTone() {
 		return `tone-${Template.instance().tone}`;
@@ -187,7 +167,6 @@ Template.emojiPicker.helpers({
 	currentCategory() {
 		return EmojiPicker.currentCategory.get();
 	},
-	baseUrl: isBaseUrlFixNeeded() ? baseUrlFix : undefined,
 });
 
 Template.emojiPicker.events({
@@ -209,7 +188,7 @@ Template.emojiPicker.events({
 
 		return false;
 	},
-	'scroll .emojis': withThrottling({ wait: 300 })((event, instance) => {
+	'scroll .emojis': _.throttle((event, instance) => {
 		if (EmojiPicker.scrollingToCategory) {
 			return;
 		}
@@ -230,7 +209,7 @@ Template.emojiPicker.events({
 		const category = el.id.replace('emoji-list-category-', '');
 
 		EmojiPicker.currentCategory.set(category);
-	}),
+	}, 300),
 	'click .change-tone > a'(event, instance) {
 		event.stopPropagation();
 		event.preventDefault();
@@ -247,7 +226,7 @@ Template.emojiPicker.events({
 		}
 
 		customItems += 90;
-		emojiListByCategory.set('rocket', createEmojiList('rocket', null, customItems));
+		emojiListByCategory.set('rocket', createEmojiList('rocket', 0, customItems));
 	},
 	'click .tone-selector .tone'(event, instance) {
 		event.stopPropagation();

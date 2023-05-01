@@ -18,9 +18,9 @@ export class LDAPDataConverter extends VirtualDataConverter {
 		this.mergeExistingUsers = settings.get<boolean>('LDAP_Merge_Existing_Users') ?? true;
 	}
 
-	async findExistingUser(data: IImportUser): Promise<IUser | undefined> {
+	findExistingUser(data: IImportUser): IUser | undefined {
 		if (data.services?.ldap?.id) {
-			const importedUser = await Users.findOneByLDAPId(data.services.ldap.id, data.services.ldap.idAttribute);
+			const importedUser = Promise.await(Users.findOneByLDAPId(data.services.ldap.id, data.services.ldap.idAttribute));
 			if (importedUser) {
 				return importedUser;
 			}
@@ -34,9 +34,9 @@ export class LDAPDataConverter extends VirtualDataConverter {
 		return super.findExistingUser(data);
 	}
 
-	static async convertSingleUser(userData: IImportUser, options?: IConverterOptions): Promise<void> {
+	static convertSingleUser(userData: IImportUser, options?: IConverterOptions): void {
 		const converter = new LDAPDataConverter(true, options);
-		await converter.addUser(userData);
-		await converter.convertUsers();
+		converter.addUser(userData);
+		converter.convertUsers();
 	}
 }

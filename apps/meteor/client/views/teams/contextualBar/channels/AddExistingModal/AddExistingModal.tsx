@@ -1,47 +1,78 @@
-import { Box, Button, Field, Modal } from '@rocket.chat/fuselage';
+import type { IRoom, Serialized } from '@rocket.chat/core-typings';
+import { Button, Field, Modal } from '@rocket.chat/fuselage';
 import { useToastMessageDispatch, useEndpoint, useTranslation } from '@rocket.chat/ui-contexts';
+import type { FC } from 'react';
 import React, { memo, useCallback } from 'react';
-import { useForm, Controller } from 'react-hook-form';
 
-import RoomsAvailableForTeamsAutoComplete from './RoomsAvailableForTeamsAutoComplete';
+import { useForm } from '../../../../../hooks/useForm';
+import RoomsInput from './RoomsInput';
 
-type AddExistingModalProps = {
-	teamId: string;
-	onClose: () => void;
+type AddExistingModalState = {
+	onAdd: any;
+	rooms: Serialized<IRoom>[];
+	onChange: (value: Serialized<IRoom>, action: 'remove' | undefined) => void;
+	hasUnsavedChanges: boolean;
 };
 
-const AddExistingModal = ({ onClose, teamId }: AddExistingModalProps) => {
+type AddExistingModalProps = {
+	onClose: () => void;
+	teamId: string;
+	reload: () => void;
+};
+
+const useAddExistingModalState = (onClose: () => void, teamId: string, reload: () => void): AddExistingModalState => {
 	const t = useTranslation();
+	const addRoomEndpoint = useEndpoint('POST', '/v1/teams.addRooms');
 	const dispatchToastMessage = useToastMessageDispatch();
 
-	const addRoomEndpoint = useEndpoint('POST', '/v1/teams.addRooms');
+	const { values, handlers, hasUnsavedChanges } = useForm({
+		rooms: [] as Serialized<IRoom>[],
+	});
 
-	const {
-		control,
-		formState: { isDirty },
-		handleSubmit,
-	} = useForm({ defaultValues: { rooms: [] } });
+	const { rooms } = values as { rooms: Serialized<IRoom>[] };
+	const { handleRooms } = handlers;
 
-	const handleAddChannels = useCallback(
-		async ({ rooms }) => {
-			try {
-				await addRoomEndpoint({
-					rooms,
-					teamId,
-				});
+	const onChange = useCallback<AddExistingModalState['onChange']>(
+		(value, action) => {
+			if (!action) {
+				if (rooms.some((current) => current._id === value._id)) {
+					return;
+				}
 
-				dispatchToastMessage({ type: 'success', message: t('Channels_added') });
-			} catch (error) {
-				dispatchToastMessage({ type: 'error', message: error });
-			} finally {
-				onClose();
+				return handleRooms([...rooms, value]);
 			}
+
+			handleRooms(rooms.filter((current: any) => current._id !== value._id));
 		},
-		[addRoomEndpoint, teamId, onClose, dispatchToastMessage, t],
+		[handleRooms, rooms],
 	);
 
+	const onAdd = useCallback(async () => {
+		try {
+			await addRoomEndpoint({
+				rooms: rooms.map((room) => room._id),
+				teamId,
+			});
+
+			dispatchToastMessage({ type: 'success', message: t('Channels_added') });
+			onClose();
+			reload();
+		} catch (error: unknown) {
+			dispatchToastMessage({ type: 'error', message: error });
+		}
+	}, [addRoomEndpoint, rooms, teamId, onClose, dispatchToastMessage, t, reload]);
+
+	return { onAdd, rooms, onChange, hasUnsavedChanges };
+};
+
+const AddExistingModal: FC<AddExistingModalProps> = ({ onClose, teamId, reload }) => {
+	const t = useTranslation();
+	const { rooms, onAdd, onChange, hasUnsavedChanges } = useAddExistingModalState(onClose, teamId, reload);
+
+	const isAddButtonEnabled = hasUnsavedChanges;
+
 	return (
-		<Modal wrapperFunction={(props) => <Box is='form' onSubmit={handleSubmit(handleAddChannels)} {...props} />}>
+		<Modal>
 			<Modal.Header>
 				<Modal.Title>{t('Team_Add_existing_channels')}</Modal.Title>
 				<Modal.Close onClick={onClose} />
@@ -49,17 +80,13 @@ const AddExistingModal = ({ onClose, teamId }: AddExistingModalProps) => {
 			<Modal.Content>
 				<Field mbe='x24'>
 					<Field.Label>{t('Channels')}</Field.Label>
-					<Controller
-						control={control}
-						name='rooms'
-						render={({ field: { value, onChange } }) => <RoomsAvailableForTeamsAutoComplete value={value} onChange={onChange} />}
-					/>
+					<RoomsInput value={rooms} onChange={onChange} />
 				</Field>
 			</Modal.Content>
 			<Modal.Footer>
 				<Modal.FooterControllers>
 					<Button onClick={onClose}>{t('Cancel')}</Button>
-					<Button disabled={!isDirty} type='submit' primary>
+					<Button disabled={!isAddButtonEnabled} onClick={onAdd} primary>
 						{t('Add')}
 					</Button>
 				</Modal.FooterControllers>

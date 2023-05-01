@@ -6,7 +6,7 @@ import React, { useCallback, useState } from 'react';
 
 import { useRoom } from '../../../contexts/RoomContext';
 
-const ComposerJoinWithPassword = (): ReactElement => {
+export const ComposerJoinWithPassword = (): ReactElement => {
 	const room = useRoom();
 	const [joinCode, setJoinPassword] = useState<string>('');
 
@@ -53,5 +53,3 @@ const ComposerJoinWithPassword = (): ReactElement => {
 		</MessageFooterCallout>
 	);
 };
-
-export default ComposerJoinWithPassword;

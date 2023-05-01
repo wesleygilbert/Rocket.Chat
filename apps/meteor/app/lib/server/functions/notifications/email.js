@@ -1,14 +1,14 @@
 import { Meteor } from 'meteor/meteor';
 import { TAPi18n } from 'meteor/rocketchat:tap-i18n';
+import s from 'underscore.string';
 import { escapeHTML } from '@rocket.chat/string-helpers';
 
-import * as Mailer from '../../../../mailer/server/api';
+import * as Mailer from '../../../../mailer';
 import { settings } from '../../../../settings/server';
-import { metrics } from '../../../../metrics/server';
+import { metrics } from '../../../../metrics';
 import { callbacks } from '../../../../../lib/callbacks';
 import { getURL } from '../../../../utils/server';
 import { roomCoordinator } from '../../../../../server/lib/rooms/roomCoordinator';
-import { ltrim } from '../../../../../lib/utils/stringUtils';
 
 let advice = '';
 let goToMessage = '';
@@ -21,10 +21,10 @@ Meteor.startup(() => {
 	});
 });
 
-async function getEmailContent({ message, user, room }) {
+function getEmailContent({ message, user, room }) {
 	const lng = (user && user.language) || settings.get('Language') || 'en';
 
-	const roomName = escapeHTML(`#${await roomCoordinator.getRoomName(room.t, room)}`);
+	const roomName = escapeHTML(`#${roomCoordinator.getRoomName(room.t, room)}`);
 	const userName = escapeHTML(settings.get('UI_Use_Real_Name') ? message.u.name || message.u.username : message.u.username);
 
 	const roomDirectives = roomCoordinator.getRoomDirectives(room.t);
@@ -46,7 +46,7 @@ async function getEmailContent({ message, user, room }) {
 			messageContent = TAPi18n.__('Encrypted_message', { lng });
 		}
 
-		message = await callbacks.run('renderMessage', message);
+		message = callbacks.run('renderMessage', message);
 		if (message.tokens && message.tokens.length > 0) {
 			message.tokens.forEach((token) => {
 				token.text = token.text.replace(/([^\$])(\$[^\$])/gm, '$1$$$2');
@@ -101,31 +101,27 @@ async function getEmailContent({ message, user, room }) {
 const getButtonUrl = (room, subscription, message) => {
 	const basePath = roomCoordinator.getRouteLink(room.t, subscription).replace(Meteor.absoluteUrl(), '');
 
-	const path = `${ltrim(basePath, '/')}?msg=${message._id}`;
-	return getURL(
-		path,
-		{
-			full: true,
-			cloud: settings.get('Offline_Message_Use_DeepLink'),
-			cloud_route: 'room',
-			cloud_params: {
-				rid: room._id,
-				mid: message._id,
-			},
+	const path = `${s.ltrim(basePath, '/')}?msg=${message._id}`;
+	return getURL(path, {
+		full: true,
+		cloud: settings.get('Offline_Message_Use_DeepLink'),
+		cloud_route: 'room',
+		cloud_params: {
+			rid: room._id,
+			mid: message._id,
 		},
-		settings.get('DeepLink_Url'),
-	);
+	});
 };
 
 function generateNameEmail(name, email) {
 	return `${String(name).replace(/@/g, '%40').replace(/[<>,]/g, '')} <${email}>`;
 }
 
-export async function getEmailData({ message, receiver, sender, subscription, room, emailAddress, hasMentionToUser }) {
+export function getEmailData({ message, receiver, sender, subscription, room, emailAddress, hasMentionToUser }) {
 	const username = settings.get('UI_Use_Real_Name') ? message.u.name || message.u.username : message.u.username;
 	let subjectKey = 'Offline_Mention_All_Email';
 
-	if (!roomCoordinator.getRoomDirectives(room.t).isGroupChat(room)) {
+	if (!roomCoordinator.getRoomDirectives(room.t)?.isGroupChat(room)) {
 		subjectKey = 'Offline_DM_Email';
 	} else if (hasMentionToUser) {
 		subjectKey = 'Offline_Mention_Email';
@@ -133,9 +129,9 @@ export async function getEmailData({ message, receiver, sender, subscription, ro
 
 	const emailSubject = Mailer.replace(settings.get(subjectKey), {
 		user: username,
-		room: await roomCoordinator.getRoomName(room.t, room),
+		room: roomCoordinator.getRoomName(room.t, room),
 	});
-	const content = await getEmailContent({
+	const content = getEmailContent({
 		message,
 		user: receiver,
 		room,
@@ -178,6 +174,10 @@ export async function getEmailData({ message, receiver, sender, subscription, ro
 export function sendEmailFromData(data) {
 	metrics.notificationsSent.inc({ notification_type: 'email' });
 	return Mailer.send(data);
+}
+
+export function sendEmail({ message, user, subscription, room, emailAddress, hasMentionToUser }) {
+	return sendEmailFromData(getEmailData({ message, user, subscription, room, emailAddress, hasMentionToUser }));
 }
 
 export function shouldNotifyEmail({

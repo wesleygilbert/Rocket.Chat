@@ -1,6 +1,6 @@
 import { StatsD } from 'node-dogstatsd';
 
-class StatsTracker {
+export class StatsTracker {
 	constructor() {
 		this.StatsD = StatsD;
 		this.dogstatsd = new this.StatsD();

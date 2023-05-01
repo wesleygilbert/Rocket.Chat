@@ -153,7 +153,7 @@ export type TeamsEndpoints = {
 
 	'/v1/teams.listRoomsOfUser': {
 		GET: (
-			params: PaginatedRequest<
+			params:
 				| {
 						teamId: ITeam['_id'];
 						userId: IUser['_id'];
@@ -163,19 +163,17 @@ export type TeamsEndpoints = {
 						teamName: ITeam['name'];
 						userId: IUser['_id'];
 						canUserDelete?: string;
-				  }
-			>,
+				  },
 		) => PaginatedResult & { rooms: IRoom[] };
 	};
 
 	'/v1/teams.listRooms': {
 		GET: (
-			params: PaginatedRequest<
+			params: PaginatedRequest &
 				({ teamId: string } | { teamName: string }) & {
 					filter?: string;
 					type?: string;
-				}
-			>,
+				},
 		) => PaginatedResult & { rooms: IRoom[] };
 	};
 

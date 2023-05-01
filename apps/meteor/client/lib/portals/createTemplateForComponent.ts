@@ -2,14 +2,14 @@ import { Blaze } from 'meteor/blaze';
 import { HTML } from 'meteor/htmljs';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Template } from 'meteor/templating';
-import type { ComponentType, PropsWithoutRef, Attributes, ReactNode, PropsWithRef } from 'react';
+import type { ComponentType, PropsWithoutRef } from 'react';
 import { Suspense, createElement, lazy } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useReactiveValue } from '../../hooks/useReactiveValue';
 import { getClosestBlazePortals } from './blazePortals';
 
-export const createTemplateForComponent = <Props extends object>(
+export const createTemplateForComponent = <Props>(
 	name: string,
 	factory: () => Promise<{ default: ComponentType<Props> }>,
 	options:
@@ -34,7 +34,7 @@ export const createTemplateForComponent = <Props extends object>(
 
 	const template = new Blaze.Template(name, renderFunction);
 	template.onRendered(function (this: Blaze.TemplateInstance) {
-		const reactiveProps = new ReactiveVar(this.data as PropsWithRef<Props & { children?: ReactNode }> & Attributes);
+		const reactiveProps = new ReactiveVar(this.data as PropsWithoutRef<Props>);
 		this.autorun(() => {
 			reactiveProps.set({
 				...('props' in options && typeof options.props === 'function' && options.props()),

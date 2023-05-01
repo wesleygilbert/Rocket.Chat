@@ -29,6 +29,10 @@
 	image-rendering: optimizeQuality;
 }
 
+.message .emojione.big {
+	width: 44px;
+	height: 44px;
+}
 .big > .emojione {
 	width: 44px;
 	height: 44px;

@@ -1,32 +1,26 @@
 import { Meteor } from 'meteor/meteor';
+import _ from 'underscore';
 import type { IRole, IUser } from '@rocket.chat/core-typings';
-import { Roles, Users } from '@rocket.chat/models';
+import { Roles } from '@rocket.chat/models';
 import { api } from '@rocket.chat/core-services';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
 
+import { Users } from '../../../models/server';
 import { settings } from '../../../settings/server';
-import { hasPermissionAsync } from '../functions/hasPermission';
+import { hasPermission } from '../functions/hasPermission';
 import { apiDeprecationLogger } from '../../../lib/server/lib/deprecationWarningLogger';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		'authorization:removeUserFromRole'(roleId: IRole['_id'], username: IUser['username'], scope: undefined): Promise<boolean>;
-	}
-}
-
-Meteor.methods<ServerMethods>({
+Meteor.methods({
 	async 'authorization:removeUserFromRole'(roleId, username, scope) {
 		const userId = Meteor.userId();
 
-		if (!userId || !(await hasPermissionAsync(userId, 'access-permissions'))) {
+		if (!userId || !hasPermission(userId, 'access-permissions')) {
 			throw new Meteor.Error('error-action-not-allowed', 'Access permissions is not allowed', {
 				method: 'authorization:removeUserFromRole',
 				action: 'Accessing_permissions',
 			});
 		}
 
-		if (!roleId || typeof roleId.valueOf() !== 'string' || !username || typeof username.valueOf() !== 'string') {
+		if (!roleId || !_.isString(roleId) || !username || !_.isString(username)) {
 			throw new Meteor.Error('error-invalid-arguments', 'Invalid arguments', {
 				method: 'authorization:removeUserFromRole',
 			});
@@ -46,14 +40,14 @@ Meteor.methods<ServerMethods>({
 			);
 		}
 
-		const user = await Users.findOneByUsernameIgnoringCase(username, {
-			projection: {
+		const user = Users.findOneByUsernameIgnoringCase(username, {
+			fields: {
 				_id: 1,
 				roles: 1,
 			},
-		});
+		}) as Pick<IUser, '_id' | 'roles'>;
 
-		if (!user?._id) {
+		if (!user || !user._id) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', {
 				method: 'authorization:removeUserFromRole',
 			});
@@ -61,11 +55,13 @@ Meteor.methods<ServerMethods>({
 
 		// prevent removing last user from admin role
 		if (role._id === 'admin') {
-			const adminCount = await Users.col.countDocuments({
-				roles: {
-					$in: ['admin'],
-				},
-			});
+			const adminCount = Meteor.users
+				.find({
+					roles: {
+						$in: ['admin'],
+					},
+				})
+				.count();
 
 			const userIsAdmin = user.roles?.indexOf('admin') > -1;
 			if (adminCount === 1 && userIsAdmin) {
@@ -77,19 +73,17 @@ Meteor.methods<ServerMethods>({
 		}
 
 		const remove = await Roles.removeUserRoles(user._id, [role._id], scope);
-		const event = {
-			type: 'removed',
-			_id: role._id,
-			u: {
-				_id: user._id,
-				username,
-			},
-			scope,
-		};
 		if (settings.get('UI_DisplayRoles')) {
-			void api.broadcast('user.roleUpdate', event);
+			api.broadcast('user.roleUpdate', {
+				type: 'removed',
+				_id: role._id,
+				u: {
+					_id: user._id,
+					username,
+				},
+				scope,
+			});
 		}
-		void api.broadcast('federation.userRoleChanged', { ...event, givenByUserId: userId });
 
 		return remove;
 	},

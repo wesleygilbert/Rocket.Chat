@@ -1,9 +1,7 @@
 import type { ISettingColor, SettingEditor, SettingValue } from '@rocket.chat/core-typings';
 import { isSettingColor, isSetting } from '@rocket.chat/core-typings';
-import { Button } from '@rocket.chat/fuselage';
 import { useDebouncedCallback } from '@rocket.chat/fuselage-hooks';
-import { ExternalLink } from '@rocket.chat/ui-client';
-import { useSettingStructure, useTranslation } from '@rocket.chat/ui-contexts';
+import { useSettingStructure, useTranslation, useAbsoluteUrl } from '@rocket.chat/ui-contexts';
 import type { ReactElement } from 'react';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 
@@ -107,16 +105,13 @@ function Setting({ className = undefined, settingId, sectionChanged }: SettingPr
 
 	const shouldDisableEnterprise = setting.enterprise && !isEnterprise;
 
-	const PRICING_URL = 'https://go.rocket.chat/i/see-paid-plan-customize-homepage';
-
-	const showUpgradeButton = useMemo(
+	const absoluteUrl = useAbsoluteUrl();
+	const enterpriseCallout = useMemo(
 		() =>
 			shouldDisableEnterprise ? (
-				<ExternalLink to={PRICING_URL}>
-					<Button>{t('See_Paid_Plan')}</Button>
-				</ExternalLink>
+				<MarkdownText variant='inline' content={t('Only_available_on_Enterprise_learn_more__URL', { URL: absoluteUrl('/admin') })} />
 			) : undefined,
-		[shouldDisableEnterprise, t],
+		[shouldDisableEnterprise, t, absoluteUrl],
 	);
 
 	const hasResetButton =
@@ -135,7 +130,7 @@ function Setting({ className = undefined, settingId, sectionChanged }: SettingPr
 			label={label || undefined}
 			hint={hint}
 			callout={callout}
-			showUpgradeButton={showUpgradeButton}
+			enterpriseCallout={enterpriseCallout}
 			sectionChanged={sectionChanged}
 			{...setting}
 			disabled={setting.disabled || shouldDisableEnterprise}

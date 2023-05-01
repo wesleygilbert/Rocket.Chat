@@ -1,4 +1,4 @@
-import { hasPermission, hasAtLeastOnePermission } from '../../../app/authorization/client';
+import { hasPermission } from '../../../app/authorization/client';
 import { settings } from '../../../app/settings/client';
 import { createSidebarItems } from '../../lib/createSidebarItems';
 
@@ -36,11 +36,5 @@ export const {
 		i18nLabel: 'Personal_Access_Tokens',
 		icon: 'key',
 		permissionGranted: (): boolean => hasPermission('create-personal-access-tokens'),
-	},
-	{
-		href: 'omnichannel',
-		i18nLabel: 'Omnichannel',
-		icon: 'headset',
-		permissionGranted: (): boolean => hasAtLeastOnePermission(['send-omnichannel-chat-transcript', 'request-pdf-transcript']),
 	},
 ]);

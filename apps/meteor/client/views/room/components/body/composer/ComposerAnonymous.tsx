@@ -1,42 +1,26 @@
 import { Button, ButtonGroup } from '@rocket.chat/fuselage';
-import {
-	useSessionDispatch,
-	useSetting,
-	useTranslation,
-	useLoginWithToken,
-	useToastMessageDispatch,
-	useMethod,
-} from '@rocket.chat/ui-contexts';
-import { useMutation } from '@tanstack/react-query';
+import { useSessionDispatch, useSetting, useTranslation, useLoginWithToken } from '@rocket.chat/ui-contexts';
 import type { ReactElement } from 'react';
 import React from 'react';
 
-const ComposerAnonymous = (): ReactElement => {
-	const isAnonymousWriteEnabled = useSetting('Accounts_AllowAnonymousWrite');
+import { useRegisterAnonymousUserMutation } from '../../../../../hooks/useRegisterAnonymousUserMutation';
 
-	const dispatch = useToastMessageDispatch();
+export const ComposerAnonymous = (): ReactElement => {
+	const isAnonymousWriteEnabled = useSetting('Accounts_AllowAnonymousWrite');
 
 	const loginWithToken = useLoginWithToken();
 
-	const anonymousUser = useMethod('registerUser');
+	const registerAnonymous = useRegisterAnonymousUserMutation();
 
-	const registerAnonymous = useMutation(
-		async (...params: Parameters<typeof anonymousUser>) => {
-			const result = await anonymousUser(...params);
-			if (typeof result !== 'string' && result.token) {
-				await loginWithToken(result.token);
-			}
-			return result;
-		},
-		{
-			onError: (error) => {
-				dispatch({ type: 'error', message: error });
+	const joinAnonymous = async () => {
+		await registerAnonymous.mutate(
+			{ email: null },
+			{
+				onSuccess: (result) => {
+					loginWithToken(result.token);
+				},
 			},
-		},
-	);
-
-	const joinAnonymous = () => {
-		registerAnonymous.mutate({ email: null });
+		);
 	};
 
 	const setForceLogin = useSessionDispatch('forceLogin');
@@ -56,5 +40,3 @@ const ComposerAnonymous = (): ReactElement => {
 		</ButtonGroup>
 	);
 };
-
-export default ComposerAnonymous;

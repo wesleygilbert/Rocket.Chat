@@ -7,11 +7,6 @@ registerOmnichannelRoute('/monitors', {
 	component: lazy(() => import('./monitors/MonitorsPageContainer')),
 });
 
-registerOmnichannelRoute('/sla-policies/:context?/:id?', {
-	name: 'omnichannel-sla-policies',
-	component: lazy(() => import('./slaPolicies/SlasRoute')),
-});
-
 registerOmnichannelRoute('/priorities/:context?/:id?', {
 	name: 'omnichannel-priorities',
 	component: lazy(() => import('./priorities/PrioritiesRoute')),

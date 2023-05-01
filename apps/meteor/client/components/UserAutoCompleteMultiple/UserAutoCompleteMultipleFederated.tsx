@@ -14,7 +14,7 @@ type UserAutoCompleteMultipleFederatedProps = {
 	placeholder?: string;
 };
 
-type UserAutoCompleteOptionType = {
+export type UserAutoCompleteOptionType = {
 	name: string;
 	username: string;
 	_federated?: boolean;
@@ -24,7 +24,7 @@ type UserAutoCompleteOptions = {
 	[k: string]: UserAutoCompleteOptionType;
 };
 
-const matrixRegex = new RegExp('@(.*:.*)');
+const matrixRegex = new RegExp('(.*:.*)');
 
 const UserAutoCompleteMultipleFederated = ({
 	onChange,
@@ -113,7 +113,6 @@ const UserAutoCompleteMultipleFederated = ({
 				}}
 				renderOptions={AutocompleteOptions}
 				options={options.concat(Object.entries(selectedCache)).map(([, item]) => [item.username, item.name || item.username])}
-				data-qa='create-channel-users-autocomplete'
 			/>
 		</OptionsContext.Provider>
 	);

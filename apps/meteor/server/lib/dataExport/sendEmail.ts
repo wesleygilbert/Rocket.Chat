@@ -1,10 +1,10 @@
 import type { IUser } from '@rocket.chat/core-typings';
 
-import * as Mailer from '../../../app/mailer/server/api';
+import * as Mailer from '../../../app/mailer';
 import { settings } from '../../../app/settings/server';
 import { getUserEmailAddress } from '../../../lib/getUserEmailAddress';
 
-export const sendEmail = async (userData: Pick<IUser, 'name' | 'emails'>, subject: string, body: string): Promise<void> => {
+export const sendEmail = (userData: Pick<IUser, 'name' | 'emails'>, subject: string, body: string): void => {
 	const emailAddress = getUserEmailAddress(userData);
 
 	if (!emailAddress) {
@@ -18,7 +18,7 @@ export const sendEmail = async (userData: Pick<IUser, 'name' | 'emails'>, subjec
 		return;
 	}
 
-	await Mailer.send({
+	Mailer.send({
 		to,
 		from,
 		subject,

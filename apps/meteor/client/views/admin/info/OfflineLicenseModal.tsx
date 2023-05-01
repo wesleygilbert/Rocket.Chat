@@ -39,8 +39,7 @@ const OfflineLicenseModal = ({ onClose, license, licenseStatus, ...props }: Offl
 
 	const addLicense = useEndpoint('POST', '/v1/licenses.add');
 
-	const handleApplyLicense = useMutableCallback(async (e) => {
-		e.preventDefault();
+	const handleApplyLicense = useMutableCallback(async () => {
 		setLastSetLicense(newLicense);
 		try {
 			setIsUpdating(true);
@@ -60,7 +59,7 @@ const OfflineLicenseModal = ({ onClose, license, licenseStatus, ...props }: Offl
 	});
 
 	return (
-		<Modal wrapperFunction={(props: ComponentProps<typeof Box>) => <Box is='form' onSubmit={handleApplyLicense} {...props} />} {...props}>
+		<Modal {...props}>
 			<Modal.Header>
 				<Modal.Title>{t('Cloud_Apply_Offline_License')}</Modal.Title>
 				<Modal.Close onClick={onClose} />
@@ -110,7 +109,7 @@ const OfflineLicenseModal = ({ onClose, license, licenseStatus, ...props }: Offl
 			</Modal.Content>
 			<Modal.Footer>
 				<Modal.FooterControllers>
-					<Button primary disabled={!hasChanges || isUpdating} type='submit'>
+					<Button primary disabled={!hasChanges || isUpdating} onClick={handleApplyLicense}>
 						{t('Cloud_Apply_license')}
 					</Button>
 				</Modal.FooterControllers>

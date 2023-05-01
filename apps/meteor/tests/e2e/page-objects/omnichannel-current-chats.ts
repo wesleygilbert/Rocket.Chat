@@ -100,10 +100,6 @@ export class OmnichannelCurrentChats {
 		return this.page.locator('[data-qa=""]');
 	}
 
-	async openChat(name: string): Promise<void> {
-		return this.page.locator(`table >> text="${name}"`).click();
-	}
-
 	async doOpenOptions(): Promise<void> {
 		await this.formOptions.click();
 	}

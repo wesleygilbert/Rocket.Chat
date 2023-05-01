@@ -1,9 +1,8 @@
-import { Users } from './fixtures/userStates';
+import { test, expect } from './utils/test';
 import { HomeChannel } from './page-objects';
 import { createTargetChannel } from './utils';
-import { test, expect } from './utils/test';
 
-test.use({ storageState: Users.user2.state });
+test.use({ storageState: 'user2-session.json' });
 
 test.describe.serial('permissions', () => {
 	let poHomeChannel: HomeChannel;
@@ -23,26 +22,21 @@ test.describe.serial('permissions', () => {
 		test.beforeAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AllowEditing', { value: false })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 
-		test('expect option(edit) not be visible', async ({ page }) => {
+		test('expect option(edit) not be visible', async () => {
 			await poHomeChannel.sidenav.openChat(targetChannel);
-
-			await poHomeChannel.content.sendMessage('expect option(edit) not be visible');
-
-			await expect(page.locator('.rcx-message', { hasText: 'expect option(edit) not be visible' })).not.toHaveAttribute(
-				'aria-busy',
-				'true',
-			);
+			await poHomeChannel.content.sendMessage('any_message');
 			await poHomeChannel.content.openLastMessageMenu();
+
 			await expect(poHomeChannel.content.btnOptionEditMessage).toBeHidden();
 		});
 
 		test.afterAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AllowEditing', { value: true })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 	});
 
@@ -50,18 +44,12 @@ test.describe.serial('permissions', () => {
 		test.beforeAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AllowDeleting', { value: false })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 
-		test('expect option(delete) not be visible', async ({ page }) => {
+		test('expect option(delete) not be visible', async () => {
 			await poHomeChannel.sidenav.openChat(targetChannel);
-			await poHomeChannel.content.sendMessage('expect option(delete) not be visible');
-
-			await expect(page.locator('.rcx-message', { hasText: 'expect option(delete) not be visible' })).not.toHaveAttribute(
-				'aria-busy',
-				'true',
-			);
-
+			await poHomeChannel.content.sendMessage('any_message');
 			await poHomeChannel.content.openLastMessageMenu();
 
 			await expect(poHomeChannel.content.btnOptionDeleteMessage).toBeHidden();
@@ -70,24 +58,22 @@ test.describe.serial('permissions', () => {
 		test.afterAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AllowDeleting', { value: true })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 	});
 
 	test.describe.serial('Pin message', () => {
-		test.use({ storageState: Users.admin.state });
+		test.use({ storageState: 'admin-session.json' });
 
 		test.beforeAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AllowPinning', { value: false })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 
-		test('expect option(pin) not be visible', async ({ page }) => {
+		test('expect option(pin) not be visible', async () => {
 			await poHomeChannel.sidenav.openChat(targetChannel);
-			await poHomeChannel.content.sendMessage('expect option(pin) not be visible');
-
-			await expect(page.locator('.rcx-message', { hasText: 'expect option(pin) not be visible' })).not.toHaveAttribute('aria-busy', 'true');
+			await poHomeChannel.content.sendMessage('any_message');
 			await poHomeChannel.content.openLastMessageMenu();
 
 			await expect(poHomeChannel.content.btnOptionPinMessage).toBeHidden();
@@ -96,7 +82,7 @@ test.describe.serial('permissions', () => {
 		test.afterAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AllowPinning', { value: true })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 	});
 
@@ -106,17 +92,12 @@ test.describe.serial('permissions', () => {
 		test.beforeAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AllowStarring', { value: false })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 
-		test('expect option(star) not be visible', async ({ page }) => {
+		test('expect option(star) not be visible', async () => {
 			await poHomeChannel.sidenav.openChat(targetChannel);
-			await poHomeChannel.content.sendMessage('expect option(star) not be visible');
-
-			await expect(page.locator('.rcx-message', { hasText: 'expect option(star) not be visible' })).not.toHaveAttribute(
-				'aria-busy',
-				'true',
-			);
+			await poHomeChannel.content.sendMessage('any_message');
 			await poHomeChannel.content.openLastMessageMenu();
 
 			await expect(poHomeChannel.content.btnOptionStarMessage).toBeHidden();
@@ -125,7 +106,7 @@ test.describe.serial('permissions', () => {
 		test.afterAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AllowStarring', { value: true })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 	});
 
@@ -133,18 +114,20 @@ test.describe.serial('permissions', () => {
 		test.beforeAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/FileUpload_Enabled', { value: false })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 
-		test('expect option (upload file) not be visible', async () => {
+		test('expect option(upload file) not be visible', async () => {
 			await poHomeChannel.sidenav.openChat(targetChannel);
+			await poHomeChannel.content.btnMenuMoreActions.click();
+
 			await expect(poHomeChannel.content.btnOptionFileUpload).toBeHidden();
 		});
 
 		test.afterAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/FileUpload_Enabled', { value: true })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 	});
 
@@ -152,18 +135,20 @@ test.describe.serial('permissions', () => {
 		test.beforeAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AudioRecorderEnabled', { value: false })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 
-		test('expect option (upload audio) not be visible', async () => {
+		test('expect option(upload audio) not be visible', async () => {
 			await poHomeChannel.sidenav.openChat(targetChannel);
+			await poHomeChannel.content.btnMenuMoreActions.click();
+
 			await expect(poHomeChannel.content.btnRecordAudio).toBeHidden();
 		});
 
 		test.afterAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AudioRecorderEnabled', { value: true })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 	});
 
@@ -171,18 +156,20 @@ test.describe.serial('permissions', () => {
 		test.beforeAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_VideoRecorderEnabled', { value: false })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 
-		test('expect option (upload video) not be visible', async () => {
+		test('expect option(upload video) not be visible', async () => {
 			await poHomeChannel.sidenav.openChat(targetChannel);
+			await poHomeChannel.content.btnMenuMoreActions.click();
+
 			await expect(poHomeChannel.content.btnVideoMessage).toBeHidden();
 		});
 
 		test.afterAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_VideoRecorderEnabled', { value: true })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 	});
 
@@ -191,8 +178,8 @@ test.describe.serial('permissions', () => {
 			const statusCode1 = (await api.post('/settings/Message_AllowBadWordsFilter', { value: true })).status();
 			const statusCode2 = (await api.post('/settings/Message_BadWordsFilterList', { value: 'badword' })).status();
 
-			await expect(statusCode1).toBe(200);
-			await expect(statusCode2).toBe(200);
+			expect(statusCode1).toBe(200);
+			expect(statusCode2).toBe(200);
 		});
 
 		test('expect badword be censored', async () => {
@@ -205,7 +192,7 @@ test.describe.serial('permissions', () => {
 		test.afterAll(async ({ api }) => {
 			const statusCode = (await api.post('/settings/Message_AllowBadWordsFilter', { value: false })).status();
 
-			await expect(statusCode).toBe(200);
+			expect(statusCode).toBe(200);
 		});
 	});
 });

@@ -4,7 +4,7 @@ import { getFederationDomain } from './getFederationDomain';
 import { search } from './dns';
 import { cryptLogger } from './logger';
 
-async function decrypt(data, peerKey) {
+export async function decrypt(data, peerKey) {
 	//
 	// Decrypt the payload
 	const payloadBuffer = Buffer.from(data);
@@ -40,7 +40,7 @@ export async function decryptIfNeeded(request, bodyParams) {
 	}
 	//
 	// Find the peer's public key
-	const { publicKey: peerKey } = await search(remotePeerDomain);
+	const { publicKey: peerKey } = search(remotePeerDomain);
 
 	if (!peerKey) {
 		throw new Error("Could not find the peer's public key to decrypt");

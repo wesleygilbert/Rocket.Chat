@@ -1,28 +1,66 @@
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
+import _ from 'underscore';
 
+import { settings } from '../../../settings/server';
+import { Users } from '../../../models/server';
+import { callbacks } from '../../../../lib/callbacks';
+import { checkUsernameAvailability } from '../functions';
 import { RateLimiter } from '../lib';
-import { setUsernameWithValidation } from '../functions/setUsername';
+import { saveUserIdentity } from '../functions/saveUserIdentity';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		setUsername(username: string, param?: { joinDefaultChannelsSilenced?: boolean }): string;
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async setUsername(username, param = {}) {
+Meteor.methods({
+	setUsername(username, param = {}) {
+		const { joinDefaultChannelsSilenced } = param;
 		check(username, String);
 
-		const userId = Meteor.userId();
+		const user = Meteor.user();
 
-		if (!userId) {
+		if (!user) {
 			throw new Meteor.Error('error-invalid-user', 'Invalid user', { method: 'setUsername' });
 		}
 
-		await setUsernameWithValidation(userId, username, param.joinDefaultChannelsSilenced);
+		if (user.username && !settings.get('Accounts_AllowUsernameChange')) {
+			throw new Meteor.Error('error-not-allowed', 'Not allowed', { method: 'setUsername' });
+		}
+
+		if (user.username === username || (user.username && user.username.toLowerCase() === username.toLowerCase())) {
+			return username;
+		}
+
+		let nameValidation;
+		try {
+			nameValidation = new RegExp(`^${settings.get('UTF8_User_Names_Validation')}$`);
+		} catch (error) {
+			nameValidation = new RegExp('^[0-9a-zA-Z-_.]+$');
+		}
+
+		if (!nameValidation.test(username)) {
+			throw new Meteor.Error(
+				'username-invalid',
+				`${_.escape(username)} is not a valid username, use only letters, numbers, dots, hyphens and underscores`,
+			);
+		}
+
+		if (!checkUsernameAvailability(username)) {
+			throw new Meteor.Error('error-field-unavailable', `<strong>${_.escape(username)}</strong> is already in use :(`, {
+				method: 'setUsername',
+				field: username,
+			});
+		}
+
+		if (!saveUserIdentity({ _id: user._id, username })) {
+			throw new Meteor.Error('error-could-not-change-username', 'Could not change username', {
+				method: 'setUsername',
+			});
+		}
+
+		if (!user.username) {
+			Meteor.runAsUser(user._id, () => Meteor.call('joinDefaultChannels', joinDefaultChannelsSilenced));
+			Meteor.defer(function () {
+				return callbacks.run('afterCreateUser', Users.findOneById(user._id));
+			});
+		}
 
 		return username;
 	},

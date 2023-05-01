@@ -1,6 +1,13 @@
-import { Base } from './models/Base';
+import { Meteor } from 'meteor/meteor';
+import _ from 'underscore';
+
+import { Base } from './models/_Base';
+import Avatars from './models/Avatars';
+import Uploads from './models/Uploads';
+import UserDataFiles from './models/UserDataFiles';
 import { Roles } from './models/Roles';
-import { Users } from './models/Users';
+import { Subscriptions as subscriptions } from './models/Subscriptions';
+import { Users as users } from './models/Users';
 import { CachedChannelList } from './models/CachedChannelList';
 import { CachedChatRoom } from './models/CachedChatRoom';
 import { CachedChatSubscription } from './models/CachedChatSubscription';
@@ -16,44 +23,38 @@ import { WebdavAccounts } from './models/WebdavAccounts';
 import CustomSounds from './models/CustomSounds';
 import EmojiCustom from './models/EmojiCustom';
 
-// overwrite Meteor.users collection so records on it don't get erased whenever the client reconnects to websocket
-const meteorUserOverwrite = () => {
-	const uid = Meteor.userId();
-
-	if (!uid) {
-		return null;
-	}
-
-	return (Users.findOne({ _id: uid }) ?? null) as Meteor.User | null;
-};
-Meteor.users = Users as typeof Meteor.users;
-Meteor.user = meteorUserOverwrite;
+/** @deprecated */
+const Users = _.extend({}, users, Meteor.users);
+/** @deprecated */
+const Subscriptions = _.extend({}, subscriptions, ChatSubscription);
+/** @deprecated */
+const Messages = _.extend({}, ChatMessage) as typeof ChatMessage;
+/** @deprecated */
+const Rooms = _.extend({}, ChatRoom) as typeof ChatRoom;
 
 export {
 	Base,
+	Avatars,
+	Uploads,
+	UserDataFiles,
 	Roles,
+	Subscriptions,
+	Users,
+	Messages,
 	CachedChannelList,
 	CachedChatRoom,
 	CachedChatSubscription,
 	CachedUserList,
+	ChatRoom,
 	RoomRoles,
 	UserAndRoom,
 	UserRoles,
 	AuthzCachedCollection,
 	ChatPermissions,
+	ChatMessage,
+	ChatSubscription,
+	Rooms,
 	CustomSounds,
 	EmojiCustom,
 	WebdavAccounts,
-	/** @deprecated */
-	Users,
-	/** @deprecated */
-	ChatRoom,
-	/** @deprecated */
-	ChatSubscription,
-	/** @deprecated */
-	ChatSubscription as Subscriptions,
-	/** @deprecated */
-	ChatMessage,
-	/** @deprecated */
-	ChatMessage as Messages,
 };

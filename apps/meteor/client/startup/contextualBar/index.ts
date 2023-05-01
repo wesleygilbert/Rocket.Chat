@@ -1,4 +1,1 @@
-import './exportMessagesTab';
-import './mentionsTab';
-import './pinnedMessagesTab';
-import './starredMessagesTab';
+import './exportMessages';

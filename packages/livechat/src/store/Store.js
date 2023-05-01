@@ -3,23 +3,7 @@ import mitt from 'mitt';
 import { parentCall } from '../lib/parentCall';
 import { createToken } from '../lib/random';
 
-function getLocalStorage() {
-	try {
-		return window.localStorage;
-	} catch (_) {
-		const store = {};
-		return {
-			getItem(name) {
-				return store[name];
-			},
-			setItem(name, val) {
-				store[name] = val;
-			},
-		};
-	}
-}
-const localStorage = getLocalStorage();
-const { sessionStorage } = window;
+const { localStorage, sessionStorage } = window;
 
 export default class Store {
 	constructor(initialState = {}, { localStorageKey = 'store', dontPersist = [] } = {}) {

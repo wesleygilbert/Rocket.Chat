@@ -1,33 +1,15 @@
 import { Meteor } from 'meteor/meteor';
 import { check } from 'meteor/check';
 import _ from 'underscore';
-import type { ServerMethods } from '@rocket.chat/ui-contexts';
-import type { IMessage } from '@rocket.chat/core-typings';
-import { Messages, Subscriptions, Rooms } from '@rocket.chat/models';
 
-import { canAccessRoomAsync } from '../../../authorization/server';
-import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
+import { canAccessRoom, hasPermission } from '../../../authorization/server';
+import { Subscriptions, Messages, Rooms } from '../../../models/server';
+import { settings } from '../../../settings/server';
 import { normalizeMessagesForUser } from '../../../utils/server/lib/normalizeMessagesForUser';
 import { getHiddenSystemMessages } from '../lib/getHiddenSystemMessages';
 
-declare module '@rocket.chat/ui-contexts' {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	interface ServerMethods {
-		getChannelHistory(params: {
-			rid: string;
-			latest?: Date;
-			oldest?: Date;
-			inclusive?: boolean;
-			offset?: number;
-			count?: number;
-			unreads?: boolean;
-			showThreadMessages?: boolean;
-		}): boolean | IMessage[] | { messages: IMessage[]; firstUnread?: any; unreadNotLoaded?: number };
-	}
-}
-
-Meteor.methods<ServerMethods>({
-	async getChannelHistory({ rid, latest, oldest, inclusive, offset = 0, count = 20, unreads, showThreadMessages = true }) {
+Meteor.methods({
+	getChannelHistory({ rid, latest, oldest, inclusive, offset = 0, count = 20, unreads, showThreadMessages = true }) {
 		check(rid, String);
 
 		if (!Meteor.userId()) {
@@ -39,31 +21,31 @@ Meteor.methods<ServerMethods>({
 			return false;
 		}
 
-		const room = await Rooms.findOneById(rid);
+		const room = Rooms.findOneById(rid);
 		if (!room) {
 			return false;
 		}
 
-		if (!(await canAccessRoomAsync(room, { _id: fromUserId }))) {
+		if (!canAccessRoom(room, { _id: fromUserId })) {
 			return false;
 		}
 
 		// Make sure they can access the room
 		if (
 			room.t === 'c' &&
-			!(await hasPermissionAsync(fromUserId, 'preview-c-room')) &&
-			!(await Subscriptions.findOneByRoomIdAndUserId(rid, fromUserId, { projection: { _id: 1 } }))
+			!hasPermission(fromUserId, 'preview-c-room') &&
+			!Subscriptions.findOneByRoomIdAndUserId(rid, fromUserId, { fields: { _id: 1 } })
 		) {
 			return false;
 		}
 
 		// Ensure latest is always defined.
-		if (latest === undefined) {
+		if (_.isUndefined(latest)) {
 			latest = new Date();
 		}
 
 		// Verify oldest is a date if it exists
-		if (oldest !== undefined && !_.isDate(oldest)) {
+		if (!_.isUndefined(oldest) && !_.isDate(oldest)) {
 			throw new Meteor.Error('error-invalid-date', 'Invalid date', { method: 'getChannelHistory' });
 		}
 
@@ -77,35 +59,38 @@ Meteor.methods<ServerMethods>({
 			limit: count,
 		};
 
-		const records =
-			oldest === undefined
-				? await Messages.findVisibleByRoomIdBeforeTimestampNotContainingTypes(
-						rid,
-						latest,
-						hiddenMessageTypes,
-						options,
-						showThreadMessages,
-						inclusive,
-				  ).toArray()
-				: await Messages.findVisibleByRoomIdBetweenTimestampsNotContainingTypes(
-						rid,
-						oldest,
-						latest,
-						hiddenMessageTypes,
-						options,
-						showThreadMessages,
-						inclusive,
-				  ).toArray();
+		if (!settings.get('Message_ShowEditedStatus')) {
+			options.fields = { editedAt: 0 };
+		}
 
-		const messages = await normalizeMessagesForUser(records, fromUserId);
+		const records = _.isUndefined(oldest)
+			? Messages.findVisibleByRoomIdBeforeTimestampNotContainingTypes(
+					rid,
+					latest,
+					hiddenMessageTypes,
+					options,
+					showThreadMessages,
+					inclusive,
+			  ).fetch()
+			: Messages.findVisibleByRoomIdBetweenTimestampsNotContainingTypes(
+					rid,
+					oldest,
+					latest,
+					hiddenMessageTypes,
+					options,
+					showThreadMessages,
+					inclusive,
+			  ).fetch();
+
+		const messages = normalizeMessagesForUser(records, fromUserId);
 
 		if (unreads) {
 			let unreadNotLoaded = 0;
 			let firstUnread = undefined;
 
-			if (oldest !== undefined) {
+			if (!_.isUndefined(oldest)) {
 				const firstMsg = messages[messages.length - 1];
-				if (firstMsg !== undefined && firstMsg.ts > oldest) {
+				if (!_.isUndefined(firstMsg) && firstMsg.ts > oldest) {
 					const unreadMessages = Messages.findVisibleByRoomIdBetweenTimestampsNotContainingTypes(
 						rid,
 						oldest,
@@ -120,16 +105,17 @@ Meteor.methods<ServerMethods>({
 						showThreadMessages,
 					);
 
-					const totalCursor = await Messages.countVisibleByRoomIdBetweenTimestampsNotContainingTypes(
+					const totalCursor = Messages.findVisibleByRoomIdBetweenTimestampsNotContainingTypes(
 						rid,
 						oldest,
 						firstMsg.ts,
 						hiddenMessageTypes,
+						{},
 						showThreadMessages,
 					);
 
-					firstUnread = (await unreadMessages.toArray())[0];
-					unreadNotLoaded = totalCursor;
+					firstUnread = unreadMessages.fetch()[0];
+					unreadNotLoaded = totalCursor.count();
 				}
 			}
 

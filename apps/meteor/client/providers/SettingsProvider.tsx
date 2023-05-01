@@ -1,4 +1,3 @@
-import type { ISetting } from '@rocket.chat/core-typings';
 import type { SettingsContextValue } from '@rocket.chat/ui-contexts';
 import { SettingsContext, useAtLeastOnePermission, useMethod } from '@rocket.chat/ui-contexts';
 import { Tracker } from 'meteor/tracker';
@@ -22,7 +21,7 @@ const SettingsProvider: FunctionComponent<SettingsProviderProps> = ({ children, 
 	const hasPrivateAccess = privileged && hasPrivilegedPermission;
 
 	const cachedCollection = useMemo(
-		() => (hasPrivateAccess ? PrivateSettingsCachedCollection : PublicSettingsCachedCollection),
+		() => (hasPrivateAccess ? PrivateSettingsCachedCollection.get() : PublicSettingsCachedCollection.get()),
 		[hasPrivateAccess],
 	);
 
@@ -51,11 +50,7 @@ const SettingsProvider: FunctionComponent<SettingsProviderProps> = ({ children, 
 	}, [cachedCollection]);
 
 	const querySetting = useMemo(
-		() =>
-			createReactiveSubscriptionFactory((_id): ISetting | undefined => {
-				const subscription = cachedCollection.collection.findOne(_id);
-				return subscription ? { ...subscription } : undefined;
-			}),
+		() => createReactiveSubscriptionFactory((_id) => ({ ...cachedCollection.collection.findOne(_id) })),
 		[cachedCollection],
 	);
 
@@ -72,7 +67,7 @@ const SettingsProvider: FunctionComponent<SettingsProviderProps> = ({ children, 
 								(query.section
 									? { section: query.section }
 									: {
-											$or: [{ section: { $exists: false } }, { section: undefined }],
+											$or: [{ section: { $exists: false } }, { section: null }],
 									  })),
 						},
 						{
@@ -104,7 +99,7 @@ const SettingsProvider: FunctionComponent<SettingsProviderProps> = ({ children, 
 	const saveSettings = useMethod('saveSettings');
 	const dispatch = useCallback(
 		async (changes) => {
-			settingsChangeCallback(changes);
+			await settingsChangeCallback(changes);
 			await saveSettings(changes);
 		},
 		[saveSettings],
@@ -125,6 +120,3 @@ const SettingsProvider: FunctionComponent<SettingsProviderProps> = ({ children, 
 };
 
 export default SettingsProvider;
-
-// '[subscribe: (onStoreChange: () => void) => () => void, getSnapshot: () => {}]'
-// '[subscribe: (onStoreChange: () => void) => () => void, getSnapshot: () => ISetting | undefined]'

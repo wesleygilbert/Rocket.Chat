@@ -2,7 +2,7 @@ import { usePermission } from '@rocket.chat/ui-contexts';
 import React from 'react';
 
 import NotAuthorizedPage from '../../notAuthorized/NotAuthorizedPage';
-import RegisterWorkspace from './RegisterWorkspace';
+import CloudPage from './CloudPage';
 
 function CloudRoute() {
 	const canManageCloud = usePermission('manage-cloud');
@@ -11,7 +11,7 @@ function CloudRoute() {
 		return <NotAuthorizedPage />;
 	}
 
-	return <RegisterWorkspace />;
+	return <CloudPage />;
 }
 
 export default CloudRoute;

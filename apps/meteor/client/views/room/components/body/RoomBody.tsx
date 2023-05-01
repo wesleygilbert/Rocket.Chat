@@ -1,10 +1,11 @@
 import type { IMessage, IUser } from '@rocket.chat/core-typings';
-import { isEditedMessage } from '@rocket.chat/core-typings';
+import { isEditedMessage, isOmnichannelRoom } from '@rocket.chat/core-typings';
 import {
 	useCurrentRoute,
 	usePermission,
 	useQueryStringParameter,
 	useRole,
+	useSession,
 	useSetting,
 	useTranslation,
 	useUser,
@@ -14,39 +15,39 @@ import type { MouseEventHandler, ReactElement, UIEvent } from 'react';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSyncExternalStore } from 'use-sync-external-store/shim';
 
-import { ChatMessage, RoomRoles } from '../../../../../app/models/client';
+import { ChatMessage } from '../../../../../app/models/client';
 import { readMessage, RoomHistoryManager } from '../../../../../app/ui-utils/client';
 import { isAtBottom } from '../../../../../app/ui/client/views/app/lib/scrolling';
 import { callbacks } from '../../../../../lib/callbacks';
 import { isTruthy } from '../../../../../lib/isTruthy';
 import { withDebouncing, withThrottling } from '../../../../../lib/utils/highOrderFunctions';
-import ScrollableContentWrapper from '../../../../components/ScrollableContentWrapper';
 import { useEmbeddedLayout } from '../../../../hooks/useEmbeddedLayout';
 import { useReactiveQuery } from '../../../../hooks/useReactiveQuery';
-import { RoomManager } from '../../../../lib/RoomManager';
+import { useUserCard } from '../../../../hooks/useUserCard';
+import { RoomManager as NewRoomManager } from '../../../../lib/RoomManager';
 import type { Upload } from '../../../../lib/chats/Upload';
 import { roomCoordinator } from '../../../../lib/rooms/roomCoordinator';
-import { setMessageJumpQueryStringParameter } from '../../../../lib/utils/setMessageJumpQueryStringParameter';
 import Announcement from '../../Announcement';
 import { MessageList } from '../../MessageList/MessageList';
 import MessageListErrorBoundary from '../../MessageList/MessageListErrorBoundary';
 import { useChat } from '../../contexts/ChatContext';
 import { useRoom, useRoomSubscription, useRoomMessages } from '../../contexts/RoomContext';
 import { useToolboxContext } from '../../contexts/ToolboxContext';
-import { useScrollMessageList } from '../../hooks/useScrollMessageList';
+import { useLegacyMessageEvents } from '../../hooks/useLegacyMessageEvents';
 import DropTargetOverlay from './DropTargetOverlay';
-import JumpToRecentMessageButton from './JumpToRecentMessageButton';
+import JumpToRecentMessagesBar from './JumpToRecentMessagesBar';
 import LeaderBar from './LeaderBar';
+import LegacyMessageTemplateList from './LegacyMessageTemplateList';
 import LoadingMessagesIndicator from './LoadingMessagesIndicator';
+import NewMessagesButton from './NewMessagesButton';
 import RetentionPolicyWarning from './RetentionPolicyWarning';
-import RoomForeword from './RoomForeword/RoomForeword';
+import RoomForeword from './RoomForeword';
 import UnreadMessagesIndicator from './UnreadMessagesIndicator';
 import UploadProgressIndicator from './UploadProgressIndicator';
 import ComposerContainer from './composer/ComposerContainer';
-import { useFileUploadDropTarget } from './hooks/useFileUploadDropTarget';
-import { useReadMessageWindowEvents } from './hooks/useReadMessageWindowEvents';
-import { useRetentionPolicy } from './hooks/useRetentionPolicy';
-import { useUnreadMessages } from './hooks/useUnreadMessages';
+import { useFileUploadDropTarget } from './useFileUploadDropTarget';
+import { useRetentionPolicy } from './useRetentionPolicy';
+import { useUnreadMessages } from './useUnreadMessages';
 
 const RoomBody = (): ReactElement => {
 	const t = useTranslation();
@@ -57,17 +58,19 @@ const RoomBody = (): ReactElement => {
 	const admin = useRole('admin');
 	const subscription = useRoomSubscription();
 
-	const [lastMessageDate, setLastMessageDate] = useState<Date | undefined>();
+	const [lastMessage, setLastMessage] = useState<Date | undefined>();
 	const [hideLeaderHeader, setHideLeaderHeader] = useState(false);
 	const [hasNewMessages, setHasNewMessages] = useState(false);
 
-	const hideFlexTab = useUserPreference<boolean>('hideFlexTab') || undefined;
+	const hideFlexTab = useUserPreference<boolean>('hideFlexTab');
 	const hideUsernames = useUserPreference<boolean>('hideUsernames');
 	const displayAvatars = useUserPreference<boolean>('displayAvatars');
+	const useLegacyMessageTemplate = useUserPreference<boolean>('useLegacyMessageTemplate') ?? false;
+	const viewMode = useUserPreference<number>('messageViewMode');
 
 	const wrapperRef = useRef<HTMLDivElement | null>(null);
 	const messagesBoxRef = useRef<HTMLDivElement | null>(null);
-	const atBottomRef = useRef(true);
+	const atBottomRef = useRef(!useQueryStringParameter('msg'));
 	const lastScrollTopRef = useRef(0);
 
 	const chat = useChat();
@@ -92,15 +95,12 @@ const RoomBody = (): ReactElement => {
 		return false;
 	}, []);
 
-	const scrollMessageList = useScrollMessageList(wrapperRef);
-
 	const sendToBottom = useCallback(() => {
-		scrollMessageList((wrapper) => {
-			return { left: 30, top: wrapper?.scrollHeight };
-		});
+		const wrapper = wrapperRef.current;
 
+		wrapper?.scrollTo(30, wrapper.scrollHeight);
 		setHasNewMessages(false);
-	}, [scrollMessageList]);
+	}, []);
 
 	const sendToBottomIfNecessary = useCallback(() => {
 		if (atBottomRef.current === true) {
@@ -128,6 +128,11 @@ const RoomBody = (): ReactElement => {
 
 	const uploads = useSyncExternalStore(chat.uploads.subscribe, chat.uploads.get);
 
+	const messageViewMode = useMemo(() => {
+		const modes = ['', 'cozy', 'compact'] as const;
+		return modes[viewMode ?? 0] ?? modes[0];
+	}, [viewMode]);
+
 	const { hasMorePreviousMessages, hasMoreNextMessages, isLoadingMoreMessages } = useRoomMessages();
 
 	const allowAnonymousRead = useSetting('Accounts_AllowAnonymousRead') as boolean | undefined;
@@ -154,8 +159,8 @@ const RoomBody = (): ReactElement => {
 
 	const useRealName = useSetting('UI_Use_Real_Name') as boolean;
 
-	const { data: roomLeader } = useReactiveQuery(['rooms', room._id, 'leader', { not: user?._id }], () => {
-		const leaderRoomRole = RoomRoles.findOne({
+	const { data: roomLeader } = useReactiveQuery(['rooms', room._id, 'leader', { not: user?._id }], ({ roomRoles }) => {
+		const leaderRoomRole = roomRoles.findOne({
 			'rid': room._id,
 			'roles': 'leader',
 			'u._id': { $ne: user?._id },
@@ -171,35 +176,32 @@ const RoomBody = (): ReactElement => {
 		};
 	});
 
+	const { open: openUserCard } = useUserCard();
+
 	const handleOpenUserCardButtonClick = useCallback(
 		(event: UIEvent, username: IUser['username']) => {
 			if (!username) {
 				return;
 			}
 
-			chat?.userCard.open(username)(event);
+			openUserCard(username)(event);
 		},
-		[chat?.userCard],
+		[openUserCard],
 	);
 
 	const handleUnreadBarJumpToButtonClick = useCallback(() => {
 		const rid = room._id;
-		const { firstUnread } = RoomHistoryManager.getRoom(rid);
+		const { firstUnread } = RoomHistoryManager.getRoom(rid) ?? {};
 		let message = firstUnread?.get();
 		if (!message) {
-			message = ChatMessage.findOne({ rid, ts: { $gt: unread?.since } }, { sort: { ts: 1 }, limit: 1 });
+			message = ChatMessage.findOne({ rid, ts: { $gt: subscription?.ls } }, { sort: { ts: 1 }, limit: 1 });
 		}
-		if (!message) {
-			return;
-		}
-		setMessageJumpQueryStringParameter(message?._id);
-		setUnreadCount(0);
-	}, [room._id, unread?.since, setUnreadCount]);
+		RoomHistoryManager.getSurroundingMessages(message, atBottomRef);
+	}, [room._id, subscription?.ls]);
 
 	const handleMarkAsReadButtonClick = useCallback(() => {
 		readMessage.readNow(room._id);
-		setUnreadCount(0);
-	}, [room._id, setUnreadCount]);
+	}, [room._id]);
 
 	const handleUploadProgressClose = useCallback(
 		(id: Upload['id']) => {
@@ -214,7 +216,7 @@ const RoomBody = (): ReactElement => {
 		callbacks.add(
 			'streamNewMessage',
 			(msg: IMessage) => {
-				if (room._id !== msg.rid || isEditedMessage(msg) || msg.tmid) {
+				if (room._id !== msg.rid || (isEditedMessage(msg) && msg.editedAt) || msg.tmid) {
 					return;
 				}
 
@@ -261,6 +263,17 @@ const RoomBody = (): ReactElement => {
 	const tabBarRef = useRef(toolbox);
 	tabBarRef.current = toolbox;
 
+	useEffect(() => {
+		const room = roomRef.current;
+		const tabBar = tabBarRef.current;
+		Tracker.afterFlush(() => {
+			// Find a better way to do this, declaratively
+			if (room && isOmnichannelRoom(room) && tabBar.activeTabBar?.id !== 'room-info') {
+				tabBar.openRoomInfo();
+			}
+		});
+	}, [room._id]);
+
 	const debouncedReadMessageRead = useMemo(
 		() =>
 			withDebouncing({ wait: 500 })(() => {
@@ -269,8 +282,10 @@ const RoomBody = (): ReactElement => {
 		[room._id],
 	);
 
+	const openedRoom = useSession('openedRoom');
+
 	useEffect(() => {
-		if (!routeName || !roomCoordinator.isRouteNameKnown(routeName)) {
+		if (!routeName || !roomCoordinator.isRouteNameKnown(routeName) || room._id !== openedRoom) {
 			return;
 		}
 
@@ -278,7 +293,7 @@ const RoomBody = (): ReactElement => {
 		if (subscribed && (subscription?.alert || subscription?.unread)) {
 			readMessage.refreshUnreadMark(room._id);
 		}
-	}, [debouncedReadMessageRead, room._id, routeName, subscribed, subscription?.alert, subscription?.unread]);
+	}, [debouncedReadMessageRead, openedRoom, room._id, routeName, subscribed, subscription?.alert, subscription?.unread]);
 
 	useEffect(() => {
 		if (!subscribed) {
@@ -288,11 +303,11 @@ const RoomBody = (): ReactElement => {
 
 		const count = ChatMessage.find({
 			rid: room._id,
-			ts: { $lte: lastMessageDate, $gt: subscription?.ls },
+			ts: { $lte: lastMessage, $gt: subscription?.ls },
 		}).count();
 
 		setUnreadCount(count);
-	}, [lastMessageDate, room._id, setUnreadCount, subscribed, subscription?.ls]);
+	}, [lastMessage, room._id, setUnreadCount, subscribed, subscription?.ls]);
 
 	useEffect(() => {
 		if (!unread?.count) {
@@ -300,6 +315,28 @@ const RoomBody = (): ReactElement => {
 		}
 		readMessage.refreshUnreadMark(room._id);
 	}, [debouncedReadMessageRead, room._id, unread?.count]);
+
+	useEffect(() => {
+		const handleReadMessage = (): void => setUnreadCount(0);
+		readMessage.on(room._id, handleReadMessage);
+
+		return () => {
+			readMessage.off(room._id, handleReadMessage);
+		};
+	}, [room._id, setUnreadCount]);
+
+	useLegacyMessageEvents({
+		messageListRef: {
+			get current() {
+				if (!useLegacyMessageTemplate) {
+					return null;
+				}
+
+				return wrapperRef.current?.querySelector('ul') ?? null;
+			},
+		},
+		onRequestScrollToBottom: sendToBottomIfNecessary,
+	});
 
 	useEffect(() => {
 		const wrapper = wrapperRef.current;
@@ -326,7 +363,7 @@ const RoomBody = (): ReactElement => {
 				element = document.elementFromPoint(messagesBoxLeft + 1, messagesBoxTop + topOffset + 1);
 			}
 
-			if (element?.classList.contains('rcx-message') || element?.classList.contains('rcx-message--sequential')) {
+			if (element?.classList.contains('message')) {
 				return element;
 			}
 		};
@@ -335,7 +372,7 @@ const RoomBody = (): ReactElement => {
 			Tracker.afterFlush(() => {
 				const lastInvisibleMessageOnScreen = getElementFromPoint(0) || getElementFromPoint(20) || getElementFromPoint(40);
 
-				if (!lastInvisibleMessageOnScreen) {
+				if (!lastInvisibleMessageOnScreen || !lastInvisibleMessageOnScreen.id) {
 					setUnreadCount(0);
 					return;
 				}
@@ -346,7 +383,7 @@ const RoomBody = (): ReactElement => {
 					return;
 				}
 
-				setLastMessageDate(lastMessage.ts);
+				setLastMessage(lastMessage.ts);
 			});
 		});
 
@@ -390,7 +427,7 @@ const RoomBody = (): ReactElement => {
 			return;
 		}
 
-		const store = RoomManager.getStore(room._id);
+		const store = NewRoomManager.getStore(room._id);
 
 		const handleWrapperScroll = withThrottling({ wait: 30 })(() => {
 			store?.update({ scroll: wrapper.scrollTop, atBottom: isAtBottom(wrapper, 50) });
@@ -439,11 +476,11 @@ const RoomBody = (): ReactElement => {
 			timer2s = setTimeout(() => checkIfScrollIsAtBottom(), 2000);
 		};
 
-		// wrapper.addEventListener('mousewheel', handleWheel);
-		// wrapper.addEventListener('wheel', handleWheel);
+		wrapper.addEventListener('mousewheel', handleWheel);
+		wrapper.addEventListener('wheel', handleWheel);
 		wrapper.addEventListener('scroll', handleWheel);
-		// wrapper.addEventListener('touchstart', handleTouchStart);
-		// wrapper.addEventListener('touchend', handleTouchEnd);
+		wrapper.addEventListener('touchstart', handleTouchStart);
+		wrapper.addEventListener('touchend', handleTouchEnd);
 
 		return (): void => {
 			if (timer1s) clearTimeout(timer1s);
@@ -497,37 +534,18 @@ const RoomBody = (): ReactElement => {
 
 	const handleCloseFlexTab: MouseEventHandler<HTMLElement> = useCallback(
 		(e): void => {
-			/*
-			 * check if the element is a button or anchor
-			 * it considers the role as well
-			 * usually, the flex tab is closed when clicking outside of it
-			 * but if the user clicks on a button or anchor, we don't want to close the flex tab
-			 * because the user could be actually trying to open the flex tab through those elements
-			 */
+			if (!hideFlexTab) {
+				return;
+			}
 
-			const checkElement = (element: HTMLElement | null): boolean => {
-				if (!element) {
-					return false;
-				}
-				if (element instanceof HTMLButtonElement || element.getAttribute('role') === 'button') {
-					return true;
-				}
-				if (element instanceof HTMLAnchorElement || element.getAttribute('role') === 'link') {
-					return true;
-				}
-				return checkElement(element.parentElement);
-			};
-
-			if (checkElement(e.target as HTMLElement)) {
+			if (e.target instanceof HTMLButtonElement) {
 				return;
 			}
 
 			toolbox.close();
 		},
-		[toolbox],
+		[toolbox, hideFlexTab],
 	);
-
-	useReadMessageWindowEvents();
 
 	return (
 		<>
@@ -537,21 +555,20 @@ const RoomBody = (): ReactElement => {
 					className={`messages-container flex-tab-main-content ${admin ? 'admin' : ''}`}
 					id={`chat-window-${room._id}`}
 					aria-label={t('Channel')}
-					onClick={hideFlexTab && handleCloseFlexTab}
+					onClick={handleCloseFlexTab}
 				>
 					<div className='messages-container-wrapper'>
 						<div className='messages-container-main' {...fileUploadTriggerProps}>
 							<DropTargetOverlay {...fileUploadOverlayProps} />
 							<div className={['container-bars', (unread || uploads.length) && 'show'].filter(isTruthy).join(' ')}>
-								{unread && (
+								{unread ? (
 									<UnreadMessagesIndicator
 										count={unread.count}
 										since={unread.since}
 										onJumpButtonClick={handleUnreadBarJumpToButtonClick}
 										onMarkAsReadButtonClick={handleMarkAsReadButtonClick}
 									/>
-								)}
-
+								) : null}
 								{uploads.map((upload) => (
 									<UploadProgressIndicator
 										key={upload.id}
@@ -563,13 +580,12 @@ const RoomBody = (): ReactElement => {
 									/>
 								))}
 							</div>
-							<div ref={messagesBoxRef} className={['messages-box', roomLeader && 'has-leader'].filter(isTruthy).join(' ')}>
-								<JumpToRecentMessageButton visible={hasNewMessages} onClick={handleNewMessageButtonClick} text={t('New_messages')} />
-								<JumpToRecentMessageButton
-									visible={hasMoreNextMessages}
-									onClick={handleJumpToRecentButtonClick}
-									text={t('Jump_to_recent_messages')}
-								/>
+							<div
+								ref={messagesBoxRef}
+								className={['messages-box', messageViewMode, roomLeader && 'has-leader'].filter(isTruthy).join(' ')}
+							>
+								<NewMessagesButton visible={hasNewMessages} onClick={handleNewMessageButtonClick} />
+								<JumpToRecentMessagesBar visible={hasMoreNextMessages} onClick={handleJumpToRecentButtonClick} />
 								{!canPreview ? (
 									<div className='content room-not-found error-color'>
 										<div>{t('You_must_join_to_view_messages_in_this_channel')}</div>
@@ -585,6 +601,7 @@ const RoomBody = (): ReactElement => {
 									/>
 								) : null}
 								<div
+									ref={wrapperRef}
 									className={[
 										'wrapper',
 										hasMoreNextMessages && 'has-more-next',
@@ -595,26 +612,24 @@ const RoomBody = (): ReactElement => {
 										.join(' ')}
 								>
 									<MessageListErrorBoundary>
-										<ScrollableContentWrapper ref={wrapperRef}>
-											<ul className='messages-list' aria-live='polite'>
-												{canPreview ? (
-													<>
-														{hasMorePreviousMessages ? (
-															<li className='load-more'>{isLoadingMoreMessages ? <LoadingMessagesIndicator /> : null}</li>
-														) : (
-															<li className='start color-info-font-color'>
-																{retentionPolicy ? <RetentionPolicyWarning {...retentionPolicy} /> : null}
-																<RoomForeword user={user} room={room} />
-															</li>
-														)}
-													</>
-												) : null}
-												<MessageList rid={room._id} scrollMessageList={scrollMessageList} />
-												{hasMoreNextMessages ? (
-													<li className='load-more'>{isLoadingMoreMessages ? <LoadingMessagesIndicator /> : null}</li>
-												) : null}
-											</ul>
-										</ScrollableContentWrapper>
+										<ul className='messages-list' aria-live='polite'>
+											{canPreview ? (
+												<>
+													{hasMorePreviousMessages ? (
+														<li className='load-more'>{isLoadingMoreMessages ? <LoadingMessagesIndicator /> : null}</li>
+													) : (
+														<li className='start color-info-font-color'>
+															{retentionPolicy ? <RetentionPolicyWarning {...retentionPolicy} /> : null}
+															<RoomForeword user={user} room={room} />
+														</li>
+													)}
+												</>
+											) : null}
+											{useLegacyMessageTemplate ? <LegacyMessageTemplateList room={room} /> : <MessageList rid={room._id} />}
+											{hasMoreNextMessages ? (
+												<li className='load-more'>{isLoadingMoreMessages ? <LoadingMessagesIndicator /> : null}</li>
+											) : null}
+										</ul>
 									</MessageListErrorBoundary>
 								</div>
 							</div>

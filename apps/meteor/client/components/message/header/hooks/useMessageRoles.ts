@@ -25,7 +25,7 @@ export const useMessageRoles = (userId: IUser['_id'] | undefined, roomId: IRoom[
 						$in: roles,
 					},
 					description: {
-						$exists: true,
+						$exists: 1,
 						$ne: '',
 					},
 				},

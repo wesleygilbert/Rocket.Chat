@@ -1,8 +1,7 @@
-import { Users } from './fixtures/userStates';
-import { OmnichannelManager } from './page-objects';
 import { test, expect } from './utils/test';
+import { OmnichannelManager } from './page-objects';
 
-test.use({ storageState: Users.admin.state });
+test.use({ storageState: 'admin-session.json' });
 
 test.describe.serial('omnichannel-manager', () => {
 	let poOmnichannelManagers: OmnichannelManager;
@@ -14,19 +13,18 @@ test.describe.serial('omnichannel-manager', () => {
 		await poOmnichannelManagers.sidenav.linkManagers.click();
 	});
 
-	test('Managers', async ({ page }) => {
-		await test.step('expect add "user1" as manager', async () => {
-			await poOmnichannelManagers.inputUsername.type('user1');
-			await page.locator('role=option[name="user1"]').click();
-			await poOmnichannelManagers.btnAdd.click();
+	test('expect add "user1" as manager', async ({ page }) => {
+		await poOmnichannelManagers.inputUsername.type('user1 ', { delay: 1000 });
+		await page.keyboard.press('Enter');
+		await poOmnichannelManagers.btnAdd.click();
 
-			await expect(poOmnichannelManagers.firstRowInTable('user1')).toBeVisible();
-		});
-		await test.step('expect remove "user1" as manager', async () => {
-			await poOmnichannelManagers.btnDeleteSelectedAgent('user1').click();
-			await poOmnichannelManagers.btnModalRemove.click();
+		await expect(poOmnichannelManagers.firstRowInTable('user1')).toBeVisible();
+	});
 
-			await expect(poOmnichannelManagers.firstRowInTable('user1')).toBeHidden();
-		});
+	test('expect remove "user1" as manager', async () => {
+		await poOmnichannelManagers.btnDeleteFirstRowInTable.click();
+		await poOmnichannelManagers.btnModalRemove.click();
+
+		await expect(poOmnichannelManagers.firstRowInTable('user1')).toBeHidden();
 	});
 });

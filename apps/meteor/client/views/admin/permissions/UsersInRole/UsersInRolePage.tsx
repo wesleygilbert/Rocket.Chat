@@ -1,4 +1,4 @@
-import type { IRole, IRoom } from '@rocket.chat/core-typings';
+import type { IRole, IRoom, IUser } from '@rocket.chat/core-typings';
 import { Box, Field, Margins, ButtonGroup, Button, Callout } from '@rocket.chat/fuselage';
 import { useMutableCallback } from '@rocket.chat/fuselage-hooks';
 import { useToastMessageDispatch, useRoute, useEndpoint, useTranslation } from '@rocket.chat/ui-contexts';
@@ -11,11 +11,6 @@ import RoomAutoComplete from '../../../../components/RoomAutoComplete';
 import UserAutoCompleteMultiple from '../../../../components/UserAutoCompleteMultiple';
 import UsersInRoleTable from './UsersInRoleTable';
 
-type UsersInRolePayload = {
-	rid?: IRoom['_id'];
-	users: string[];
-};
-
 const UsersInRolePage = ({ role }: { role: IRole }): ReactElement => {
 	const t = useTranslation();
 	const reload = useRef<() => void>(() => undefined);
@@ -27,7 +22,7 @@ const UsersInRolePage = ({ role }: { role: IRole }): ReactElement => {
 		formState: { isDirty },
 		reset,
 		getValues,
-	} = useForm<UsersInRolePayload>({ defaultValues: { users: [] } });
+	} = useForm<{ rid?: IRoom['_id']; users: IUser['username'][] }>({ defaultValues: { users: [] } });
 
 	const { _id, name, description } = role;
 	const router = useRoute('admin-permissions');
@@ -42,7 +37,7 @@ const UsersInRolePage = ({ role }: { role: IRole }): ReactElement => {
 		});
 	});
 
-	const handleAdd = useMutableCallback(async ({ users, rid }: UsersInRolePayload) => {
+	const handleAdd = useMutableCallback(async ({ users, rid }: { users: IUser['username'][]; rid?: IRoom['_id'] }) => {
 		try {
 			await Promise.all(
 				users.map(async (user) => {
@@ -90,7 +85,20 @@ const UsersInRolePage = ({ role }: { role: IRole }): ReactElement => {
 									control={control}
 									name='users'
 									render={({ field: { onChange, value } }): ReactElement => (
-										<UserAutoCompleteMultiple value={value} placeholder={t('User')} onChange={onChange} />
+										<UserAutoCompleteMultiple
+											value={value}
+											placeholder={t('User')}
+											onChange={(member, action): void => {
+												if (!action && value) {
+													if (value.includes(member)) {
+														return;
+													}
+													return onChange([...value, member]);
+												}
+
+												onChange(value?.filter((current) => current !== member));
+											}}
+										/>
 									)}
 								/>
 								<ButtonGroup mis='x8' align='end'>

@@ -1,6 +1,4 @@
-import type { RoomType, ISubscription, SlashCommandCallbackParams } from '@rocket.chat/core-typings';
 import { Meteor } from 'meteor/meteor';
-import type { Mongo } from 'meteor/mongo';
 import { FlowRouter } from 'meteor/kadira:flow-router';
 
 import { roomCoordinator } from '../../../client/lib/rooms/roomCoordinator';
@@ -9,8 +7,8 @@ import { Subscriptions, ChatSubscription } from '../../models/client';
 
 slashCommands.add({
 	command: 'open',
-	callback: async function Open({ params }: SlashCommandCallbackParams<'open'>): Promise<void> {
-		const dict: Record<string, RoomType[]> = {
+	callback: function Open(_command, params): void {
+		const dict: Record<string, string[]> = {
 			'#': ['c', 'p'],
 			'@': ['d'],
 		};
@@ -18,7 +16,7 @@ slashCommands.add({
 		const room = params.trim().replace(/#|@/, '');
 		const type = dict[params.trim()[0]] || [];
 
-		const query: Mongo.Selector<ISubscription> = {
+		const query = {
 			name: room,
 			...(type && { t: { $in: type } }),
 		};
@@ -32,16 +30,13 @@ slashCommands.add({
 		if (type && type.indexOf('d') === -1) {
 			return;
 		}
-		try {
-			await Meteor.callAsync('createDirectMessage', room);
-			const subscription = Subscriptions.findOne(query);
-			if (!subscription) {
+		return Meteor.call('createDirectMessage', room, function (err: Meteor.Error) {
+			if (err) {
 				return;
 			}
+			const subscription = Subscriptions.findOne(query);
 			roomCoordinator.openRouteLink(subscription.t, subscription, FlowRouter.current().queryParams);
-		} catch (err: unknown) {
-			// noop
-		}
+		});
 	},
 	options: {
 		description: 'Opens_a_channel_group_or_direct_message',

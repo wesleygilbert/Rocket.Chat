@@ -22,13 +22,13 @@ API.v1.addRoute(
 
 			const config = await cachedSettings({ businessUnit });
 
-			const status = await Livechat.online(department);
-			const guest = token ? await Livechat.findGuest(token) : null;
+			const status = Livechat.online(department);
+			const guest = token && (await Livechat.findGuest(token));
 
-			const room = guest ? await findOpenRoom(guest.token) : undefined;
-			const agent = guest && room && room.servedBy && (await findAgent(room.servedBy._id));
+			const room = guest && findOpenRoom(token);
+			const agent = guest && room && room.servedBy && findAgent(room.servedBy._id);
 
-			const extra = await getExtraConfigInfo(room);
+			const extra = room && (await getExtraConfigInfo(room));
 			return API.v1.success({
 				config: { ...config, online: status, ...extra, ...(guest && { guest }), ...(room && { room }), ...(agent && { agent }) },
 			});

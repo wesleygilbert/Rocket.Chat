@@ -1,19 +1,20 @@
 import { UserStatusConnection, UserType } from '@rocket.chat/apps-engine/definition/users';
-import { Users } from '@rocket.chat/models';
+
+import { Users } from '../../../models/server';
 
 export class AppUsersConverter {
 	constructor(orch) {
 		this.orch = orch;
 	}
 
-	async convertById(userId) {
-		const user = await Users.findOneById(userId);
+	convertById(userId) {
+		const user = Users.findOneById(userId);
 
 		return this.convertToApp(user);
 	}
 
-	async convertByUsername(username) {
-		const user = await Users.findOneByUsername(username);
+	convertByUsername(username) {
+		const user = Users.findOneByUsername(username);
 
 		return this.convertToApp(user);
 	}

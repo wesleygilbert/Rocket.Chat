@@ -1,13 +1,15 @@
+import { Meteor } from 'meteor/meteor';
 import { Cookies } from 'meteor/ostrio:cookies';
-import { Avatars, Rooms } from '@rocket.chat/models';
+import { Avatars } from '@rocket.chat/models';
 
 import { renderSVGLetters, serveAvatar, wasFallbackModified, setCacheAndDispositionHeaders } from './utils';
-import { FileUpload } from '../../../app/file-upload/server';
+import { FileUpload } from '../../../app/file-upload';
+import { Rooms } from '../../../app/models/server';
 import { roomCoordinator } from '../../lib/rooms/roomCoordinator';
 
 const cookie = new Cookies();
 const getRoomAvatar = async (roomId) => {
-	const room = await Rooms.findOneById(roomId, { projection: { t: 1, prid: 1, name: 1, fname: 1, federated: 1 } });
+	const room = Rooms.findOneById(roomId, { fields: { t: 1, prid: 1, name: 1, fname: 1 } });
 	if (!room) {
 		return {};
 	}
@@ -22,7 +24,7 @@ const getRoomAvatar = async (roomId) => {
 	return { room, file };
 };
 
-export const roomAvatar = async function (req, res /* , next*/) {
+export const roomAvatar = Meteor.bindEnvironment(async function (req, res /* , next*/) {
 	const roomId = decodeURIComponent(req.url.substr(1).replace(/\?.*$/, ''));
 
 	const { room, file } = await getRoomAvatar(roomId);
@@ -54,7 +56,7 @@ export const roomAvatar = async function (req, res /* , next*/) {
 		return FileUpload.get(file, req, res);
 	}
 
-	const roomName = await roomCoordinator.getRoomName(room.t, room, uid);
+	const roomName = roomCoordinator.getRoomName(room.t, room, uid);
 
 	setCacheAndDispositionHeaders(req, res);
 
@@ -67,4 +69,4 @@ export const roomAvatar = async function (req, res /* , next*/) {
 	const svg = renderSVGLetters(roomName, req.query.size && parseInt(req.query.size));
 
 	return serveAvatar(svg, req.query.format, res);
-};
+});

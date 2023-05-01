@@ -5,6 +5,7 @@ import React from 'react';
 
 import { useTimeAgo } from '../../../hooks/useTimeAgo';
 import { useGoToRoom } from '../../../views/room/hooks/useGoToRoom';
+import { useBlockRendered } from '../hooks/useBlockRendered';
 
 type DiscussionMetricsProps = {
 	drid: string;
@@ -16,11 +17,13 @@ type DiscussionMetricsProps = {
 const DiscussionMetrics = ({ lm, count, rid, drid }: DiscussionMetricsProps): ReactElement => {
 	const t = useTranslation();
 	const format = useTimeAgo();
+	const { className, ref } = useBlockRendered<HTMLDivElement>();
 
 	const goToRoom = useGoToRoom();
 
 	return (
 		<MessageBlock>
+			<div className={className} ref={ref} />
 			<MessageMetrics>
 				<MessageMetricsReply data-rid={rid} data-drid={drid} onClick={() => goToRoom(drid)}>
 					{count ? t('message_counter', { counter: count, count }) : t('Reply')}

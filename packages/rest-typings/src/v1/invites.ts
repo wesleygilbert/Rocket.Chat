@@ -1,5 +1,4 @@
 import type { IInvite, IRoom } from '@rocket.chat/core-typings';
-import type { JSONSchemaType } from 'ajv';
 import Ajv from 'ajv';
 
 const ajv = new Ajv({
@@ -10,7 +9,7 @@ type UseInviteTokenProps = {
 	token: string;
 };
 
-const UseInviteTokenPropsSchema: JSONSchemaType<UseInviteTokenProps> = {
+const UseInviteTokenPropsSchema = {
 	type: 'object',
 	properties: {
 		token: {
@@ -27,7 +26,7 @@ type ValidateInviteTokenProps = {
 	token: string;
 };
 
-const ValidateInviteTokenPropsSchema: JSONSchemaType<ValidateInviteTokenProps> = {
+const ValidateInviteTokenPropsSchema = {
 	type: 'object',
 	properties: {
 		token: {
@@ -42,7 +41,7 @@ export const isValidateInviteTokenProps = ajv.compile<ValidateInviteTokenProps>(
 
 type FindOrCreateInviteParams = { rid: IRoom['_id']; days: number; maxUses: number };
 
-const FindOrCreateInviteParamsSchema: JSONSchemaType<FindOrCreateInviteParams> = {
+const FindOrCreateInviteParamsSchema = {
 	type: 'object',
 	properties: {
 		rid: {
@@ -60,26 +59,6 @@ const FindOrCreateInviteParamsSchema: JSONSchemaType<FindOrCreateInviteParams> =
 };
 
 export const isFindOrCreateInviteParams = ajv.compile<FindOrCreateInviteParams>(FindOrCreateInviteParamsSchema);
-
-type SendInvitationEmailParams = {
-	emails: string[];
-};
-
-const SendInvitationEmailParamsSchema: JSONSchemaType<SendInvitationEmailParams> = {
-	type: 'object',
-	properties: {
-		emails: {
-			type: 'array',
-			items: {
-				type: 'string',
-			},
-		},
-	},
-	required: ['emails'],
-	additionalProperties: false,
-};
-
-export const isSendInvitationEmailParams = ajv.compile<SendInvitationEmailParams>(SendInvitationEmailParamsSchema);
 
 export type InvitesEndpoints = {
 	'/v1/listInvites': {
@@ -104,8 +83,5 @@ export type InvitesEndpoints = {
 	};
 	'/v1/findOrCreateInvite': {
 		POST: (params: FindOrCreateInviteParams) => IInvite;
-	};
-	'/v1/sendInvitationEmail': {
-		POST: (params: SendInvitationEmailParams) => { success: boolean };
 	};
 };

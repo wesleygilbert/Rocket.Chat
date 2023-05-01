@@ -1,52 +1,45 @@
 import { AutoComplete, Option, Box } from '@rocket.chat/fuselage';
-import { useDebouncedValue } from '@rocket.chat/fuselage-hooks';
-import { useEndpoint } from '@rocket.chat/ui-contexts';
-import { useQuery } from '@tanstack/react-query';
 import type { ReactElement, ComponentProps } from 'react';
 import React, { memo, useMemo, useState } from 'react';
 
+import { useEndpointData } from '../../hooks/useEndpointData';
 import RoomAvatar from '../avatar/RoomAvatar';
 import Avatar from './Avatar';
 
-const generateQuery = (
+const query = (
 	term = '',
 ): {
 	selector: string;
 } => ({ selector: JSON.stringify({ name: term }) });
 
-type RoomAutoCompleteProps = Omit<ComponentProps<typeof AutoComplete>, 'filter'>;
+type RoomAutoCompleteProps<T> = Omit<ComponentProps<typeof AutoComplete>, 'value' | 'filter' | 'onChange'> & {
+	value: T;
+	onChange: (value: TemplateStringsArray) => void;
+};
 
-const RoomAutoComplete = ({ value, onChange, ...props }: RoomAutoCompleteProps): ReactElement => {
+/* @deprecated */
+const RoomAutoComplete = <T,>(props: RoomAutoCompleteProps<T>): ReactElement => {
 	const [filter, setFilter] = useState('');
-	const filterDebounced = useDebouncedValue(filter, 300);
-	const autocomplete = useEndpoint('GET', '/v1/rooms.autocomplete.channelAndPrivate');
-
-	const result = useQuery(['rooms.autocomplete.channelAndPrivate', filterDebounced], () => autocomplete(generateQuery(filterDebounced)), {
-		keepPreviousData: true,
-	});
-
+	const { value: data } = useEndpointData('/v1/rooms.autocomplete.channelAndPrivate', { params: useMemo(() => query(filter), [filter]) });
 	const options = useMemo(
 		() =>
-			result.isSuccess
-				? result.data.items.map(({ name, _id, avatarETag, t }) => ({
-						value: _id,
-						label: { name, avatarETag, type: t },
-				  }))
-				: [],
-		[result.data?.items, result.isSuccess],
-	);
+			data?.items.map(({ name, _id, avatarETag, t }) => ({
+				value: _id,
+				label: { name, avatarETag, type: t },
+			})) || [],
+		[data],
+	) as unknown as { value: string; label: string }[];
 
 	return (
 		<AutoComplete
-			{...props}
-			value={value}
-			onChange={onChange}
+			value={props.value as any}
+			onChange={props.onChange as any}
 			filter={filter}
 			setFilter={setFilter}
-			renderSelected={({ selected: { value, label } }): ReactElement => (
+			renderSelected={({ value, label }): ReactElement => (
 				<>
 					<Box margin='none' mi='x2'>
-						<RoomAvatar size='x20' room={{ type: label?.type || 'c', _id: value, ...label }} />
+						<RoomAvatar size='x20' room={{ type: label?.type || 'c', _id: value, ...label }} />{' '}
 					</Box>
 					<Box margin='none' mi='x2'>
 						{label?.name}

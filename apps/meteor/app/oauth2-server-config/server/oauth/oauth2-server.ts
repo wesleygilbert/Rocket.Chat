@@ -1,37 +1,46 @@
 import { Meteor } from 'meteor/meteor';
+import { Mongo } from 'meteor/mongo';
 import { WebApp } from 'meteor/webapp';
+import { OAuth2Server } from 'meteor/rocketchat:oauth2-server';
 import type { Request, Response } from 'express';
 import type { IUser } from '@rocket.chat/core-typings';
-import { OAuthAccessTokens, Users } from '@rocket.chat/models';
+import { OAuthApps } from '@rocket.chat/models';
 
+import { Users } from '../../../models/server';
 import { API } from '../../../api/server';
-import { OAuth2Server } from '../../../../server/oauth2-server/oauth';
 
 const oauth2server = new OAuth2Server({
+	accessTokensCollectionName: 'rocketchat_oauth_access_tokens',
+	refreshTokensCollectionName: 'rocketchat_oauth_refresh_tokens',
+	authCodesCollectionName: 'rocketchat_oauth_auth_codes',
+	// TODO: Remove workaround. Used to pass meteor collection reference to a package
+	clientsCollection: new Mongo.Collection(OAuthApps.col.collectionName),
 	// If you're developing something related to oauth servers, you should change this to true
 	debug: false,
 });
 
 // https://github.com/RocketChat/rocketchat-oauth2-server/blob/e758fd7ef69348c7ceceabe241747a986c32d036/model.coffee#L27-L27
-async function getAccessToken(accessToken: string) {
-	return OAuthAccessTokens.findOneByAccessToken(accessToken);
+function getAccessToken(accessToken: string): any {
+	return oauth2server.oauth.model.AccessTokens.findOne({
+		accessToken,
+	});
 }
 
-export async function oAuth2ServerAuth(partialRequest: {
+export function oAuth2ServerAuth(partialRequest: {
 	headers: Record<string, any>;
 	query: Record<string, any>;
-}): Promise<{ user: IUser } | undefined> {
+}): { user: IUser } | undefined {
 	const headerToken = partialRequest.headers.authorization?.replace('Bearer ', '');
 	const queryToken = partialRequest.query.access_token;
 
-	const accessToken = await getAccessToken(headerToken || queryToken);
+	const accessToken = getAccessToken(headerToken || queryToken);
 
 	// If there is no token available or the token has expired, return undefined
-	if (!accessToken || (accessToken.expires != null && accessToken.expires < new Date())) {
+	if (!accessToken || (accessToken.expires != null && accessToken.expires !== 0 && accessToken.expires < new Date())) {
 		return;
 	}
 
-	const user = await Users.findOneById(accessToken.userId);
+	const user = Users.findOne(accessToken.userId);
 
 	if (user == null) {
 		return;
@@ -41,27 +50,28 @@ export async function oAuth2ServerAuth(partialRequest: {
 }
 
 oauth2server.app.disable('x-powered-by');
+oauth2server.routes.disable('x-powered-by');
 
 WebApp.connectHandlers.use(oauth2server.app);
 
-oauth2server.app.get('/oauth/userinfo', async function (req: Request, res: Response) {
+oauth2server.routes.get('/oauth/userinfo', function (req: Request, res: Response) {
 	if (req.headers.authorization == null) {
-		return res.status(401).send('No token');
+		return res.sendStatus(401).send('No token');
 	}
 	const accessToken = req.headers.authorization.replace('Bearer ', '');
-	const token = await getAccessToken(accessToken);
+	const token = getAccessToken(accessToken);
 	if (token == null) {
-		return res.status(401).send('Invalid Token');
+		return res.sendStatus(401).send('Invalid Token');
 	}
-	const user = await Users.findOneById(token.userId);
+	const user = Users.findOneById(token.userId);
 	if (user == null) {
-		return res.status(401).send('Invalid Token');
+		return res.sendStatus(401).send('Invalid Token');
 	}
 	return res.send({
 		sub: user._id,
 		name: user.name,
-		email: user.emails?.[0].address,
-		email_verified: user.emails?.[0].verified,
+		email: user.emails[0].address,
+		email_verified: user.emails[0].verified,
 		department: '',
 		birthdate: '',
 		preffered_username: user.username,
@@ -70,6 +80,6 @@ oauth2server.app.get('/oauth/userinfo', async function (req: Request, res: Respo
 	});
 });
 
-API.v1.addAuthMethod(async function () {
+API.v1.addAuthMethod(function () {
 	return oAuth2ServerAuth(this.request);
 });

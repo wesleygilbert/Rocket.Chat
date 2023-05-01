@@ -1,10 +1,9 @@
 import { faker } from '@faker-js/faker';
 
-import { Users } from './fixtures/userStates';
-import { HomeChannel, AccountProfile } from './page-objects';
 import { test, expect } from './utils/test';
+import { HomeChannel, AccountProfile } from './page-objects';
 
-test.use({ storageState: Users.user3.state });
+test.use({ storageState: 'user3-session.json' });
 
 test.describe.serial('settings-account-profile', () => {
 	let poHomeChannel: HomeChannel;
@@ -52,7 +51,7 @@ test.describe.serial('settings-account-profile', () => {
 			await poAccountProfile.inputToken.type(token);
 			await poAccountProfile.btnTokensAdd.click();
 			await expect(poAccountProfile.tokenAddedModal).toBeVisible();
-			await page.locator('role=button[name=Ok]').click();
+			await page.locator('button:has-text("Ok")').click();
 		});
 
 		await test.step('expect not allow add new personal token with same name', async () => {
@@ -65,7 +64,7 @@ test.describe.serial('settings-account-profile', () => {
 			await poAccountProfile.tokenInTable(token).locator('button >> nth=0').click();
 			await poAccountProfile.btnRegenerateTokenModal.click();
 			await expect(poAccountProfile.tokenAddedModal).toBeVisible();
-			await page.locator('role=button[name=Ok]').click();
+			await page.locator('button:has-text("Ok")').click();
 		});
 
 		await test.step('expect delete personal token', async () => {

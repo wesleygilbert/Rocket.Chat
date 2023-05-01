@@ -1,22 +1,21 @@
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
-import { Settings, Rooms, Users } from '@rocket.chat/models';
-import colors from 'colors/safe';
+import { Settings } from '@rocket.chat/models';
 
-import { RocketChatFile } from '../../app/file/server';
+import { RocketChatFile } from '../../app/file';
 import { FileUpload } from '../../app/file-upload/server';
 import { getUsersInRole } from '../../app/authorization/server';
 import { addUserRolesAsync } from '../lib/roles/addUserRoles';
+import { Users, Rooms } from '../../app/models/server';
 import { settings } from '../../app/settings/server';
-import { addUserToDefaultChannels } from '../../app/lib/server';
-import { checkUsernameAvailability } from '../../app/lib/server/functions/checkUsernameAvailability';
+import { checkUsernameAvailability, addUserToDefaultChannels } from '../../app/lib/server';
 import { validateEmail } from '../../lib/emailValidator';
 
 Meteor.startup(async function () {
 	if (!settings.get('Initial_Channel_Created')) {
-		const exists = await Rooms.findOneById('GENERAL', { projection: { _id: 1 } });
+		const exists = Rooms.findOneById('GENERAL', { fields: { _id: 1 } });
 		if (!exists) {
-			await Rooms.createWithIdTypeAndName('GENERAL', 'c', 'general', {
+			Rooms.createWithIdTypeAndName('GENERAL', 'c', 'general', {
 				default: true,
 			});
 		}
@@ -24,8 +23,8 @@ Meteor.startup(async function () {
 		Settings.updateValueById('Initial_Channel_Created', true);
 	}
 
-	if (!(await Users.findOneById('rocket.cat'))) {
-		await Users.create({
+	if (!Users.findOneById('rocket.cat')) {
+		Users.create({
 			_id: 'rocket.cat',
 			name: 'Rocket.Cat',
 			username: 'rocket.cat',
@@ -42,7 +41,7 @@ Meteor.startup(async function () {
 
 		const rs = RocketChatFile.bufferToStream(buffer, 'utf8');
 		const fileStore = FileUpload.getStore('Avatars');
-		await fileStore.deleteByName('rocket.cat');
+		fileStore.deleteByName('rocket.cat');
 
 		const file = {
 			userId: 'rocket.cat',
@@ -50,15 +49,14 @@ Meteor.startup(async function () {
 			size: buffer.length,
 		};
 
-		await Meteor.runAsUser('rocket.cat', async () => {
-			await fileStore.insert(file, rs);
-			Users.setAvatarData('rocket.cat', 'local', null);
+		Meteor.runAsUser('rocket.cat', () => {
+			fileStore.insert(file, rs, () => Users.setAvatarData('rocket.cat', 'local', null));
 		});
 	}
 
 	if (process.env.ADMIN_PASS) {
 		if ((await (await getUsersInRole('admin')).count()) === 0) {
-			console.log(colors.green('Inserting admin user:'));
+			console.log('Inserting admin user:'.green);
 			const adminUser = {
 				name: 'Administrator',
 				username: 'admin',
@@ -72,11 +70,11 @@ Meteor.startup(async function () {
 				adminUser.name = process.env.ADMIN_NAME;
 			}
 
-			console.log(colors.green(`Name: ${adminUser.name}`));
+			console.log(`Name: ${adminUser.name}`.green);
 
 			if (process.env.ADMIN_EMAIL) {
 				if (validateEmail(process.env.ADMIN_EMAIL)) {
-					if (!(await Users.findOneByEmailAddress(process.env.ADMIN_EMAIL))) {
+					if (!Users.findOneByEmailAddress(process.env.ADMIN_EMAIL)) {
 						adminUser.emails = [
 							{
 								address: process.env.ADMIN_EMAIL,
@@ -84,12 +82,12 @@ Meteor.startup(async function () {
 							},
 						];
 
-						console.log(colors.green(`Email: ${process.env.ADMIN_EMAIL}`));
+						console.log(`Email: ${process.env.ADMIN_EMAIL}`.green);
 					} else {
-						console.log(colors.red('Email provided already exists; Ignoring environment variables ADMIN_EMAIL'));
+						console.log('Email provided already exists; Ignoring environment variables ADMIN_EMAIL'.red);
 					}
 				} else {
-					console.log(colors.red('Email provided is invalid; Ignoring environment variables ADMIN_EMAIL'));
+					console.log('Email provided is invalid; Ignoring environment variables ADMIN_EMAIL'.red);
 				}
 			}
 
@@ -103,27 +101,27 @@ Meteor.startup(async function () {
 				}
 
 				if (nameValidation.test(process.env.ADMIN_USERNAME)) {
-					if (await checkUsernameAvailability(process.env.ADMIN_USERNAME)) {
+					if (checkUsernameAvailability(process.env.ADMIN_USERNAME)) {
 						adminUser.username = process.env.ADMIN_USERNAME;
 					} else {
-						console.log(colors.red('Username provided already exists; Ignoring environment variables ADMIN_USERNAME'));
+						console.log('Username provided already exists; Ignoring environment variables ADMIN_USERNAME'.red);
 					}
 				} else {
-					console.log(colors.red('Username provided is invalid; Ignoring environment variables ADMIN_USERNAME'));
+					console.log('Username provided is invalid; Ignoring environment variables ADMIN_USERNAME'.red);
 				}
 			}
 
-			console.log(colors.green(`Username: ${adminUser.username}`));
+			console.log(`Username: ${adminUser.username}`.green);
 
 			adminUser.type = 'user';
 
-			const id = await Users.create(adminUser);
+			const id = Users.create(adminUser);
 
-			await Accounts.setPasswordAsync(id, process.env.ADMIN_PASS);
+			Accounts.setPassword(id, process.env.ADMIN_PASS);
 
 			await addUserRolesAsync(id, ['admin']);
 		} else {
-			console.log(colors.red('Users with admin role already exist; Ignoring environment variables ADMIN_PASS'));
+			console.log('Users with admin role already exist; Ignoring environment variables ADMIN_PASS'.red);
 		}
 	}
 
@@ -132,21 +130,21 @@ Meteor.startup(async function () {
 			const initialUser = JSON.parse(process.env.INITIAL_USER);
 
 			if (!initialUser._id) {
-				console.log(colors.red('No _id provided; Ignoring environment variable INITIAL_USER'));
-			} else if (!(await Users.findOneById(initialUser._id))) {
-				console.log(colors.green('Inserting initial user:'));
-				console.log(colors.green(JSON.stringify(initialUser, null, 2)));
-				await Users.create(initialUser);
+				console.log('No _id provided; Ignoring environment variable INITIAL_USER'.red);
+			} else if (!Users.findOneById(initialUser._id)) {
+				console.log('Inserting initial user:'.green);
+				console.log(JSON.stringify(initialUser, null, 2).green);
+				Users.create(initialUser);
 
 				await addUserToDefaultChannels(initialUser, true);
 			}
 		} catch (e) {
-			console.log(colors.red('Error processing environment variable INITIAL_USER'), e);
+			console.log('Error processing environment variable INITIAL_USER'.red, e);
 		}
 	}
 
 	if ((await (await getUsersInRole('admin')).count()) === 0) {
-		const oldestUser = await Users.getOldest({ projection: { _id: 1, username: 1, name: 1 } });
+		const oldestUser = Users.getOldest({ _id: 1, username: 1, name: 1 });
 
 		if (oldestUser) {
 			await addUserRolesAsync(oldestUser._id, ['admin']);
@@ -161,10 +159,10 @@ Meteor.startup(async function () {
 		}
 	}
 
-	await Users.removeById('rocketchat.internal.admin.test');
+	Users.removeById('rocketchat.internal.admin.test');
 
 	if (process.env.TEST_MODE === 'true') {
-		console.log(colors.green('Inserting admin test user:'));
+		console.log('Inserting admin test user:'.green);
 
 		const adminUser = {
 			_id: 'rocketchat.internal.admin.test',
@@ -183,22 +181,22 @@ Meteor.startup(async function () {
 			type: 'user',
 		};
 
-		console.log(colors.green(`Name: ${adminUser.name}`));
-		console.log(colors.green(`Email: ${adminUser.emails[0].address}`));
-		console.log(colors.green(`Username: ${adminUser.username}`));
-		console.log(colors.green(`Password: ${adminUser._id}`));
+		console.log(`Name: ${adminUser.name}`.green);
+		console.log(`Email: ${adminUser.emails[0].address}`.green);
+		console.log(`Username: ${adminUser.username}`.green);
+		console.log(`Password: ${adminUser._id}`.green);
 
-		if (await Users.findOneByEmailAddress(adminUser.emails[0].address)) {
+		if (Users.findOneByEmailAddress(adminUser.emails[0].address)) {
 			throw new Meteor.Error(`Email ${adminUser.emails[0].address} already exists`, "Rocket.Chat can't run in test mode");
 		}
 
-		if (!(await checkUsernameAvailability(adminUser.username))) {
+		if (!checkUsernameAvailability(adminUser.username)) {
 			throw new Meteor.Error(`Username ${adminUser.username} already exists`, "Rocket.Chat can't run in test mode");
 		}
 
-		await Users.create(adminUser);
+		Users.create(adminUser);
 
-		await Accounts.setPasswordAsync(adminUser._id, adminUser._id);
+		Accounts.setPassword(adminUser._id, adminUser._id);
 
 		await addUserRolesAsync(adminUser._id, ['admin']);
 

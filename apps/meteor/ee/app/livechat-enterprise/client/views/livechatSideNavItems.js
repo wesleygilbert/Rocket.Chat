@@ -1,5 +1,5 @@
 import { registerOmnichannelSidebarItem } from '../../../../../client/views/omnichannel/sidebarItems';
-import { hasPermission, hasAtLeastOnePermission } from '../../../../../app/authorization/client';
+import { hasPermission } from '../../../../../app/authorization/client';
 
 registerOmnichannelSidebarItem({
 	href: 'omnichannel-monitors',
@@ -26,13 +26,7 @@ registerOmnichannelSidebarItem({
 });
 
 registerOmnichannelSidebarItem({
-	href: 'omnichannel/sla-policies',
-	i18nLabel: 'SLA_Policies',
-	permissionGranted: () => hasAtLeastOnePermission('manage-livechat-sla'),
-});
-
-registerOmnichannelSidebarItem({
 	href: 'omnichannel/priorities',
 	i18nLabel: 'Priorities',
-	permissionGranted: () => hasAtLeastOnePermission('manage-livechat-priorities'),
+	permissionGranted: () => hasPermission('manage-livechat-priorities'),
 });

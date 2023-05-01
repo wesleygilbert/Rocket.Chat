@@ -2,7 +2,7 @@ import { Icon, Pagination, States, StatesAction, StatesActions, StatesIcon, Stat
 import { useDebouncedState, useDebouncedValue, useMutableCallback } from '@rocket.chat/fuselage-hooks';
 import { useRoute, useTranslation } from '@rocket.chat/ui-contexts';
 import type { ReactElement } from 'react';
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 
 import { parseOutboundPhoneNumber } from '../../../../../ee/client/lib/voip/parseOutboundPhoneNumber';
 import FilterByText from '../../../../components/FilterByText';
@@ -21,9 +21,13 @@ import { useIsCallReady } from '../../../../contexts/CallContext';
 import { useEndpointData } from '../../../../hooks/useEndpointData';
 import { useFormatDate } from '../../../../hooks/useFormatDate';
 import { AsyncStatePhase } from '../../../../lib/asyncState';
-import { CallDialpadButton } from '../components/CallDialpadButton';
+import { CallDialpadButton } from '../CallDialpadButton';
 
-function ContactTable(): ReactElement {
+type ContactTableProps = {
+	setContactReload(fn: () => void): void;
+};
+
+function ContactTable({ setContactReload }: ContactTableProps): ReactElement {
 	const { current, itemsPerPage, setItemsPerPage, setCurrent, ...paginationProps } = usePagination();
 	const { sortBy, sortDirection, setSort } = useSort<'username' | 'phone' | 'name' | 'visitorEmails.address' | 'lastchat'>('username');
 	const isCallReady = useIsCallReady();
@@ -65,6 +69,10 @@ function ContactTable(): ReactElement {
 	);
 
 	const { reload, ...result } = useEndpointData('/v1/livechat/visitors.search', { params: query });
+
+	useEffect(() => {
+		setContactReload(() => reload);
+	}, [reload, setContactReload]);
 
 	return (
 		<>
@@ -111,9 +119,9 @@ function ContactTable(): ReactElement {
 					</GenericTableHeaderCell>
 					<GenericTableHeaderCell key='call' width={44} />
 				</GenericTableHeader>
-				<GenericTableBody>
-					{result.phase === AsyncStatePhase.RESOLVED &&
-						result.value.visitors.map(({ _id, username, fname, name, visitorEmails, phone, lastChat }) => {
+				{result.phase === AsyncStatePhase.RESOLVED && (
+					<GenericTableBody>
+						{result.value.visitors.map(({ _id, username, fname, name, visitorEmails, phone, lastChat }) => {
 							const phoneNumber = (phone?.length && phone[0].phoneNumber) || '';
 							const visitorEmail = visitorEmails?.length && visitorEmails[0].address;
 
@@ -137,8 +145,9 @@ function ContactTable(): ReactElement {
 								</GenericTableRow>
 							);
 						})}
-					{result.phase === AsyncStatePhase.LOADING && <GenericTableLoadingTable headerCells={6} />}
-				</GenericTableBody>
+					</GenericTableBody>
+				)}
+				{result.phase === AsyncStatePhase.LOADING && <GenericTableLoadingTable headerCells={6} />}
 			</GenericTable>
 
 			{result.phase === AsyncStatePhase.REJECTED && (
