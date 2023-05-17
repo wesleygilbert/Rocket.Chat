@@ -644,6 +644,10 @@ await settingsRegistry.addGroup('SMS', async function () {
 				key: 'mobex',
 				i18nLabel: 'Mobex',
 			},
+			{
+				key: 'vitelity',
+				i18nLabel: 'Vitelity',
+			},
 		],
 		i18nLabel: 'Service',
 	});
@@ -784,6 +788,70 @@ await settingsRegistry.addGroup('SMS', async function () {
 			},
 			i18nLabel: 'Mobex_sms_gateway_from_numbers_list',
 			i18nDescription: 'Mobex_sms_gateway_from_numbers_list_desc',
+		});
+	});
+
+	await this.section('Vitelity', async function () {
+		await this.add('SMS_Vitelity_gateway_address', '', {
+			type: 'string',
+			enableQuery: {
+				_id: 'SMS_Service',
+				value: 'vitelity',
+			},
+			i18nLabel: 'Vitelity_sms_gateway_address',
+			i18nDescription: 'Vitelity_sms_gateway_address_desc',
+		});
+		await this.add('SMS_Vitelity_authToken', '', {
+			type: 'string',
+			enableQuery: {
+				_id: 'SMS_Service',
+				value: 'vitelity',
+			},
+			i18nLabel: 'Auth_Token',
+			secret: true,
+		});
+		await this.add('SMS_Vitelity_restful_address', '', {
+			type: 'string',
+			enableQuery: {
+				_id: 'SMS_Service',
+				value: 'vitelity',
+			},
+			i18nLabel: 'Vitelity_sms_gateway_restful_address',
+			i18nDescription: 'Vitelity_sms_gateway_restful_address_desc',
+		});
+		await this.add('SMS_Vitelity_username', '', {
+			type: 'string',
+			enableQuery: {
+				_id: 'SMS_Service',
+				value: 'vitelity',
+			},
+			i18nLabel: 'Vitelity_sms_gateway_username',
+		});
+		await this.add('SMS_Vitelity_password', '', {
+			type: 'password',
+			enableQuery: {
+				_id: 'SMS_Service',
+				value: 'vitelity',
+			},
+			i18nLabel: 'Vitelity_sms_gateway_password',
+		});
+		await this.add('SMS_Vitelity_from_number', '', {
+			type: 'int',
+			enableQuery: {
+				_id: 'SMS_Service',
+				value: 'vitelity',
+			},
+			i18nLabel: 'Vitelity_sms_gateway_from_number',
+			i18nDescription: 'Vitelity_sms_gateway_from_number_desc',
+		});
+		await this.add('SMS_Vitelity_from_numbers_list', '', {
+			type: 'string',
+			enableQuery: {
+				_id: 'SMS_Service',
+				value: 'vitelity',
+			},
+			i18nLabel: 'Vitelity_sms_gateway_from_numbers_list',
+			i18nDescription: 'Vitelity_sms_gateway_from_numbers_list_desc',
 		});
 	});
 	await this.section('External Frame', async function () {
