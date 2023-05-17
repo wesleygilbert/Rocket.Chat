@@ -50,9 +50,9 @@ export class Vitelity implements ISMSProvider {
 		}
 
 		const returnData: ServiceData = {
-			src: data.from,
-			dst: data.to,
-			msg: data.content,
+			src: data.src,
+			dst: data.dst,
+			msg: data.msg,
 		};
 
 		if (data.NumMedia) {
@@ -123,7 +123,7 @@ export class Vitelity implements ISMSProvider {
 				params: {
 					login: currentUsername,
 					pass: currentPassword,
-					cmd: 'sendsms'
+					cmd: 'sendsms',
 					dst: strippedTo,
 					src: currentFrom,
 					msg: message,
@@ -164,10 +164,10 @@ export class Vitelity implements ISMSProvider {
 				body: {
 					messages: [
 						{
-							login: ${this.username},
-							pass: ${this.password},
+							login: this.username,
+							pass: this.password,
 							dest: toNumbersArr,
-							cmd: 'sendsms'
+							cmd: 'sendsms',
 							src: currentFrom,
 							msg: message,
 						},
