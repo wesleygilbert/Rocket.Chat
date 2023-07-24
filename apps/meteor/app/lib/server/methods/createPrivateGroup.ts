@@ -5,7 +5,7 @@ import type { ICreatedRoom } from '@rocket.chat/core-typings';
 import { Users } from '@rocket.chat/models';
 
 import { hasPermissionAsync } from '../../../authorization/server/functions/hasPermission';
-import { createRoom } from '../functions';
+import { createRoom } from '../functions/createRoom';
 
 declare module '@rocket.chat/ui-contexts' {
 	// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -27,6 +27,7 @@ export const createPrivateGroupMethod = async (
 	readOnly = false,
 	customFields = {},
 	extraData = {},
+	excludeSelf = false,
 ): Promise<
 	ICreatedRoom & {
 		rid: string;
@@ -50,7 +51,7 @@ export const createPrivateGroupMethod = async (
 		throw new Meteor.Error('error-not-allowed', 'Not allowed', { method: 'createPrivateGroup' });
 	}
 
-	return createRoom('p', name, user.username, members, readOnly, {
+	return createRoom('p', name, user.username, members, excludeSelf, readOnly, {
 		customFields,
 		...extraData,
 	});

@@ -9,11 +9,13 @@ import { LDAPDataConverter } from '../../../../server/lib/ldap/DataConverter';
 import { LDAPConnection } from '../../../../server/lib/ldap/Connection';
 import { LDAPManager } from '../../../../server/lib/ldap/Manager';
 import { logger, searchLogger, mapLogger } from '../../../../server/lib/ldap/Logger';
-import { addUserToRoom, removeUserFromRoom, createRoom } from '../../../../app/lib/server/functions';
+import { addUserToRoom } from '../../../../app/lib/server/functions/addUserToRoom';
+import { createRoom } from '../../../../app/lib/server/functions/createRoom';
+import { removeUserFromRoom } from '../../../../app/lib/server/functions/removeUserFromRoom';
 import { syncUserRoles } from '../syncUserRoles';
 import { ensureArray } from '../../../../lib/utils/arrayUtils';
 import { copyCustomFieldsLDAP } from './copyCustomFieldsLDAP';
-import { getValidRoomName } from '../../../../app/utils/server';
+import { getValidRoomName } from '../../../../app/utils/server/lib/getValidRoomName';
 
 export class LDAPEEManager extends LDAPManager {
 	public static async sync(): Promise<void> {
@@ -254,7 +256,7 @@ export class LDAPEEManager extends LDAPManager {
 
 		const roomOwner = settings.get<string>('LDAP_Sync_User_Data_Channels_Admin') || '';
 		// #ToDo: Remove typecastings when createRoom is converted to ts.
-		const room = await createRoom('c', channel, roomOwner, [], false, {
+		const room = await createRoom('c', channel, roomOwner, [], false, false, {
 			customFields: { ldap: true },
 		} as any);
 		if (!room?.rid) {
