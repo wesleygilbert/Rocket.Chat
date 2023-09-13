@@ -123,7 +123,7 @@ function EditDepartment({ data, id, title, allowedToForwardData }: EditDepartmen
 		control,
 		handleSubmit,
 		watch,
-		formState: { errors, isValid, isDirty },
+		formState: { errors, isValid, isDirty, isSubmitting },
 	} = useForm<FormValues>({ mode: 'onChange', defaultValues: initialValues });
 
 	const requestTagBeforeClosingChat = watch('requestTagBeforeClosingChat');
@@ -211,7 +211,7 @@ function EditDepartment({ data, id, title, allowedToForwardData }: EditDepartmen
 		departmentsRoute.push({});
 	});
 
-	const isFormValid = isValid && isDirty;
+	const isFormValid = isValid && isDirty && !isSubmitting;
 
 	const formId = useUniqueId();
 
@@ -473,9 +473,9 @@ function EditDepartment({ data, id, title, allowedToForwardData }: EditDepartmen
 							</Field>
 						)}
 
-						<Divider mb='x16' />
+						<Divider mb={16} />
 						<Field>
-							<Field.Label mb='x4'>{t('Agents')}:</Field.Label>
+							<Field.Label mb={4}>{t('Agents')}:</Field.Label>
 							<Box display='flex' flexDirection='column' height='50vh'>
 								<DepartmentsAgentsTable control={control} register={register} />
 							</Box>
