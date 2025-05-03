@@ -123,7 +123,7 @@ export class Vitelity implements ISMSProvider {
 				params: {
 					login: currentUsername,
 					pass: currentPassword,
-					cmd: 'sendsms'
+					cmd: 'sendsms',
 					dst: strippedTo,
 					src: currentFrom,
 					msg: message,
@@ -167,7 +167,7 @@ export class Vitelity implements ISMSProvider {
 							login: ${this.username},
 							pass: ${this.password},
 							dest: toNumbersArr,
-							cmd: 'sendsms'
+							cmd: 'sendsms',
 							src: currentFrom,
 							msg: message,
 						},
